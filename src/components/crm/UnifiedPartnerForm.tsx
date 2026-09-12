@@ -306,7 +306,7 @@ export function UnifiedPartnerForm({
                             name="name"
                             render={({ field }) => (
                             <FormItem>
-                                <FormLabel className={labelStyle}>Company Name</FormLabel>
+                                <FormLabel className={labelStyle}>Company Name *</FormLabel>
                                 <FormControl>
                                 <Input
                                     placeholder="e.g. Lumber Inc"
@@ -325,7 +325,7 @@ export function UnifiedPartnerForm({
                                 name="first_name"
                                 render={({ field }) => (
                                 <FormItem className="flex-1">
-                                    <FormLabel className={labelStyle}>First Name</FormLabel>
+                                    <FormLabel className={labelStyle}>First Name *</FormLabel>
                                     <FormControl>
                                     <Input
                                         placeholder="First Name"
@@ -342,7 +342,7 @@ export function UnifiedPartnerForm({
                                 name="last_name"
                                 render={({ field }) => (
                                 <FormItem className="flex-1">
-                                    <FormLabel className={labelStyle}>Last Name</FormLabel>
+                                    <FormLabel className={labelStyle}>Last Name *</FormLabel>
                                     <FormControl>
                                     <Input
                                         placeholder="Last Name"

@@ -225,7 +225,7 @@ export function ActivityForm({ initialData, onSubmit, onCancel }: ActivityFormPr
                     name="subject"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Subject</FormLabel>
+                        <FormLabel>Subject *</FormLabel>
                         <FormControl>
                           <Input placeholder={`e.g. ${activityType === 'call' ? 'Introductory call with...' : 'Prepare proposal for...'}`} {...field} />
                         </FormControl>
