@@ -1,4 +1,4 @@
-import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign, FileCheck, Ship, MapPin, Users2, Box, Ruler, PackageCheck, Globe, Cog, Palette, GitBranch, Database, ArrowRightLeft, Anchor, LineChart, Landmark, BookOpen, ShieldAlert, Mail, Wallet, Eye, Brain, Newspaper, Activity, Flag, Wifi, PiggyBank, LayoutDashboard, Radar, Calculator, Monitor, Lightbulb, Bot, Copy, Sparkles } from 'lucide-react';
+import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign, FileCheck, Ship, MapPin, Users2, Box, Ruler, PackageCheck, Globe, Cog, Palette, GitBranch, Database, ArrowRightLeft, Anchor, LineChart, Landmark, BookOpen, ShieldAlert, Mail, Wallet, Eye, Brain, Newspaper, Activity, Flag, Wifi, PiggyBank, LayoutDashboard, Radar, Calculator, Monitor, Lightbulb, Bot, Copy, Sparkles, Zap } from 'lucide-react';
 import type { AppRole, Permission } from '@/config/permissions';
 
 export type MenuScreen = {
@@ -54,6 +54,7 @@ export const APP_MENU: MenuModule[] = [
       { name: 'Dashboards', path: '/dashboard/dashboards', icon: BarChart3, description: 'Visual dashboards' },
       { name: 'Migration Baseline', path: '/dashboard/migration-baseline', icon: LineChart, description: 'Compatibility baseline and dual-run migration KPIs', permissions: ['dashboards.view'] },
       { name: 'CRM Workspace', path: '/dashboard/crm-workspace', icon: BarChart3, description: 'Unified overview, pipeline, analytics, and tasks', permissions: ['dashboards.view', 'leads.view'] },
+      { name: 'Sales Command Center', path: '/dashboard/sales/command-center', icon: Zap, description: 'Revenue, deals, and recent activity overview', permissions: ['dashboards.view'] },
       // Duplicate entry removed to fix key conflict
       // { name: 'Leads Workspace', path: '/dashboard/leads/pipeline', icon: Users, description: 'Leads-focused workspace variant' },
       { name: 'Reports', path: '/dashboard/reports', icon: PieChart, description: 'Analytics and reports', permissions: ['reports.view'] },

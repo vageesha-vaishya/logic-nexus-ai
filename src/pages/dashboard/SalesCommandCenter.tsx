@@ -1,29 +1,49 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { 
-  BarChart3, 
-  TrendingUp, 
-  Users, 
-  FileText, 
-  Plus, 
-  ArrowRight,
+import {
+  BarChart3,
+  Users,
+  FileText,
+  Plus,
   Clock,
   Zap,
   Target,
-  DollarSign
+  DollarSign,
+  Loader2,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { formatDistanceToNow } from 'date-fns';
+import { useSalesCommandCenterData, type SalesActivityEvent } from '@/features/module-sales/hooks/useSalesCommandCenterData';
+
+const currency = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+});
+
+function formatTrend(pct: number | null): string | null {
+  if (pct === null) return null;
+  const sign = pct >= 0 ? '+' : '';
+  return `${sign}${pct.toFixed(1)}%`;
+}
+
+function activityTone(activity: SalesActivityEvent): 'success' | 'info' | 'warning' {
+  if (activity.status === 'completed') return 'success';
+  if (activity.status === 'cancelled') return 'warning';
+  return 'info';
+}
+
+function activityDescription(activity: SalesActivityEvent): string {
+  const type = activity.activity_type ? activity.activity_type.charAt(0).toUpperCase() + activity.activity_type.slice(1) : 'Activity';
+  const status = activity.status ? activity.status.replace('_', ' ') : 'planned';
+  return `${type} — ${status}`;
+}
 
 export default function SalesCommandCenter() {
   const navigate = useNavigate();
-
-  const metrics = [
-    { title: 'Total Revenue', value: '$124.5k', trend: '+12%', icon: DollarSign, color: 'text-green-600', bg: 'bg-green-50' },
-    { title: 'Active Deals', value: '42', trend: '+5', icon: FileText, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { title: 'Conversion Rate', value: '24%', trend: '+2.1%', icon: Target, color: 'text-purple-600', bg: 'bg-purple-50' },
-    { title: 'New Leads', value: '18', trend: '+4', icon: Users, color: 'text-orange-600', bg: 'bg-orange-50' },
-  ];
+  const { loading, error, metrics, activities } = useSalesCommandCenterData();
 
   const quickActions = [
     { label: 'New Quote', icon: Plus, action: '/dashboard/quotes/new', desc: 'Create a new quotation' },
@@ -32,73 +52,133 @@ export default function SalesCommandCenter() {
     { label: 'Sales Report', icon: BarChart3, action: '/dashboard/reports/sales', desc: 'View performance analytics' },
   ];
 
-  const recentActivities = [
-    { title: 'Quote #QT-2024-001 approved', time: '10 mins ago', type: 'success', desc: 'Approved by Manager' },
-    { title: 'New lead assigned: Acme Corp', time: '1 hour ago', type: 'info', desc: 'Assigned to Vimal Bahuguna' },
-    { title: 'Meeting with Global Logistics', time: '2 hours ago', type: 'warning', desc: 'Discussing Q3 contract' },
-    { title: 'Order #ORD-2024-055 shipped', time: '4 hours ago', type: 'success', desc: 'Carrier: Maersk Line' },
+  const revenueTrend = formatTrend(metrics.revenueTrendPct);
+  const metricCards = [
+    {
+      title: 'Revenue This Month',
+      value: currency.format(metrics.totalRevenue),
+      trend: revenueTrend,
+      icon: DollarSign,
+      tone: 'success' as const,
+    },
+    {
+      title: 'Active Deals',
+      value: String(metrics.activeDeals),
+      trend: null,
+      icon: FileText,
+      tone: 'info' as const,
+    },
+    {
+      title: 'Conversion Rate',
+      value: `${metrics.conversionRate.toFixed(1)}%`,
+      trend: null,
+      icon: Target,
+      tone: 'primary' as const,
+    },
+    {
+      title: 'New Leads This Month',
+      value: String(metrics.newLeadsThisMonth),
+      trend: metrics.newLeadsTrend !== 0 ? `${metrics.newLeadsTrend > 0 ? '+' : ''}${metrics.newLeadsTrend}` : null,
+      icon: Users,
+      tone: 'warning' as const,
+    },
   ];
+
+  const toneClasses: Record<'success' | 'info' | 'warning' | 'primary', { icon: string; bg: string }> = {
+    success: { icon: 'text-success', bg: 'bg-success/10' },
+    info: { icon: 'text-info', bg: 'bg-info/10' },
+    warning: { icon: 'text-warning', bg: 'bg-warning/10' },
+    primary: { icon: 'text-primary', bg: 'bg-primary/10' },
+  };
+
+  const dotToneClasses: Record<'success' | 'info' | 'warning', string> = {
+    success: 'bg-success',
+    info: 'bg-info',
+    warning: 'bg-warning',
+  };
+
+  if (error) {
+    return (
+      <div className="p-6 max-w-7xl mx-auto">
+        <p className="text-sm text-destructive">Failed to load sales command center data. Please refresh the page.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-            <Zap className="h-8 w-8 text-yellow-500 fill-yellow-500" />
+          <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
+            <Zap className="h-8 w-8 text-warning fill-warning" />
             Sales Command Center
           </h1>
-          <p className="text-gray-500 mt-1">Overview of your sales performance and daily tasks</p>
+          <p className="text-muted-foreground mt-1">Overview of your sales performance and daily tasks</p>
         </div>
         <div className="flex gap-3">
           <Button variant="outline">Customize Dashboard</Button>
-          <Button className="bg-[#714B67] hover:bg-[#5e3d55]">
+          <Button onClick={() => navigate('/dashboard/leads/new')}>
             <Plus className="mr-2 h-4 w-4" /> New Activity
           </Button>
         </div>
       </div>
 
       {/* Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {metrics.map((metric, idx) => (
-          <Card key={idx} className="border-none shadow-sm hover:shadow-md transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className={`p-3 rounded-xl ${metric.bg}`}>
-                  <metric.icon className={`h-6 w-6 ${metric.color}`} />
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i} className="border-none shadow-sm">
+              <CardContent className="p-6 flex items-center justify-center h-[104px]">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {metricCards.map((metric, idx) => (
+            <Card key={idx} className="border-none shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className={`p-3 rounded-xl ${toneClasses[metric.tone].bg}`}>
+                    <metric.icon className={`h-6 w-6 ${toneClasses[metric.tone].icon}`} />
+                  </div>
+                  {metric.trend && (
+                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+                      metric.trend.startsWith('+') ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'
+                    }`}>
+                      {metric.trend}
+                    </span>
+                  )}
                 </div>
-                <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                  metric.trend.startsWith('+') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                }`}>
-                  {metric.trend}
-                </span>
-              </div>
-              <h3 className="text-sm font-medium text-gray-500">{metric.title}</h3>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{metric.value}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                <h3 className="text-sm font-medium text-muted-foreground">{metric.title}</h3>
+                <p className="text-2xl font-bold text-foreground mt-1">{metric.value}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Quick Actions */}
         <Card className="lg:col-span-2 border-none shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg font-semibold text-gray-800">Quick Actions</CardTitle>
+            <CardTitle className="text-lg font-semibold text-foreground">Quick Actions</CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {quickActions.map((action, idx) => (
               <button
                 key={idx}
                 onClick={() => navigate(action.action)}
-                className="flex items-start gap-4 p-4 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 hover:border-gray-200 transition-all text-left group"
+                className="flex items-start gap-4 p-4 rounded-xl border bg-card hover:bg-muted/50 transition-all text-left group"
               >
-                <div className="p-3 rounded-lg bg-gray-100 group-hover:bg-white group-hover:shadow-sm transition-all">
-                  <action.icon className="h-6 w-6 text-gray-600 group-hover:text-[#714B67]" />
+                <div className="p-3 rounded-lg bg-muted group-hover:bg-card group-hover:shadow-sm transition-all">
+                  <action.icon className="h-6 w-6 text-muted-foreground group-hover:text-primary" />
                 </div>
                 <div>
-                  <h4 className="font-semibold text-gray-900 group-hover:text-[#714B67] transition-colors">{action.label}</h4>
-                  <p className="text-sm text-gray-500 mt-1">{action.desc}</p>
+                  <h4 className="font-semibold text-foreground group-hover:text-primary transition-colors">{action.label}</h4>
+                  <p className="text-sm text-muted-foreground mt-1">{action.desc}</p>
                 </div>
               </button>
             ))}
@@ -108,28 +188,33 @@ export default function SalesCommandCenter() {
         {/* Recent Activity */}
         <Card className="border-none shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg font-semibold text-gray-800">Recent Activity</CardTitle>
-            <Button variant="ghost" size="sm" className="text-purple-600">View All</Button>
+            <CardTitle className="text-lg font-semibold text-foreground">Recent Activity</CardTitle>
+            <Button variant="ghost" size="sm" className="text-primary" onClick={() => navigate('/dashboard/activities')}>View All</Button>
           </CardHeader>
           <CardContent className="space-y-6">
-            {recentActivities.map((activity, idx) => (
-              <div key={idx} className="flex gap-4 relative">
-                {idx !== recentActivities.length - 1 && (
-                  <div className="absolute left-[11px] top-8 bottom-[-24px] w-px bg-gray-100" />
-                )}
-                <div className={`relative z-10 h-6 w-6 rounded-full border-2 border-white shadow-sm flex-shrink-0 ${
-                  activity.type === 'success' ? 'bg-green-500' : 
-                  activity.type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500'
-                }`} />
-                <div>
-                  <h4 className="text-sm font-medium text-gray-900">{activity.title}</h4>
-                  <p className="text-xs text-gray-500 mt-0.5">{activity.desc}</p>
-                  <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                    <Clock className="h-3 w-3" /> {activity.time}
-                  </p>
-                </div>
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               </div>
-            ))}
+            ) : activities.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No recent activity</p>
+            ) : (
+              activities.map((activity, idx) => (
+                <div key={activity.id} className="flex gap-4 relative">
+                  {idx !== activities.length - 1 && (
+                    <div className="absolute left-[11px] top-8 bottom-[-24px] w-px bg-border" />
+                  )}
+                  <div className={`relative z-10 h-6 w-6 rounded-full border-2 border-background shadow-sm flex-shrink-0 ${dotToneClasses[activityTone(activity)]}`} />
+                  <div>
+                    <h4 className="text-sm font-medium text-foreground">{activity.subject || 'Sales activity'}</h4>
+                    <p className="text-xs text-muted-foreground mt-0.5">{activityDescription(activity)}</p>
+                    <p className="text-xs text-muted-foreground/70 mt-1 flex items-center gap-1">
+                      <Clock className="h-3 w-3" /> {formatDistanceToNow(new Date(activity.created_at), { addSuffix: true })}
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
           </CardContent>
         </Card>
       </div>
