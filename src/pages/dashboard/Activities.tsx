@@ -9,8 +9,8 @@ import { Table, TableBody, TableCell, TableHeader, TableRow, SortableHead } from
 import { useSort } from '@/hooks/useSort';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Pagination, PaginationContent, PaginationItem, PaginationPrevious, PaginationNext, PaginationFirst, PaginationLast, PaginationLink } from '@/components/ui/pagination';
 import { usePagination } from '@/hooks/usePagination';
+import { PaginationSizeBar } from '@/components/common/PaginationSizeBar';
 import { useCRM } from '@/hooks/useCRM';
 import { useAssignableUsers, AssignableUser } from '@/hooks/useAssignableUsers';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
@@ -511,40 +511,21 @@ export default function Activities() {
               </div>
             </div>
           </div>
-          <div className="mt-3 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <div className="text-xs text-muted-foreground">Cards per page</div>
-              <Select value={String(pageSize)} onValueChange={(v) => setPageSize(v === 'ALL' ? 'ALL' : Number(v))}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Cards" />
-                </SelectTrigger>
-                <SelectContent>
-                  {pageSizeOptions.map((opt) => (
-                    <SelectItem key={String(opt)} value={String(opt)}>{String(opt)}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Pagination className="justify-end">
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationFirst onClick={firstPage} className={!canPrev ? 'pointer-events-none opacity-50' : ''} />
-                </PaginationItem>
-                <PaginationItem>
-                  <PaginationPrevious onClick={prevPage} className={!canPrev ? 'pointer-events-none opacity-50' : ''} />
-                </PaginationItem>
-                <PaginationItem>
-                  <PaginationLink isActive size="default">Page {currentPage} of {totalPages}</PaginationLink>
-                </PaginationItem>
-                <PaginationItem>
-                  <PaginationNext onClick={nextPage} className={!canNext ? 'pointer-events-none opacity-50' : ''} />
-                </PaginationItem>
-                <PaginationItem>
-                  <PaginationLast onClick={lastPage} className={!canNext ? 'pointer-events-none opacity-50' : ''} />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-          </div>
+          <PaginationSizeBar
+            sizeLabel="Cards per page"
+            sizePlaceholder="Cards"
+            pageSize={pageSize}
+            onPageSizeChange={setPageSize}
+            pageSizeOptions={pageSizeOptions}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            canPrev={canPrev}
+            canNext={canNext}
+            onFirstPage={firstPage}
+            onPrevPage={prevPage}
+            onNextPage={nextPage}
+            onLastPage={lastPage}
+          />
         </CardHeader>
         <CardContent>
           {showHelp && (
@@ -806,40 +787,21 @@ export default function Activities() {
                 ))}
               </TableBody>
             </Table>
-            <div className="mt-3 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <div className="text-xs text-muted-foreground">Rows per page</div>
-                <Select value={String(pageSize)} onValueChange={(v) => setPageSize(v === 'ALL' ? 'ALL' : Number(v))}>
-                  <SelectTrigger className="w-[140px]">
-                    <SelectValue placeholder="Rows" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {pageSizeOptions.map((opt) => (
-                      <SelectItem key={String(opt)} value={String(opt)}>{String(opt)}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Pagination className="justify-end">
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationFirst onClick={firstPage} className={!canPrev ? 'pointer-events-none opacity-50' : ''} />
-                  </PaginationItem>
-                  <PaginationItem>
-                    <PaginationPrevious onClick={prevPage} className={!canPrev ? 'pointer-events-none opacity-50' : ''} />
-                  </PaginationItem>
-                  <PaginationItem>
-                    <PaginationLink isActive size="default">Page {currentPage} of {totalPages}</PaginationLink>
-                  </PaginationItem>
-                  <PaginationItem>
-                    <PaginationNext onClick={nextPage} className={!canNext ? 'pointer-events-none opacity-50' : ''} />
-                  </PaginationItem>
-                  <PaginationItem>
-                    <PaginationLast onClick={lastPage} className={!canNext ? 'pointer-events-none opacity-50' : ''} />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            </div>
+            <PaginationSizeBar
+              sizeLabel="Rows per page"
+              sizePlaceholder="Rows"
+              pageSize={pageSize}
+              onPageSizeChange={setPageSize}
+              pageSizeOptions={pageSizeOptions}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              canPrev={canPrev}
+              canNext={canNext}
+              onFirstPage={firstPage}
+              onPrevPage={prevPage}
+              onNextPage={nextPage}
+              onLastPage={lastPage}
+            />
           </CardContent>
         </Card>
       ) : activityViewMode === 'board' ? (
