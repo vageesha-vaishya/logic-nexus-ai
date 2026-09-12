@@ -9,9 +9,6 @@ import { useNavigate } from "react-router-dom";
 import { Search, Filter, Layers, Settings, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useCRM } from "@/hooks/useCRM";
-import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
-import { Droppable } from "@/components/kanban/Droppable";
-import { Draggable } from "@/components/kanban/Draggable";
 import { SwimLane } from "@/components/kanban/SwimLane";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -73,7 +70,6 @@ export default function ContactsPipeline() {
     viewMode: "pipeline",
     theme: "Azure Sky",
   });
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,7 +77,6 @@ export default function ContactsPipeline() {
   const [dbFallbackReason, setDbFallbackReason] = useState<'relations_query_failed' | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [groupBy, setGroupBy] = useState<'none' | 'account'>('none');
-  const [activeId, setActiveId] = useState<string | null>(null);
   const [wipLimits, setWipLimits] = useState<Record<ContactStage, number>>({
     new_contact: 999, verified: 999, key_decision_maker: 999, active: 999, inactive: 999, bounced_invalid: 999,
   });
@@ -169,11 +164,6 @@ export default function ContactsPipeline() {
     return acc;
   }, {} as Record<ContactStage, Contact[]>);
 
-  const handleDragStart = (e: DragStartEvent) => setActiveId(e.active.id as string);
-  const handleDragEnd = (e: DragEndEvent) => setActiveId(null);
-
-  const activeContact = activeId ? contacts.find(c => c.id === activeId) : null;
-
   const getSwimLanes = () => {
     if (groupBy === 'none') return [{ id: 'all', title: 'All Contacts', items: filtered }];
     const accounts = new Map<string, Contact[]>();
@@ -257,62 +247,46 @@ export default function ContactsPipeline() {
         {loading ? (
           <div className="text-center py-12">Loading contacts...</div>
         ) : (
-          <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-            <div className="space-y-4">
-              {lanes.map(lane => {
-                const laneGrouped = stages.reduce((acc, stage) => {
-                  acc[stage] = lane.items.filter(c => computeStage(c) === stage);
-                  return acc;
-                }, {} as Record<ContactStage, Contact[]>);
+          <div className="space-y-4">
+            {lanes.map(lane => {
+              const laneGrouped = stages.reduce((acc, stage) => {
+                acc[stage] = lane.items.filter(c => computeStage(c) === stage);
+                return acc;
+              }, {} as Record<ContactStage, Contact[]>);
 
-                return (
-                  <SwimLane key={lane.id} id={lane.id} title={lane.title} count={lane.items.length}>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-                      {stages.map((stage) => (
-                        <Droppable key={stage} id={stage}>
-                          <Card className="h-full transition-all duration-200 hover:shadow-md">
-                            <CardHeader className="pb-3">
-                              <CardTitle className="text-sm font-medium flex items-center justify-between">
-                                <span>{stageLabels[stage]}</span>
-                                <Badge variant="secondary" className={`${stageColors[stage]} transition-all duration-200`}>{laneGrouped[stage].length}</Badge>
-                              </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-2 min-h-[200px]">
-                              {laneGrouped[stage].map((c) => (
-                                <Draggable key={c.id} id={c.id}>
-                                  <Card className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] hover:-translate-y-1 animate-fade-in" onClick={() => navigate(`/dashboard/contacts/${c.id}`)}>
-                                    <CardContent className="p-3 space-y-2">
-                                      <div className="font-medium text-sm">{c.first_name} {c.last_name}</div>
-                                      {showFields.title && c.title && (<div className="text-xs text-muted-foreground">{c.title}</div>)}
-                                      {showFields.email && c.email && (<div className="text-xs text-muted-foreground">{c.email}</div>)}
-                                      {showFields.phone && c.phone && (<div className="text-xs text-muted-foreground">{c.phone}</div>)}
-                                    </CardContent>
-                                  </Card>
-                                </Draggable>
-                              ))}
-                              {laneGrouped[stage].length === 0 && (
-                                <div className="text-xs text-muted-foreground text-center py-4">No contacts in this stage</div>
-                              )}
-                            </CardContent>
-                          </Card>
-                        </Droppable>
-                      ))}
-                    </div>
-                  </SwimLane>
-                );
-              })}
-            </div>
-            <DragOverlay>
-              {activeContact ? (
-                <Card className="w-64 shadow-2xl rotate-3 scale-105 border-2 border-primary animate-scale-in">
-                  <CardContent className="p-3 space-y-2 bg-gradient-to-br from-background to-muted">
-                    <div className="font-medium text-sm">{activeContact.first_name} {activeContact.last_name}</div>
-                    {activeContact.title && (<div className="text-xs text-muted-foreground">{activeContact.title}</div>)}
-                  </CardContent>
-                </Card>
-              ) : null}
-            </DragOverlay>
-          </DndContext>
+              return (
+                <SwimLane key={lane.id} id={lane.id} title={lane.title} count={lane.items.length}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+                    {stages.map((stage) => (
+                      <Card key={stage} className="h-full transition-all duration-200 hover:shadow-md">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-sm font-medium flex items-center justify-between">
+                            <span>{stageLabels[stage]}</span>
+                            <Badge variant="secondary" className={`${stageColors[stage]} transition-all duration-200`}>{laneGrouped[stage].length}</Badge>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2 min-h-[200px]">
+                          {laneGrouped[stage].map((c) => (
+                            <Card key={c.id} className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] hover:-translate-y-1 animate-fade-in" onClick={() => navigate(`/dashboard/contacts/${c.id}`)}>
+                              <CardContent className="p-3 space-y-2">
+                                <div className="font-medium text-sm">{c.first_name} {c.last_name}</div>
+                                {showFields.title && c.title && (<div className="text-xs text-muted-foreground">{c.title}</div>)}
+                                {showFields.email && c.email && (<div className="text-xs text-muted-foreground">{c.email}</div>)}
+                                {showFields.phone && c.phone && (<div className="text-xs text-muted-foreground">{c.phone}</div>)}
+                              </CardContent>
+                            </Card>
+                          ))}
+                          {laneGrouped[stage].length === 0 && (
+                            <div className="text-xs text-muted-foreground text-center py-4">No contacts in this stage</div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </SwimLane>
+              );
+            })}
+          </div>
         )}
       </div>
     </DashboardLayout>
