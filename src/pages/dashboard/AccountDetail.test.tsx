@@ -50,7 +50,7 @@ describe('AccountDetail', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByRole('heading', { name: 'Acme Logistics' })).toBeInTheDocument();
+    expect((await screen.findAllByRole('heading', { name: 'Acme Logistics' })).length).toBeGreaterThan(0);
     expect(screen.getByText('123 Main St')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /^Edit$/i }).length).toBeGreaterThan(0);
   });

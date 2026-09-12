@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { DeleteConfirmDialog } from '@/components/common/DeleteConfirmDialog';
 import { UnifiedPartnerForm } from '@/components/crm/UnifiedPartnerForm';
@@ -12,7 +13,7 @@ import {
     EnterpriseField, 
     EnterpriseStatButton 
 } from '@/components/ui/enterprise/EnterpriseComponents';
-import { EnterpriseFormLayout } from '@/components/ui/enterprise/EnterpriseFormLayout';
+import { DetailScreenTemplate } from '@/components/system/DetailScreenTemplate';
 import { EnterpriseNotebook, EnterpriseTab } from '@/components/ui/enterprise/EnterpriseTabs';
 import { EnterpriseActivityFeed } from '@/components/ui/enterprise/EnterpriseActivityFeed';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -95,9 +96,11 @@ export default function ContactDetail() {
 
   if (loading || !contact) {
     return (
-      <div className="flex items-center justify-center h-screen bg-muted">
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-full">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
+        </div>
+      </DashboardLayout>
     );
   }
 
@@ -120,35 +123,32 @@ export default function ContactDetail() {
       ];
 
   return (
-    <div className="h-screen w-full bg-muted overflow-hidden">
-        <EnterpriseFormLayout 
+    <DashboardLayout>
+        <DetailScreenTemplate
             title={`${contact.first_name} ${contact.last_name}`}
+            subtitle={contact.is_primary ? <Badge variant="outline" className="rounded-full px-2 font-normal">Primary</Badge> : undefined}
             breadcrumbs={[
                 { label: 'Contacts', to: '/dashboard/contacts' },
                 { label: `${contact.first_name} ${contact.last_name}` },
             ]}
-            status={contact.is_primary ? 'Primary' : undefined}
             actions={
                 !isEditing && (
                     <div className="flex items-center gap-2">
-                        <Button 
-                            variant="outline" 
-                            className="h-8 border-primary text-primary hover:bg-primary/10"
+                        <Button
+                            variant="outline"
                             onClick={() => setIsEditing(true)}
                         >
                             Edit
                         </Button>
-                        <Button 
-                            variant="outline" 
-                            className="h-8 text-gray-600"
+                        <Button
+                            variant="outline"
                             onClick={() => navigate('/dashboard/contacts/new')}
                         >
                             Create
                         </Button>
-                        <Button 
-                            variant="ghost" 
+                        <Button
+                            variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-gray-500"
                             onClick={() => setShowDeleteDialog(true)}
                         >
                             <Trash2 className="h-4 w-4" />
@@ -157,6 +157,7 @@ export default function ContactDetail() {
                 )
             }
         >
+            <div className="flex flex-col xl:flex-row gap-6 items-stretch">
             <EnterpriseSheet
                 smartButtons={
                     !isEditing && (
@@ -274,7 +275,8 @@ export default function ContactDetail() {
             </EnterpriseSheet>
 
             <EnterpriseActivityFeed className="hidden xl:flex shrink-0 w-[400px]" />
-        </EnterpriseFormLayout>
+            </div>
+        </DetailScreenTemplate>
         <StickyActionsBar right={stickyActions} />
 
         <DeleteConfirmDialog
@@ -284,6 +286,6 @@ export default function ContactDetail() {
             title="Delete Contact?"
             description="This action cannot be undone."
         />
-    </div>
+    </DashboardLayout>
   );
 }

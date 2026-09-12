@@ -4,6 +4,10 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import ContactDetail from './ContactDetail';
 import { createChainableQuery } from '../../../test/supabaseQueryMock';
 
+vi.mock('@/components/layout/DashboardLayout', () => ({
+  DashboardLayout: ({ children }: any) => <div data-testid="dashboard-layout">{children}</div>,
+}));
+
 vi.mock('@/features/module-communications/components/email/EmailHistoryPanel', () => ({
   EmailHistoryPanel: () => <div data-testid="email-history-panel" />,
 }));
@@ -49,7 +53,7 @@ describe('ContactDetail', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByRole('heading', { name: 'Jane Doe' })).toBeInTheDocument();
+    expect((await screen.findAllByRole('heading', { name: 'Jane Doe' })).length).toBeGreaterThan(0);
     expect(screen.getByText('Director of Ops')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /^Edit$/i }).length).toBeGreaterThan(0);
   });

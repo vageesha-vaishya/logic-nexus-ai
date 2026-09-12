@@ -13,7 +13,7 @@ import {
     EnterpriseField,
     EnterpriseStatButton
 } from '@/components/ui/enterprise/EnterpriseComponents';
-import { EnterpriseFormLayout } from '@/components/ui/enterprise/EnterpriseFormLayout';
+import { DetailScreenTemplate } from '@/components/system/DetailScreenTemplate';
 import { EnterpriseNotebook, EnterpriseTab } from '@/components/ui/enterprise/EnterpriseTabs';
 import { EnterpriseActivityFeed } from '@/components/ui/enterprise/EnterpriseActivityFeed';
 import { EnterpriseTable, type Column, EnterpriseCard } from '@/components/ui/enterprise';
@@ -188,35 +188,37 @@ export default function AccountDetail() {
       ];
 
   return (
-    <div className="h-screen w-full bg-muted overflow-hidden">
-        <EnterpriseFormLayout 
+    <DashboardLayout>
+        <DetailScreenTemplate
             title={account.name}
+            subtitle={
+                <div className="flex flex-wrap items-center gap-2">
+                    {account.account_type && <Badge variant="secondary" className="rounded-full px-2 font-normal bg-green-100 text-green-800 hover:bg-green-200">{account.account_type}</Badge>}
+                    {account.status && <Badge variant="outline" className="rounded-full px-2 font-normal">{account.status}</Badge>}
+                </div>
+            }
             breadcrumbs={[
                 { label: 'Accounts', to: '/dashboard/accounts' },
                 { label: account.name },
             ]}
-            status={account.status}
             actions={
                 !isEditing && (
                     <div className="flex items-center gap-2">
-                        <Button 
-                            variant="outline" 
-                            className="h-8 border-primary text-primary hover:bg-primary/10"
+                        <Button
+                            variant="outline"
                             onClick={() => setIsEditing(true)}
                         >
                             Edit
                         </Button>
-                        <Button 
-                            variant="outline" 
-                            className="h-8 text-gray-600"
+                        <Button
+                            variant="outline"
                             onClick={() => navigate('/dashboard/accounts/new')}
                         >
                             Create
                         </Button>
-                        <Button 
-                            variant="ghost" 
+                        <Button
+                            variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-gray-500"
                             onClick={() => setShowDeleteDialog(true)}
                         >
                             <Trash2 className="h-4 w-4" />
@@ -225,6 +227,7 @@ export default function AccountDetail() {
                 )
             }
         >
+            <div className="flex flex-col xl:flex-row gap-6 items-stretch">
                 {/* Main Sheet */}
                 <EnterpriseSheet
                     smartButtons={
@@ -379,9 +382,10 @@ export default function AccountDetail() {
 
                 {/* Chatter Sidebar */}
                 <EnterpriseActivityFeed className="hidden xl:flex shrink-0 w-[400px]" />
-            </EnterpriseFormLayout>
+            </div>
+        </DetailScreenTemplate>
         <StickyActionsBar right={stickyActions} />
-        
+
         <DeleteConfirmDialog
             open={showDeleteDialog}
             onOpenChange={setShowDeleteDialog}
@@ -389,6 +393,6 @@ export default function AccountDetail() {
             title="Delete Account?"
             description="This action cannot be undone."
         />
-    </div>
+    </DashboardLayout>
   );
 }

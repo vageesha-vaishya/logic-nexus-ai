@@ -4,10 +4,11 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ActivityForm } from '@/components/crm/ActivityForm';
-import { ArrowLeft, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { DeleteConfirmDialog } from '@/components/common/DeleteConfirmDialog';
+import { DetailScreenTemplate } from '@/components/system/DetailScreenTemplate';
 import { logger } from "@/lib/logger";
 
 export default function ActivityDetail() {
@@ -181,73 +182,72 @@ export default function ActivityDetail() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/activities')}>
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold">Edit Activity</h1>
-              <p className="text-muted-foreground">Update activity details</p>
-            </div>
-          </div>
+      <DetailScreenTemplate
+        title="Edit Activity"
+        subtitle="Update activity details"
+        breadcrumbs={[
+          { label: 'Activities', to: '/dashboard/activities' },
+          { label: 'Edit Activity' },
+        ]}
+        actions={
           <Button variant="destructive" size="sm" onClick={() => setShowDeleteDialog(true)}>
             <Trash2 className="mr-2 h-4 w-4" />
             Delete
           </Button>
-          <DeleteConfirmDialog
-            open={showDeleteDialog}
-            onOpenChange={setShowDeleteDialog}
-            onConfirm={handleDelete}
-            title="Delete Activity"
-            description="Are you sure you want to delete this activity? This action cannot be undone."
-          />
-        </div>
+        }
+      >
+        <div className="space-y-6">
+          {activity?.activity_type === 'email' && (emailTo || emailFrom || emailBody) && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Email</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {emailFrom ? (
+                  <div className="space-y-1">
+                    <div className="text-sm font-medium">From</div>
+                    <div className="text-sm text-muted-foreground">{emailFrom}</div>
+                  </div>
+                ) : null}
+                {emailTo ? (
+                  <div className="space-y-1">
+                    <div className="text-sm font-medium">To</div>
+                    <div className="text-sm text-muted-foreground">{emailTo}</div>
+                  </div>
+                ) : null}
+                {emailBody ? (
+                  <div className="space-y-1">
+                    <div className="text-sm font-medium">Body</div>
+                    <div className="rounded-md border p-3 text-sm whitespace-pre-wrap break-words">
+                      {emailBody}
+                    </div>
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+          )}
 
-        {activity?.activity_type === 'email' && (emailTo || emailFrom || emailBody) && (
           <Card>
             <CardHeader>
-              <CardTitle>Email</CardTitle>
+              <CardTitle>Activity Details</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {emailFrom ? (
-                <div className="space-y-1">
-                  <div className="text-sm font-medium">From</div>
-                  <div className="text-sm text-muted-foreground">{emailFrom}</div>
-                </div>
-              ) : null}
-              {emailTo ? (
-                <div className="space-y-1">
-                  <div className="text-sm font-medium">To</div>
-                  <div className="text-sm text-muted-foreground">{emailTo}</div>
-                </div>
-              ) : null}
-              {emailBody ? (
-                <div className="space-y-1">
-                  <div className="text-sm font-medium">Body</div>
-                  <div className="rounded-md border p-3 text-sm whitespace-pre-wrap break-words">
-                    {emailBody}
-                  </div>
-                </div>
-              ) : null}
+            <CardContent>
+              <ActivityForm
+                initialData={activity}
+                onSubmit={handleUpdate}
+                onCancel={() => navigate('/dashboard/activities')}
+              />
             </CardContent>
           </Card>
-        )}
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Activity Details</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ActivityForm
-              initialData={activity}
-              onSubmit={handleUpdate}
-              onCancel={() => navigate('/dashboard/activities')}
-            />
-          </CardContent>
-        </Card>
-      </div>
+        </div>
+      </DetailScreenTemplate>
+      <DeleteConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        onConfirm={handleDelete}
+        title="Delete Activity"
+        description="Are you sure you want to delete this activity? This action cannot be undone."
+      />
     </DashboardLayout>
   );
 }

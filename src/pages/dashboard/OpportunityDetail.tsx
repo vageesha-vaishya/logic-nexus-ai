@@ -9,7 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { matchText, TextOp, formatCurrency, formatDate } from '@/lib/utils';
 import { OpportunityForm } from '@/components/crm/OpportunityForm';
-import { ArrowLeft, Edit, Trash2 } from 'lucide-react';
+import { Edit, Trash2 } from 'lucide-react';
+import { DetailScreenTemplate } from '@/components/system/DetailScreenTemplate';
 import { useCRM } from '@/hooks/useCRM';
 import { invokeFunction } from '@/lib/supabase-functions';
 import { toast } from 'sonner';
@@ -327,29 +328,31 @@ export default function OpportunityDetail() {
   return (
     <DashboardLayout>
       <StickyActionsRegister />
-      <div className="max-w-4xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/opportunities')}>
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold">{opportunity.name}</h1>
-              <p className="text-muted-foreground">Opportunity Details</p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setIsEditing(!isEditing)}>
-              <Edit className="mr-2 h-4 w-4" />
-              {isEditing ? 'Cancel' : 'Edit'}
-            </Button>
-            <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete
-            </Button>
-          </div>
-        </div>
-
+      <div className="max-w-4xl mx-auto">
+        <DetailScreenTemplate
+          title={opportunity.name}
+          subtitle={
+            <Badge className={stageColors[opportunity.stage]}>
+              {stageLabels[opportunity.stage]}
+            </Badge>
+          }
+          breadcrumbs={[
+            { label: 'Opportunities', to: '/dashboard/opportunities' },
+            { label: opportunity.name },
+          ]}
+          actions={
+            <>
+              <Button variant="outline" onClick={() => setIsEditing(!isEditing)}>
+                <Edit className="mr-2 h-4 w-4" />
+                {isEditing ? 'Cancel' : 'Edit'}
+              </Button>
+              <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </Button>
+            </>
+          }
+        >
         {isEditing ? (
           <>
           <Card>
@@ -631,6 +634,7 @@ export default function OpportunityDetail() {
             </TabsContent>
           </Tabs>
         )}
+        </DetailScreenTemplate>
       </div>
 
       <DeleteConfirmDialog
