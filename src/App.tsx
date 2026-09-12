@@ -497,37 +497,37 @@ const App = () => (
                 </ProtectedRoute>
               } 
             />
-            <Route 
-              path="/dashboard/accounts/new" 
+            <Route
+              path="/dashboard/accounts/new"
               element={
-                <ProtectedRoute requiredPermissions={["accounts.create"]}>
+                <ProtectedRoute requiredPermissions={["accounts.create"]} moduleCode="logistics.accounts" moduleLabel="Accounts">
                   <AccountNew />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/dashboard/accounts/import-export" 
+            <Route
+              path="/dashboard/accounts/import-export"
               element={
-                <ProtectedRoute requiredPermissions={["accounts.create"]}>
+                <ProtectedRoute requiredPermissions={["accounts.create"]} moduleCode="logistics.accounts" moduleLabel="Accounts">
                   <AccountsImportExport />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/dashboard/accounts/:id" 
+            <Route
+              path="/dashboard/accounts/:id"
               element={
-                <ProtectedRoute requiredPermissions={["accounts.view"]}>
+                <ProtectedRoute requiredPermissions={["accounts.view"]} moduleCode="logistics.accounts" moduleLabel="Accounts">
                   <AccountDetail />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/dashboard/accounts/pipeline" 
+            <Route
+              path="/dashboard/accounts/pipeline"
               element={
-                <ProtectedRoute requiredPermissions={["accounts.view"]}>
+                <ProtectedRoute requiredPermissions={["accounts.view"]} moduleCode="logistics.accounts" moduleLabel="Accounts">
                   <AccountsPipeline />
                 </ProtectedRoute>
-              } 
+              }
             />
             <Route
               path="/dashboard/contacts"
@@ -541,37 +541,37 @@ const App = () => (
                 </ProtectedRoute>
               } 
             />
-            <Route 
-              path="/dashboard/contacts/new" 
+            <Route
+              path="/dashboard/contacts/new"
               element={
-                <ProtectedRoute requiredPermissions={["contacts.create"]}>
+                <ProtectedRoute requiredPermissions={["contacts.create"]} moduleCode="logistics.contacts" moduleLabel="Contacts">
                   <ContactNew />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/dashboard/contacts/import-export" 
+            <Route
+              path="/dashboard/contacts/import-export"
               element={
-                <ProtectedRoute requiredPermissions={["contacts.create"]}>
+                <ProtectedRoute requiredPermissions={["contacts.create"]} moduleCode="logistics.contacts" moduleLabel="Contacts">
                   <ContactsImportExport />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/dashboard/contacts/:id" 
+            <Route
+              path="/dashboard/contacts/:id"
               element={
-                <ProtectedRoute requiredPermissions={["contacts.view"]}>
+                <ProtectedRoute requiredPermissions={["contacts.view"]} moduleCode="logistics.contacts" moduleLabel="Contacts">
                   <ContactDetail />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/dashboard/contacts/pipeline" 
+            <Route
+              path="/dashboard/contacts/pipeline"
               element={
-                <ProtectedRoute requiredPermissions={["contacts.view"]}>
+                <ProtectedRoute requiredPermissions={["contacts.view"]} moduleCode="logistics.contacts" moduleLabel="Contacts">
                   <ContactsPipeline />
                 </ProtectedRoute>
-              } 
+              }
             />
             <Route
               path="/dashboard/leads"
@@ -585,37 +585,37 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            <Route 
-              path="/dashboard/leads/new" 
+            <Route
+              path="/dashboard/leads/new"
               element={
-                <ProtectedRoute requiredPermissions={["leads.create"]}>
+                <ProtectedRoute requiredPermissions={["leads.create"]} moduleCode="logistics.leads" moduleLabel="Leads">
                   <LeadNew />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/dashboard/leads/import-export" 
+            <Route
+              path="/dashboard/leads/import-export"
               element={
-                <ProtectedRoute requiredPermissions={["leads.import_export"]}>
+                <ProtectedRoute requiredPermissions={["leads.import_export"]} moduleCode="logistics.leads" moduleLabel="Leads">
                   <LeadsImportExport />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/dashboard/leads/pipeline" 
+            <Route
+              path="/dashboard/leads/pipeline"
               element={
-                <ProtectedRoute requiredPermissions={["leads.view"]}>
+                <ProtectedRoute requiredPermissions={["leads.view"]} moduleCode="logistics.leads" moduleLabel="Leads">
                   <LeadsPipeline />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/dashboard/leads/:id" 
+            <Route
+              path="/dashboard/leads/:id"
               element={
-                <ProtectedRoute requiredPermissions={["leads.view"]}>
+                <ProtectedRoute requiredPermissions={["leads.view"]} moduleCode="logistics.leads" moduleLabel="Leads">
                   <LeadDetail />
                 </ProtectedRoute>
-              } 
+              }
             />
             <Route 
               path="/dashboard/activities"
@@ -826,37 +826,37 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            <Route 
-              path="/dashboard/opportunities/pipeline" 
+            <Route
+              path="/dashboard/opportunities/pipeline"
               element={
-                <ProtectedRoute requiredPermissions={["opportunities.view"]}>
+                <ProtectedRoute requiredPermissions={["opportunities.view"]} moduleCode="logistics.opportunities" moduleLabel="Opportunities">
                   <OpportunitiesPipeline />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/dashboard/opportunities/new" 
+            <Route
+              path="/dashboard/opportunities/new"
               element={
-                <ProtectedRoute requiredPermissions={["opportunities.create"]}>
+                <ProtectedRoute requiredPermissions={["opportunities.create"]} moduleCode="logistics.opportunities" moduleLabel="Opportunities">
                   <OpportunityNew />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/dashboard/opportunities/import-export" 
+            <Route
+              path="/dashboard/opportunities/import-export"
               element={
-                <ProtectedRoute requiredPermissions={["opportunities.create"]}>
+                <ProtectedRoute requiredPermissions={["opportunities.create"]} moduleCode="logistics.opportunities" moduleLabel="Opportunities">
                   <OpportunitiesImportExport />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/dashboard/opportunities/:id" 
+            <Route
+              path="/dashboard/opportunities/:id"
               element={
-                <ProtectedRoute requiredPermissions={["opportunities.view"]}>
+                <ProtectedRoute requiredPermissions={["opportunities.view"]} moduleCode="logistics.opportunities" moduleLabel="Opportunities">
                   <OpportunityDetail />
                 </ProtectedRoute>
-              } 
+              }
             />
             <Route 
               path="/dashboard/quotes" 
