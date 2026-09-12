@@ -526,7 +526,7 @@ export const FinalizeSection = memo(function FinalizeSection({
                 <span className="text-sm text-muted-foreground">%</span>
               </div>
             )}
-            <div className="grid grid-cols-3 gap-4 text-sm">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
               <div>
                 <span className="text-muted-foreground">Sell Price</span>
                 <p className="font-semibold">{formatCurrency(totals.totalSell, selectedOption.currency || 'USD')}</p>

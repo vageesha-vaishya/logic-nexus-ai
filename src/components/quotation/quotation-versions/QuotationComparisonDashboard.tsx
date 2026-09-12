@@ -306,7 +306,7 @@ export function QuotationComparisonDashboard({ options, onSelect, selectedOption
                       </div>
 
                       {option.rank_details && (
-                        <div className="pt-2 text-xs grid grid-cols-3 gap-1">
+                        <div className="pt-2 text-xs grid grid-cols-1 md:grid-cols-3 gap-1">
                           <div className="text-center bg-muted p-1 rounded">
                             <div className="text-muted-foreground">Cost</div>
                             <div className="font-bold">{option.rank_details.cost_score}</div>

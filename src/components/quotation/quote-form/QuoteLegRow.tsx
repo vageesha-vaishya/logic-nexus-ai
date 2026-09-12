@@ -187,7 +187,7 @@ export function QuoteLegRow({ prefix, leg, index, carriers, ports }: QuoteLegRow
       </div>
       
       {/* Dates Row - Full Width */}
-      <div className="md:col-span-12 grid grid-cols-2 gap-4">
+      <div className="md:col-span-12 grid grid-cols-1 md:grid-cols-2 gap-4">
            <FormField
               control={control}
               name={`${prefix}.departure_date`}

@@ -125,7 +125,7 @@ export const LeadCard = React.forwardRef<HTMLDivElement, LeadCardProps>(function
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 text-xs">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
           <div className="space-y-1">
             <span className="text-muted-foreground">Status</span>
             <div>
@@ -156,7 +156,7 @@ export const LeadCard = React.forwardRef<HTMLDivElement, LeadCardProps>(function
         </div>
       </div>
 
-      <div className="p-2 border-t bg-muted/10 grid grid-cols-4 gap-1">
+      <div className="p-2 border-t bg-muted/10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-1">
          <Button 
            variant="ghost" 
            size="sm" 

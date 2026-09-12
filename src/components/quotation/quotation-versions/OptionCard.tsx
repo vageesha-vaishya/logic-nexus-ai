@@ -46,7 +46,7 @@ export function OptionCard({ option, versionId, onEdit, onSelect }: OptionCardPr
             </div>
 
             {/* Pricing Information */}
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div>
                 <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
                   <DollarSign className="w-3 h-3" />

@@ -372,7 +372,7 @@ export function QuoteResultsList({
                             </div>
                         </CardHeader>
                         <CardContent className="space-y-4 px-4 pb-4 pt-0">
-                            <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                                 <div className="space-y-1">
                                     <span className="text-[10px] uppercase text-muted-foreground font-semibold block">Service</span>
                                     <div className="font-medium flex items-center gap-1.5 truncate">
@@ -386,7 +386,7 @@ export function QuoteResultsList({
                                 </div>
                             </div>
 
-                            <div className="pt-3 border-t grid grid-cols-2 gap-2">
+                            <div className="pt-3 border-t grid grid-cols-1 md:grid-cols-2 gap-2">
                                 {option.reliability && (
                                     <div className={cn("px-2 py-1 rounded text-xs font-medium border flex items-center justify-between", getReliabilityColor(option.reliability.score))}>
                                         <span>Reliability</span>

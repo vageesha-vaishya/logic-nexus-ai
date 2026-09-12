@@ -155,7 +155,7 @@ export function CreateTaskDialog({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
             <Label htmlFor="title" className="text-right">
               Title
             </Label>
@@ -167,7 +167,7 @@ export function CreateTaskDialog({
               required
             />
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
             <Label htmlFor="due_date" className="text-right">
               Due Date
             </Label>
@@ -180,7 +180,7 @@ export function CreateTaskDialog({
               required
             />
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
             <Label htmlFor="priority" className="text-right">
               Priority
             </Label>

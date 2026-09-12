@@ -288,7 +288,7 @@ export function QuoteOptionsOverview({
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                     <div className="space-y-1">
                       <span className="text-xs text-muted-foreground block">Service</span>
                       <div className="font-medium flex items-center gap-1">
@@ -302,7 +302,7 @@ export function QuoteOptionsOverview({
                     </div>
                   </div>
 
-                  <div className="pt-2 border-t grid grid-cols-2 gap-2">
+                  <div className="pt-2 border-t grid grid-cols-1 md:grid-cols-2 gap-2">
                     {opt.reliability_score && (
                       <div className={cn("px-2 py-1 rounded text-xs font-medium border flex items-center justify-between", getReliabilityColor(opt.reliability_score))}>
                         <span>Reliability</span>

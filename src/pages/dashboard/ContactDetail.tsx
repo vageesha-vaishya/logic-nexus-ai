@@ -245,7 +245,7 @@ export default function ContactDetail() {
                                 {contact.custom_fields && (
                                     <div>
                                         <h3 className="text-sm font-semibold mb-3">Custom Fields</h3>
-                                        <div className="grid grid-cols-2 gap-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             {Object.entries(contact.custom_fields).map(([k, v]) => (
                                                 <EnterpriseField key={k} label={k} value={String(v)} />
                                             ))}

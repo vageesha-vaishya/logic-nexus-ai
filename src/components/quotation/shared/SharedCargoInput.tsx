@@ -418,7 +418,7 @@ export function SharedCargoInput({ value, onChange, onCommodityChange, onRemove,
           </div>
 
           {/* Secondary Fields Row */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Quantity */}
             <div className="space-y-1">
               <Label className={cn("text-xs", errors?.quantity ? "text-destructive" : "text-muted-foreground")}>Quantity {value.type === 'container' && '(Total)'}</Label>

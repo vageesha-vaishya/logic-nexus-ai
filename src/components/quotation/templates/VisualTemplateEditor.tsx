@@ -90,7 +90,7 @@ function SortableItem({ section, index, updateSection, removeSection }: any) {
           </Button>
         </CardHeader>
         <CardContent className="p-3 pt-0 grid gap-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
              <div className="space-y-1">
                 <Label className="text-[10px] uppercase text-muted-foreground">Type</Label>
                 <Select

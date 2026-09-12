@@ -109,7 +109,7 @@ export function CommandCenterModal() {
           </div>
 
           {/* Stats Summary */}
-          <div className="grid grid-cols-2 gap-4 pt-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <Card className="bg-gradient-to-br from-purple-50 to-white border-purple-100">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">

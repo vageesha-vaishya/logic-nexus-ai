@@ -384,7 +384,7 @@ export default function OpportunityDetail() {
               <CardTitle>SOS</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Sync Status</p>
                   <div className="flex items-center gap-2">
@@ -435,7 +435,7 @@ export default function OpportunityDetail() {
                   <CardTitle>Opportunity Information</CardTitle>
                 </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Stage</p>
                     <Badge className={stageColors[opportunity.stage]}>

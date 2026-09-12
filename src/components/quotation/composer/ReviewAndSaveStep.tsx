@@ -159,7 +159,7 @@ export const ReviewAndSaveStep = memo(function ReviewAndSaveStep({ templateId }:
                         <p className="font-bold text-lg">{currency?.symbol || ''}{legTotalSell.toFixed(2)}</p>
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 text-xs bg-muted/50 p-2 rounded">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs bg-muted/50 p-2 rounded">
                       <div>
                         <p className="text-muted-foreground">Buy Cost</p>
                         <p className="font-medium">{currency?.symbol || ''}{legTotalBuy.toFixed(2)}</p>
@@ -199,7 +199,7 @@ export const ReviewAndSaveStep = memo(function ReviewAndSaveStep({ templateId }:
                       <p className="font-bold text-lg">{currency?.symbol || ''}{calculateChargesTotal(combinedCharges, 'sell').toFixed(2)}</p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 text-xs bg-muted/50 p-2 rounded">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs bg-muted/50 p-2 rounded">
                     <div>
                       <p className="text-muted-foreground">Buy Cost</p>
                       <p className="font-medium">{currency?.symbol || ''}{calculateChargesTotal(combinedCharges, 'buy').toFixed(2)}</p>
@@ -241,7 +241,7 @@ export const ReviewAndSaveStep = memo(function ReviewAndSaveStep({ templateId }:
           
           <Separator />
           
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-background p-3 rounded">
               <p className="text-xs text-muted-foreground mb-1">Total Profit</p>
               <p className="text-lg font-bold text-green-600 dark:text-green-400">

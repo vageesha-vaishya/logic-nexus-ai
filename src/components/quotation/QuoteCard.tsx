@@ -119,7 +119,7 @@ export const QuoteCard = React.forwardRef<HTMLDivElement, QuoteCardProps>(functi
       </div>
 
       <div className="flex flex-1 flex-col gap-3 p-4">
-        <div className="grid grid-cols-2 gap-2 text-xs">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
           <div className="space-y-1">
             <span className="text-muted-foreground">Total Price</span>
             <div className="inline-flex items-center gap-1 rounded-sm bg-emerald-500/10 px-2 py-1 font-medium text-emerald-700 dark:text-emerald-300">
@@ -163,7 +163,7 @@ export const QuoteCard = React.forwardRef<HTMLDivElement, QuoteCardProps>(functi
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-1 border-t bg-muted/10 p-2">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-1 border-t bg-muted/10 p-2">
         <Button variant="ghost" size="sm" className="h-8 px-0" onClick={(event) => handleAction(event, onDuplicate)} aria-label={`Duplicate ${quoteNumber}`} title="Duplicate">
           <Copy className="h-4 w-4" />
         </Button>

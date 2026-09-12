@@ -257,7 +257,7 @@ export function QuickQuoteHistory({ onSelect, className }: QuickQuoteHistoryProp
                                                 {getStatusBadge(item.status)}
                                             </div>
                                             
-                                            <div className="grid grid-cols-3 gap-4 text-sm mt-3 bg-muted/30 p-3 rounded-md group-hover:bg-muted/50 transition-colors">
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm mt-3 bg-muted/30 p-3 rounded-md group-hover:bg-muted/50 transition-colors">
                                                 <div>
                                                     <span className="text-muted-foreground text-xs block">Commodity</span>
                                                     <span className="font-medium">{item.request_payload.commodity}</span>
@@ -289,7 +289,7 @@ export function QuickQuoteHistory({ onSelect, className }: QuickQuoteHistoryProp
                 // DETAIL VIEW
                 <div className="flex flex-col h-full">
                     {/* Summary Header */}
-                    <div className="bg-muted/30 p-4 rounded-lg mb-4 grid grid-cols-2 gap-4 text-sm">
+                    <div className="bg-muted/30 p-4 rounded-lg mb-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                         <div>
                             <span className="text-xs text-muted-foreground block">Route</span>
                             <div className="font-medium flex items-center gap-2">
