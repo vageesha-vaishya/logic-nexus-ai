@@ -92,7 +92,7 @@ export function EnterpriseStatButton({ icon, label, value, to, onClick }: Enterp
                 <span className="text-gray-500 scale-90">{icon}</span>
                 <span className="text-[11px] font-semibold uppercase tracking-tight">{label}</span>
             </div>
-            <span className="text-lg font-bold text-[#714B67] leading-none">{value}</span>
+            <span className="text-lg font-bold text-primary leading-none">{value}</span>
         </button>
     );
 

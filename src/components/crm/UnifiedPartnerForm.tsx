@@ -210,7 +210,7 @@ export function UnifiedPartnerForm({
   }, [autoSave, autoSaveDelayMs, form, mode, onSubmit]);
 
   // Enterprise Input Style Helper
-  const inputStyle = "border-0 border-b border-border rounded-none focus-visible:ring-0 focus-visible:border-[#714B67] px-0 h-9 placeholder:text-muted-foreground/50";
+  const inputStyle = "border-0 border-b border-border rounded-none focus-visible:ring-0 focus-visible:border-primary px-0 h-9 placeholder:text-muted-foreground/50";
   const labelStyle = "text-xs font-semibold text-muted-foreground mb-1";
 
   return (
@@ -262,7 +262,7 @@ export function UnifiedPartnerForm({
                       >
                         <FormItem className="flex items-center space-x-2 space-y-0 cursor-pointer">
                           <FormControl>
-                            <RadioGroupItem value="company" id="r-company" className="text-[#714B67] border-border" />
+                            <RadioGroupItem value="company" id="r-company" className="text-primary border-border" />
                           </FormControl>
                           <FormLabel htmlFor="r-company" className="font-medium text-base cursor-pointer flex items-center gap-2 text-foreground">
                             <Building2 className="w-4 h-4 text-muted-foreground" />
@@ -271,7 +271,7 @@ export function UnifiedPartnerForm({
                         </FormItem>
                         <FormItem className="flex items-center space-x-2 space-y-0 cursor-pointer">
                           <FormControl>
-                            <RadioGroupItem value="individual" id="r-individual" className="text-[#714B67] border-border" />
+                            <RadioGroupItem value="individual" id="r-individual" className="text-primary border-border" />
                           </FormControl>
                           <FormLabel htmlFor="r-individual" className="font-medium text-base cursor-pointer flex items-center gap-2 text-foreground">
                             <User className="w-4 h-4 text-muted-foreground" />
@@ -309,7 +309,7 @@ export function UnifiedPartnerForm({
                                 <FormControl>
                                 <Input
                                     placeholder="e.g. Lumber Inc"
-                                    className="text-3xl font-bold h-12 px-0 border-0 border-b border-border rounded-none focus-visible:ring-0 focus-visible:border-[#714B67] placeholder:text-muted-foreground/50"
+                                    className="text-3xl font-bold h-12 px-0 border-0 border-b border-border rounded-none focus-visible:ring-0 focus-visible:border-primary placeholder:text-muted-foreground/50"
                                     {...field}
                                 />
                                 </FormControl>
@@ -327,7 +327,7 @@ export function UnifiedPartnerForm({
                                     <FormControl>
                                     <Input
                                         placeholder="First Name"
-                                        className="text-3xl font-bold h-12 px-0 border-0 border-b border-border rounded-none focus-visible:ring-0 focus-visible:border-[#714B67] placeholder:text-muted-foreground/50"
+                                        className="text-3xl font-bold h-12 px-0 border-0 border-b border-border rounded-none focus-visible:ring-0 focus-visible:border-primary placeholder:text-muted-foreground/50"
                                         {...field}
                                     />
                                     </FormControl>
@@ -343,7 +343,7 @@ export function UnifiedPartnerForm({
                                     <FormControl>
                                     <Input
                                         placeholder="Last Name"
-                                        className="text-3xl font-bold h-12 px-0 border-0 border-b border-border rounded-none focus-visible:ring-0 focus-visible:border-[#714B67] placeholder:text-muted-foreground/50"
+                                        className="text-3xl font-bold h-12 px-0 border-0 border-b border-border rounded-none focus-visible:ring-0 focus-visible:border-primary placeholder:text-muted-foreground/50"
                                         {...field}
                                     />
                                     </FormControl>
@@ -672,7 +672,7 @@ export function UnifiedPartnerForm({
                             <FormControl>
                             <Textarea
                                 placeholder="Add internal notes..."
-                                className="min-h-[100px] border-border resize-none bg-yellow-50/20 focus-visible:ring-[#714B67]"
+                                className="min-h-[100px] border-border resize-none bg-yellow-50/20 focus-visible:ring-primary"
                                 {...field}
                             />
                             </FormControl>
@@ -689,7 +689,7 @@ export function UnifiedPartnerForm({
             <Button type="button" variant="outline" onClick={onCancel} className="border-border">
               Discard
             </Button>
-            <Button type="submit" disabled={isLoading} className="bg-[#714B67] hover:bg-[#5e3d55] text-white">
+            <Button type="submit" disabled={isLoading}>
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {mode === 'create' ? 'Create Partner' : 'Save Changes'}
             </Button>

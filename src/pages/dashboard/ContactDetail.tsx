@@ -95,7 +95,7 @@ export default function ContactDetail() {
 
   if (loading || !contact) {
     return (
-      <div className="flex items-center justify-center h-screen bg-[#f9fafb]">
+      <div className="flex items-center justify-center h-screen bg-muted">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
@@ -120,7 +120,7 @@ export default function ContactDetail() {
       ];
 
   return (
-    <div className="h-screen w-full bg-[#f9fafb] overflow-hidden">
+    <div className="h-screen w-full bg-muted overflow-hidden">
         <EnterpriseFormLayout 
             title={`${contact.first_name} ${contact.last_name}`}
             breadcrumbs={[
@@ -133,7 +133,7 @@ export default function ContactDetail() {
                     <div className="flex items-center gap-2">
                         <Button 
                             variant="outline" 
-                            className="h-8 border-[#714B67] text-[#714B67] hover:bg-[#714B67]/10"
+                            className="h-8 border-primary text-primary hover:bg-primary/10"
                             onClick={() => setIsEditing(true)}
                         >
                             Edit
@@ -194,7 +194,7 @@ export default function ContactDetail() {
                                     {contact.accounts && (
                                         <div className="flex items-center gap-2 mt-1 text-gray-500">
                                             <Building2 className="h-4 w-4" />
-                                            <span className="font-medium text-[#714B67] hover:underline cursor-pointer">{contact.accounts.name}</span>
+                                            <span className="font-medium text-primary hover:underline cursor-pointer">{contact.accounts.name}</span>
                                         </div>
                                     )}
                                 </div>

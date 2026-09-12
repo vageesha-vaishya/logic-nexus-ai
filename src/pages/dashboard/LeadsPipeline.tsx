@@ -59,19 +59,19 @@ function PipelineSkeleton() {
     <div className="flex h-full gap-3 pb-4 overflow-x-auto">
       {[1, 2, 3, 4].map((i) => (
         <div key={i} className="w-[300px] flex-shrink-0 flex flex-col gap-2">
-          <div className="rounded-md border border-[#e4e8f0] bg-white p-2.5">
+          <div className="rounded-md border border-border bg-card p-2.5">
             <div className="mb-2 flex items-center justify-between">
               <Skeleton className="h-4 w-16 rounded-sm" />
               <Skeleton className="h-4 w-6 rounded-sm" />
             </div>
             <div className="h-0.5 w-full rounded-full bg-red-500/80" />
           </div>
-          <div className="rounded-md border border-[#edf1f7] bg-white p-1.5">
+          <div className="rounded-md border border-border bg-card p-1.5">
             <div className="flex-1 space-y-2">
             {[1, 2, 3].map((j) => (
                 <div key={j} className="relative pl-4">
-                  <span className="absolute left-1.5 top-0 h-full w-[3px] rounded-full bg-[#e5e7eb]" />
-                  <Skeleton className="h-28 w-full rounded-md border border-[#e7ebf2]" />
+                  <span className="absolute left-1.5 top-0 h-full w-[3px] rounded-full bg-border" />
+                  <Skeleton className="h-28 w-full rounded-md border border-border" />
                 </div>
             ))}
             </div>
@@ -1068,7 +1068,7 @@ export default function LeadsPipeline() {
                   </div>
 
                   {/* Kanban Board */}
-                  <div className="flex-1 min-h-[420px] max-h-[calc(100vh-260px)] overflow-hidden bg-white rounded-lg border border-[#e5eaf2] p-2">
+                  <div className="flex-1 min-h-[420px] max-h-[calc(100vh-260px)] overflow-hidden bg-card rounded-lg border border-border p-2">
                     {loading && items.length === 0 ? (
                       <PipelineSkeleton />
                     ) : columns.length === 0 ? (

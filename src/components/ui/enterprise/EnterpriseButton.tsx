@@ -32,7 +32,7 @@ export const EnterpriseButton = React.forwardRef<
   ) => {
     const variantClasses = {
       primary:
-        'bg-[#714B67] text-white hover:bg-[#5d3d54] disabled:bg-gray-300 disabled:text-gray-500',
+        'bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-gray-300 disabled:text-gray-500',
       secondary:
         'bg-gray-100 text-gray-900 hover:bg-gray-200 disabled:bg-gray-100 disabled:text-gray-400',
       destructive:
@@ -57,7 +57,7 @@ export const EnterpriseButton = React.forwardRef<
         disabled={disabled || loading}
         className={cn(
           'inline-flex items-center justify-center gap-2 font-medium transition-all',
-          'focus:outline-none focus:ring-2 focus:ring-[#714B67]/20 focus:ring-offset-2',
+          'focus:outline-none focus:ring-2 focus:ring-primary/20 focus:ring-offset-2',
           'disabled:cursor-not-allowed disabled:opacity-60',
           variantClasses[variant],
           sizeClasses[size],

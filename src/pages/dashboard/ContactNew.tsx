@@ -72,7 +72,7 @@ export default function ContactNew() {
   };
 
   return (
-    <div className="h-screen w-full bg-[#f9fafb] overflow-hidden">
+    <div className="h-screen w-full bg-muted overflow-hidden">
         <EnterpriseFormLayout 
             title="New Contact"
             breadcrumbs={[

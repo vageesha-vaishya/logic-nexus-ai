@@ -31,9 +31,9 @@ export function EnterpriseFormLayout({
   hideTopStrip = false,
 }: EnterpriseFormLayoutProps) {
   return (
-    <div className={cn("flex flex-col h-full bg-[#f9fafb]", className)}>
+    <div className={cn("flex flex-col h-full bg-muted", className)}>
       {!hideTopStrip && (
-        <div className="bg-[#714B67] text-white px-4 h-12 flex items-center justify-between shadow-md shrink-0 z-30">
+        <div className="bg-primary text-primary-foreground px-4 h-12 flex items-center justify-between shadow-md shrink-0 z-30">
           <div className="flex items-center gap-6">
             {!hideLabelSection && (
               <>
@@ -52,7 +52,7 @@ export function EnterpriseFormLayout({
              <div className="flex items-center gap-3 text-sm">
                <span className="bg-green-500 text-white text-xs px-1.5 py-0.5 rounded-full">7</span>
                <span className="bg-gray-500 text-white text-xs px-1.5 py-0.5 rounded-full">14</span>
-               <div className="w-8 h-8 bg-purple-800 rounded-full flex items-center justify-center text-xs">US</div>
+               <div className="w-8 h-8 bg-primary-foreground/20 rounded-full flex items-center justify-center text-xs">US</div>
              </div>
           </div>
         </div>
@@ -62,7 +62,7 @@ export function EnterpriseFormLayout({
         <div className="flex items-center gap-4">
           {!hideLabelSection && (
             <>
-              <Button className="bg-[#714B67] hover:bg-[#5d3d54] text-white shadow-sm h-8 px-4 text-sm font-medium rounded-md">
+              <Button className="shadow-sm h-8 px-4 text-sm font-medium rounded-md">
                 New
               </Button>
               <div className="h-6 w-px bg-gray-300 mx-2" />
@@ -90,7 +90,7 @@ export function EnterpriseFormLayout({
              <input 
                type="text" 
                placeholder="Search..." 
-               className="w-full pl-8 pr-3 py-1 text-sm border-b border-gray-300 focus:border-[#714B67] focus:outline-none bg-transparent"
+               className="w-full pl-8 pr-3 py-1 text-sm border-b border-gray-300 focus:border-primary focus:outline-none bg-transparent"
              />
              <Search className="h-4 w-4 absolute left-0 top-1.5 text-gray-400" />
            </div>

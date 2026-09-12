@@ -74,7 +74,7 @@ export default function AccountNew() {
   };
 
   return (
-    <div className="h-screen w-full bg-[#f9fafb] overflow-hidden">
+    <div className="h-screen w-full bg-muted overflow-hidden">
         <EnterpriseFormLayout 
             title="New Account"
             breadcrumbs={[

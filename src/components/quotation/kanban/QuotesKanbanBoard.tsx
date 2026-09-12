@@ -200,7 +200,7 @@ export function QuotesKanbanBoard({
       <div className={`relative h-full ${className || ''}`}>
         <div
           ref={topScrollRef}
-          className="mb-2 h-4 overflow-x-auto overflow-y-hidden rounded-md border border-[#e4e8f0] bg-white [scrollbar-gutter:stable] touch-pan-x"
+          className="mb-2 h-4 overflow-x-auto overflow-y-hidden rounded-md border border-border bg-card [scrollbar-gutter:stable] touch-pan-x"
           tabIndex={0}
         >
           <div style={{ width: `${Math.max(topScrollContentWidth, 1)}px` }} className="h-px" aria-hidden="true" />

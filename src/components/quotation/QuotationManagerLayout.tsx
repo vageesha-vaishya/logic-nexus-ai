@@ -172,7 +172,7 @@ export function QuotationManagerLayout({
     <div className="flex flex-col h-screen bg-gray-50">
       
       {/* --- Top Header Strip --- */}
-      <header className="h-14 bg-[#714B67] text-white flex items-center justify-between px-4 shadow-sm shrink-0 z-50">
+      <header className="h-14 bg-primary text-primary-foreground flex items-center justify-between px-4 shadow-sm shrink-0 z-50">
         {/* Left Section */}
         <div className="flex items-center gap-4">
           <Button 
@@ -312,7 +312,7 @@ export function QuotationManagerLayout({
           >
             <MessageSquare className="h-5 w-5" />
             {unreadMessages > 0 && (
-              <span className="absolute top-2 right-2 h-2 w-2 bg-red-500 rounded-full border border-[#714B67]" />
+              <span className="absolute top-2 right-2 h-2 w-2 bg-red-500 rounded-full border border-primary" />
             )}
           </Button>
           <Button 
@@ -324,7 +324,7 @@ export function QuotationManagerLayout({
           >
             <Clock className="h-5 w-5" />
             {dueActivities > 0 && (
-              <span className="absolute top-2 right-2 h-2 w-2 bg-yellow-500 rounded-full border border-[#714B67]" />
+              <span className="absolute top-2 right-2 h-2 w-2 bg-yellow-500 rounded-full border border-primary" />
             )}
           </Button>
           
@@ -437,10 +437,10 @@ export function QuotationManagerLayout({
         <div className="flex-1 max-w-3xl flex items-center gap-2">
           <DomainSwitcher />
            <div className="relative flex-1 group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-[#714B67] transition-colors" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-primary transition-colors" />
             <Input 
               placeholder="Search quotations..." 
-              className="pl-9 h-10 bg-gray-50 border-gray-200 focus:bg-white transition-all focus:ring-1 focus:ring-[#714B67]"
+              className="pl-9 h-10 bg-gray-50 border-gray-200 focus:bg-white transition-all focus:ring-1 focus:ring-primary"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
             />

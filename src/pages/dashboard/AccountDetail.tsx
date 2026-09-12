@@ -188,7 +188,7 @@ export default function AccountDetail() {
       ];
 
   return (
-    <div className="h-screen w-full bg-[#f9fafb] overflow-hidden">
+    <div className="h-screen w-full bg-muted overflow-hidden">
         <EnterpriseFormLayout 
             title={account.name}
             breadcrumbs={[
@@ -201,7 +201,7 @@ export default function AccountDetail() {
                     <div className="flex items-center gap-2">
                         <Button 
                             variant="outline" 
-                            className="h-8 border-[#714B67] text-[#714B67] hover:bg-[#714B67]/10"
+                            className="h-8 border-primary text-primary hover:bg-primary/10"
                             onClick={() => setIsEditing(true)}
                         >
                             Edit
@@ -260,11 +260,11 @@ export default function AccountDetail() {
                                     <div>
                                         <div className="flex items-center gap-6 mb-2">
                                             <div className="flex items-center gap-2">
-                                                <input type="radio" checked={account.account_type !== 'individual'} readOnly className="accent-[#714B67] h-4 w-4" />
+                                                <input type="radio" checked={account.account_type !== 'individual'} readOnly className="accent-primary h-4 w-4" />
                                                 <span className="text-sm font-semibold text-gray-700">Company</span>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                <input type="radio" checked={account.account_type === 'individual'} readOnly className="accent-[#714B67] h-4 w-4" />
+                                                <input type="radio" checked={account.account_type === 'individual'} readOnly className="accent-primary h-4 w-4" />
                                                 <span className="text-sm font-semibold text-gray-700">Individual</span>
                                             </div>
                                         </div>
@@ -289,7 +289,7 @@ export default function AccountDetail() {
                                             {account.email && (
                                                 <div className="flex items-center gap-2 text-[13px]">
                                                     <Mail className="h-3.5 w-3.5 text-gray-500" />
-                                                    <a href={`mailto:${account.email}`} className="text-[#714B67] hover:underline font-medium">{account.email}</a>
+                                                    <a href={`mailto:${account.email}`} className="text-primary hover:underline font-medium">{account.email}</a>
                                                 </div>
                                             )}
                                             {account.phone && (
@@ -305,7 +305,7 @@ export default function AccountDetail() {
                                             <EnterpriseField label="VAT" value={account.vat_number} />
                                             <EnterpriseField label="Website" value={
                                                 account.website ? (
-                                                    <a href={account.website} target="_blank" rel="noopener noreferrer" className="text-[#714B67] hover:underline">{account.website}</a>
+                                                    <a href={account.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{account.website}</a>
                                                 ) : null
                                             } />
                                             <EnterpriseField label="Tags" value={

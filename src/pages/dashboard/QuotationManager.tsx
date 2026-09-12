@@ -619,10 +619,10 @@ export default function QuotationManager() {
                     </div>
                   </div>
 
-                  <div className="flex-1 min-h-[420px] max-h-[calc(100vh-330px)] overflow-hidden bg-white rounded-lg border border-[#e5eaf2] p-2">
+                  <div className="flex-1 min-h-[420px] max-h-[calc(100vh-330px)] overflow-hidden bg-card rounded-lg border border-border p-2">
                     {loading ? (
                       <div className="flex items-center justify-center h-full">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#714B67]" />
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
                       </div>
                     ) : (
                       <FeatureErrorBoundary featureName="Quotes Pipeline Board">
@@ -816,7 +816,7 @@ export default function QuotationManager() {
                     <Card>
                       <CardContent className="py-20">
                         <div className="flex items-center justify-center gap-3 text-sm text-muted-foreground">
-                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#714B67]" />
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary" />
                           Loading analytics...
                         </div>
                       </CardContent>
