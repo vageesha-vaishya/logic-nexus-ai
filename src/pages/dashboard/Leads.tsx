@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'react';
-import { Search, UserPlus, Filter, TrendingUp, Users as UsersIcon, Trash2, MoreHorizontal, ArrowUpDown, SlidersHorizontal, X, Pencil, ChevronDown, ChevronRight, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, UserPlus, Filter, TrendingUp, Users as UsersIcon, MoreHorizontal, ArrowUpDown, SlidersHorizontal, X, Pencil, ChevronDown, ChevronRight, ArrowUp, ArrowDown } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
@@ -11,16 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { DeleteConfirmDialog } from '@/components/common/DeleteConfirmDialog';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -39,7 +30,8 @@ import { TextOp } from '@/lib/utils';
 import { FirstScreenTemplate } from '@/components/system/FirstScreenTemplate';
 import { EmptyState } from '@/components/system/EmptyState';
 import { TableSkeleton } from '@/components/system/TableSkeleton';
-import { LeadCard } from '@/features/module-sales/components/LeadCard';
+import { LeadsBulkActionBar } from '@/features/module-sales/components/LeadsBulkActionBar';
+import { LeadCardsView } from '@/features/module-sales/components/LeadCardsView';
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import LeadsMasterDataFormModal, { LeadMasterDataFormValues } from '@/features/module-sales/components/LeadsMasterDataFormModal';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
@@ -2470,71 +2462,28 @@ export default function Leads() {
             </Card>
             </div>
           </div>
-        ) : viewMode === 'grid' ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {leads.map((lead) => (
-              <LeadCard
-                ref={(element) => {
-                  if (element) {
-                    leadCardRefs.current.set(lead.id, element);
-                  } else {
-                    leadCardRefs.current.delete(lead.id);
-                  }
-                }}
-                key={lead.id}
-                lead={lead}
-                onClick={() => handleLeadSingleClick(lead)}
-                onDoubleClick={() => handleLeadDoubleClick(lead)}
-                selected={focusedLead?.id === lead.id}
-                highlighted={matchedLeadIds.includes(lead.id)}
-                activeMatch={activeMatchedLeadId === lead.id}
-                onSelect={() => toggleSelection(lead.id)}
-                onDelete={() => handleDelete(lead.id)}
-                onEdit={() => openUpdateLeadModal(lead)}
-              />
-            ))}
-          </div>
         ) : (
-          <div className="flex flex-col gap-3">
-            {leads.map((lead) => (
-              <LeadCard
-                ref={(element) => {
-                  if (element) {
-                    leadCardRefs.current.set(lead.id, element);
-                  } else {
-                    leadCardRefs.current.delete(lead.id);
-                  }
-                }}
-                key={lead.id}
-                lead={lead}
-                onClick={() => handleLeadSingleClick(lead)}
-                onDoubleClick={() => handleLeadDoubleClick(lead)}
-                selected={focusedLead?.id === lead.id}
-                highlighted={matchedLeadIds.includes(lead.id)}
-                activeMatch={activeMatchedLeadId === lead.id}
-                onSelect={() => toggleSelection(lead.id)}
-                onDelete={() => handleDelete(lead.id)}
-                onEdit={() => openUpdateLeadModal(lead)}
-              />
-            ))}
-          </div>
+          <LeadCardsView
+            leads={leads}
+            layout={viewMode === 'grid' ? 'grid' : 'list'}
+            focusedLeadId={focusedLead?.id}
+            matchedLeadIds={matchedLeadIds}
+            activeMatchedLeadId={activeMatchedLeadId}
+            leadCardRefs={leadCardRefs}
+            onLeadClick={handleLeadSingleClick}
+            onLeadDoubleClick={handleLeadDoubleClick}
+            onToggleSelection={toggleSelection}
+            onDelete={handleDelete}
+            onEdit={openUpdateLeadModal}
+          />
         )}
           </CardContent>
         </Card>
-        {/* Bulk Action Bar */}
-        {selectedIds.size > 0 && (
-          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-popover text-popover-foreground shadow-lg border rounded-full px-6 py-3 flex items-center gap-4 z-50 animate-in fade-in slide-in-from-bottom-4">
-            <span className="font-medium text-sm">{t('leads.bulk.selected', { count: selectedIds.size })}</span>
-            <div className="h-4 w-px bg-border" />
-            <Button variant="ghost" size="sm" onClick={() => setSelectedIds([])}>
-              {t('leads.actions.cancel')}
-            </Button>
-            <Button variant="destructive" size="sm" onClick={() => setBulkDeleteDialogOpen(true)}>
-              <Trash2 className="mr-2 h-4 w-4" />
-              {t('leads.actions.delete')}
-            </Button>
-          </div>
-        )}
+        <LeadsBulkActionBar
+          selectedCount={selectedIds.size}
+          onCancel={() => setSelectedIds([])}
+          onDeleteClick={() => setBulkDeleteDialogOpen(true)}
+        />
         <LeadsMasterDataFormModal
           open={leadFormModalOpen}
           mode={leadFormModalMode}
@@ -2548,24 +2497,17 @@ export default function Leads() {
           }}
           onSubmit={handleLeadModalSubmit}
         />
-        <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>{t('leads.bulk.deleteTitle', 'Delete selected leads?')}</AlertDialogTitle>
-              <AlertDialogDescription>{t('leads.messages.deleteConfirm', { count: selectedIds.size })}</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>{t('leads.actions.cancel', 'Cancel')}</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => {
-                  void handleBulkDelete();
-                }}
-              >
-                {t('leads.actions.delete', 'Delete')}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <DeleteConfirmDialog
+          open={bulkDeleteDialogOpen}
+          onOpenChange={setBulkDeleteDialogOpen}
+          onConfirm={() => {
+            void handleBulkDelete();
+          }}
+          title={t('leads.bulk.deleteTitle', 'Delete selected leads?')}
+          description={t('leads.messages.deleteConfirm', { count: selectedIds.size })}
+          cancelLabel={t('leads.actions.cancel', 'Cancel')}
+          confirmLabel={t('leads.actions.delete', 'Delete')}
+        />
       </FirstScreenTemplate>
       </div>
     </DashboardLayout>

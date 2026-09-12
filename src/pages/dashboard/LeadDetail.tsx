@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { DeleteConfirmDialog } from '@/components/common/DeleteConfirmDialog';
 import { LeadForm } from '@/features/module-sales/components/LeadForm';
 import type { LeadFormData } from '@/features/module-sales/components/LeadForm';
 import { LeadWorkspaceSections } from '@/features/module-sales/components/LeadWorkspaceSections';
@@ -794,19 +794,6 @@ export default function LeadDetail() {
     );
   }
 
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      new: 'bg-blue-500/10 text-blue-500',
-      contacted: 'bg-purple-500/10 text-purple-500',
-      qualified: 'bg-teal-500/10 text-teal-500',
-      proposal: 'bg-yellow-500/10 text-yellow-500',
-      negotiation: 'bg-orange-500/10 text-orange-500',
-      won: 'bg-green-500/10 text-green-500',
-      lost: 'bg-red-500/10 text-red-500',
-    };
-    return colors[status] || 'bg-muted/50 text-muted-foreground';
-  };
-
   const StickyActionsRegister = () => {
     const { setActions, clearActions } = useStickyActions();
 
@@ -1074,7 +1061,7 @@ export default function LeadDetail() {
                   <CardContent className="space-y-4">
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Status</p>
-                      <Badge className={`mt-1 ${getStatusColor(lead.status)}`}>{stage.label}</Badge>
+                      <Badge className={`mt-1 ${stage.color}`}>{stage.label}</Badge>
                     </div>
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Source</p>
@@ -1430,22 +1417,13 @@ export default function LeadDetail() {
           />
         )}
 
-        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Lead</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete this lead? This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <DeleteConfirmDialog
+          open={showDeleteDialog}
+          onOpenChange={setShowDeleteDialog}
+          onConfirm={handleDelete}
+          title="Delete Lead"
+          description="Are you sure you want to delete this lead? This action cannot be undone."
+        />
         </DetailScreenTemplate>
       </div>
     </DashboardLayout>

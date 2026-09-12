@@ -15,6 +15,8 @@ interface DeleteConfirmDialogProps {
   onConfirm: () => void;
   title: string;
   description: string;
+  cancelLabel?: string;
+  confirmLabel?: string;
 }
 
 export function DeleteConfirmDialog({
@@ -22,7 +24,9 @@ export function DeleteConfirmDialog({
   onOpenChange,
   onConfirm,
   title,
-  description
+  description,
+  cancelLabel = "Cancel",
+  confirmLabel = "Delete",
 }: DeleteConfirmDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -32,9 +36,9 @@ export function DeleteConfirmDialog({
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel>{cancelLabel}</AlertDialogCancel>
           <AlertDialogAction onClick={onConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-            Delete
+            {confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
