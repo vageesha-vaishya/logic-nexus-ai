@@ -23,6 +23,7 @@ import {
 import { ViewMode } from '@/components/ui/view-toggle';
 import { useCRM } from '@/hooks/useCRM';
 import { useCrmApiHeaders } from '@/hooks/useCrmApiHeaders';
+import { useColumnResizing } from '@/hooks/useColumnResizing';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
@@ -194,8 +195,11 @@ export default function Leads() {
 
   const [totalCount, setTotalCount] = useState(0);
   const [columnWidths, setColumnWidths] = useState<Partial<Record<ListTableColumnKey, number>>>({});
-  const [activeResizeColumn, setActiveResizeColumn] = useState<ListTableColumnKey | null>(null);
-  const resizeMetaRef = useRef<{ key: ListTableColumnKey; startX: number; startWidth: number } | null>(null);
+  const { activeColumn: activeResizeColumn, startResize: startColumnResizeCore } = useColumnResizing<ListTableColumnKey>(
+    MIN_COLUMN_WIDTH,
+    MAX_COLUMN_WIDTH,
+    setColumnWidths,
+  );
   const leadClickTimeoutRef = useRef<number | null>(null);
   const leadListRowRefs = useRef<Map<string, HTMLTableRowElement>>(new Map());
   const leadCardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -266,29 +270,6 @@ export default function Leads() {
     }
   }, [columnWidths]);
 
-  useEffect(() => {
-    if (!activeResizeColumn) return;
-    const handleMouseMove = (event: MouseEvent) => {
-      const resizeMeta = resizeMetaRef.current;
-      if (!resizeMeta || resizeMeta.key !== activeResizeColumn) return;
-      const delta = event.clientX - resizeMeta.startX;
-      const nextWidth = Math.max(MIN_COLUMN_WIDTH, Math.min(MAX_COLUMN_WIDTH, Math.round(resizeMeta.startWidth + delta)));
-      setColumnWidths((prev) => {
-        if (prev[resizeMeta.key] === nextWidth) return prev;
-        return { ...prev, [resizeMeta.key]: nextWidth };
-      });
-    };
-    const handleMouseUp = () => {
-      setActiveResizeColumn(null);
-      resizeMetaRef.current = null;
-    };
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [activeResizeColumn]);
 
   const viewMode = (viewState.view === 'pipeline' ? 'card' : viewState.view) as ViewMode;
   const selectedIds = new Set(viewState.selection.selectedIds);
@@ -304,8 +285,11 @@ export default function Leads() {
   const [activitySortField, setActivitySortField] = useState<ActivitySortableColumn>('created_at');
   const [activitySortDirection, setActivitySortDirection] = useState<ActivitySortDirection>('desc');
   const [activityColumnWidths, setActivityColumnWidths] = useState<Partial<Record<ActivitySortableColumn | 'actions', number>>>({});
-  const [activeActivityResizeColumn, setActiveActivityResizeColumn] = useState<ActivitySortableColumn | 'actions' | null>(null);
-  const activityResizeMetaRef = useRef<{ key: ActivitySortableColumn | 'actions'; startX: number; startWidth: number } | null>(null);
+  const { activeColumn: activeActivityResizeColumn, startResize: startActivityColumnResizeCore } = useColumnResizing<ActivitySortableColumn | 'actions'>(
+    ACTIVITY_TABLE_MIN_COLUMN_WIDTH,
+    ACTIVITY_TABLE_MAX_COLUMN_WIDTH,
+    setActivityColumnWidths,
+  );
   const hasAppliedInitialStatusDefaultRef = useRef(false);
   const hasHydratedFromUrlRef = useRef(false);
   const leadsRequestSequenceRef = useRef(0);
@@ -1031,14 +1015,7 @@ export default function Leads() {
   );
 
   const startActivityColumnResize = (event: React.MouseEvent<HTMLDivElement>, column: ActivitySortableColumn | 'actions') => {
-    event.preventDefault();
-    event.stopPropagation();
-    activityResizeMetaRef.current = {
-      key: column,
-      startX: event.clientX,
-      startWidth: getActivityColumnWidth(column),
-    };
-    setActiveActivityResizeColumn(column);
+    startActivityColumnResizeCore(event, column, getActivityColumnWidth(column));
   };
 
   const handleActivitySort = (column: ActivitySortableColumn) => {
@@ -1178,29 +1155,6 @@ export default function Leads() {
     void loadTablePreferences();
   }, [context?.userId, scopedDb]);
 
-  useEffect(() => {
-    if (!activeActivityResizeColumn) return;
-    const onMouseMove = (event: MouseEvent) => {
-      const meta = activityResizeMetaRef.current;
-      if (!meta || meta.key !== activeActivityResizeColumn) return;
-      const delta = event.clientX - meta.startX;
-      const next = Math.max(
-        ACTIVITY_TABLE_MIN_COLUMN_WIDTH,
-        Math.min(ACTIVITY_TABLE_MAX_COLUMN_WIDTH, Math.round(meta.startWidth + delta)),
-      );
-      setActivityColumnWidths((prev) => ({ ...prev, [meta.key]: next }));
-    };
-    const onMouseUp = () => {
-      setActiveActivityResizeColumn(null);
-      activityResizeMetaRef.current = null;
-    };
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-    };
-  }, [activeActivityResizeColumn]);
 
   useEffect(() => {
     const container = splitContainerRef.current;
@@ -1440,14 +1394,7 @@ export default function Leads() {
   };
 
   const startColumnResize = (event: React.MouseEvent<HTMLDivElement>, column: ListTableColumnKey) => {
-    event.preventDefault();
-    event.stopPropagation();
-    resizeMetaRef.current = {
-      key: column,
-      startX: event.clientX,
-      startWidth: getColumnWidth(column),
-    };
-    setActiveResizeColumn(column);
+    startColumnResizeCore(event, column, getColumnWidth(column));
   };
 
   const getFieldCellClass = (field: ListFieldKey) => {
