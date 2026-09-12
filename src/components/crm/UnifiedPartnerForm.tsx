@@ -695,11 +695,11 @@ export function UnifiedPartnerForm({
           {/* Actions */}
           <div className="flex justify-end gap-3 pt-6 border-t border-border/50">
             <Button type="button" variant="outline" onClick={onCancel} className="border-border">
-              Discard
+              Cancel
             </Button>
             <Button type="submit" disabled={isLoading}>
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {mode === 'create' ? 'Create Partner' : 'Save Changes'}
+              {mode === 'create' ? `Create ${partnerType === 'company' ? 'Account' : 'Contact'}` : 'Save Changes'}
             </Button>
           </div>
 

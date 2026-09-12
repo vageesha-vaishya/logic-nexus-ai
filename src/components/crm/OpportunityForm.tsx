@@ -484,7 +484,7 @@ export function OpportunityForm({ opportunity, onSubmit, onCancel }: Opportunity
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button type="submit" data-testid="save-opportunity-btn">Save Opportunity</Button>
+          <Button type="submit" data-testid="save-opportunity-btn">{opportunity ? 'Save Changes' : 'Create Opportunity'}</Button>
         </div>
       </form>
     </Form>

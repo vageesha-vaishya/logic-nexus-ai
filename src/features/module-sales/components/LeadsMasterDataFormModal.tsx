@@ -250,7 +250,7 @@ export function LeadsMasterDataFormModal({
             <div className="flex flex-wrap gap-2">
               <Button onClick={() => void handleSubmit()} disabled={submitting}>
                 {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                {mode === 'create' ? 'Create' : 'Update Selected'}
+                {mode === 'create' ? 'Create Lead' : 'Save Changes'}
               </Button>
               <Button variant="outline" onClick={handleReset} disabled={submitting}>Reset Form</Button>
               <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Cancel</Button>
