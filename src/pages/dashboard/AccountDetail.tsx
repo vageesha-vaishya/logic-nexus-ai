@@ -31,6 +31,7 @@ export default function AccountDetail() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [relatedContacts, setRelatedContacts] = useState<any[]>([]);
   const [relatedOpps, setRelatedOpps] = useState<any[]>([]);
+  const [invoicedTotal, setInvoicedTotal] = useState(0);
   const [isEnriching, setIsEnriching] = useState(false);
   const shouldOpenInEditMode = Boolean((location.state as { openEdit?: boolean } | null)?.openEdit);
   const returnTo = (location.state as { returnTo?: string } | null)?.returnTo;
@@ -60,6 +61,7 @@ export default function AccountDetail() {
       await Promise.all([
         fetchRelatedContacts(id as string),
         fetchRelatedOpportunities(id as string),
+        fetchInvoicedTotal(id as string),
       ]);
     } catch (error: any) {
       toast.error('Failed to load account');
@@ -90,6 +92,19 @@ export default function AccountDetail() {
       setRelatedOpps(data || []);
     } catch (err) {
       logger.error('Failed to load related opportunities', err);
+    }
+  };
+
+  const fetchInvoicedTotal = async (accountId: string) => {
+    try {
+      const { data } = await scopedDb
+        .from('invoices')
+        .select('total')
+        .eq('customer_id', accountId);
+      const sum = (data || []).reduce((acc: number, row: any) => acc + (row.total || 0), 0);
+      setInvoicedTotal(sum);
+    } catch (err) {
+      logger.error('Failed to load invoiced total', err);
     }
   };
 
@@ -267,10 +282,10 @@ export default function AccountDetail() {
                                     label="Opportunity"
                                     value={relatedOpps.length}
                                 />
-                                <EnterpriseStatButton 
+                                <EnterpriseStatButton
                                     icon={<FileText className="h-5 w-5" />}
                                     label="Invoiced"
-                                    value="$0.00"
+                                    value={`$${invoicedTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                                 />
                             </>
                         )
