@@ -30,6 +30,9 @@ export interface CellResult {
   mode: Mode;
   /** Relative to docs/design-system/verification/ */
   screenshot?: string;
+  /** 'viewport' when the engine refused a full-page capture (Firefox caps at 32767px). */
+  screenshotMode?: 'full' | 'viewport';
+  scrollHeight?: number;
   layout?: { passed: boolean; offenders: string[] };
   axe?: { passed: boolean; violations: AxeViolationSummary[]; disabledRules: { id: string; reason: string }[] };
   keyboard?: { passed: boolean; stops: FocusStop[]; failures: string[] };

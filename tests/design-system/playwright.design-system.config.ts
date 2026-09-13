@@ -86,5 +86,8 @@ export default defineConfig({
         url: baseURL,
         reuseExistingServer: true,
         timeout: 180_000,
+        // Drops the dev CSP's `upgrade-insecure-requests` (vite.config.ts) — WebKit
+        // otherwise upgrades the module script to https and never boots the app.
+        env: { DS_HARNESS: '1' },
       },
 });

@@ -730,7 +730,8 @@ export default defineConfig(({ mode }) => {
         "form-action 'self'",
         "object-src 'none'",
         "frame-ancestors 'none'",
-        "upgrade-insecure-requests",
+        // WebKit upgrades same-origin module scripts on http://localhost under this directive and the app never boots; the design-system harness (tests/design-system) sets DS_HARNESS=1.
+        ...(process.env.DS_HARNESS === '1' ? [] : ["upgrade-insecure-requests"]),
       ].join("; "),
       "X-Content-Type-Options":          "nosniff",
       "X-Frame-Options":                 "DENY",

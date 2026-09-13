@@ -1,13 +1,19 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { DESKTOP, PAGES, VERIFICATION_DIR, ariaRelPath } from './pages';
 import { applyModeInitScript, expectMode } from './helpers/theme';
+import { expectPageBooted } from './helpers/ready';
 import { checkAriaSnapshot } from './helpers/aria';
 import { routeFor } from './helpers/route';
 import { writeCellResult, type CellResult } from './helpers/results';
 
 test.use({ viewport: DESKTOP });
+
+async function settle(page: Page) {
+  await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => { /* SPAs poll; proceed */ });
+  await page.waitForTimeout(500);
+}
 
 for (const def of PAGES) {
   test.describe(def.key, () => {
@@ -15,17 +21,18 @@ for (const def of PAGES) {
 
     test('aria: one h1, main landmark, named controls', async ({ page }, testInfo) => {
       const engine = testInfo.project.name;
-      const route = await routeFor(def);
       const result: CellResult = {
-        page: def.key, route, engine, width: DESKTOP.width, height: DESKTOP.height, mode: 'light',
+        page: def.key, route: typeof def.route === 'string' ? def.route : def.key, engine,
+        width: DESKTOP.width, height: DESKTOP.height, mode: 'light',
       };
       try {
+        const route = routeFor(def);
+        result.route = route;
         await applyModeInitScript(page, 'light');
         await page.goto(route, { waitUntil: 'domcontentloaded' });
-        if (def.authenticated) await expect(page).not.toHaveURL(/\/auth(\?|$)/, { timeout: 30_000 });
+        await settle(page);
+        await expectPageBooted(page, def.authenticated);
         await expectMode(page, 'light');
-        await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
-        await page.waitForTimeout(500);
 
         const snapshot = await page.locator('body').ariaSnapshot();
         const rel = ariaRelPath(def.key, engine);

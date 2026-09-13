@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildReport } from './generate-report.mjs';
+import { buildReport, expectedCellIds } from './generate-report.mjs';
 
 const meta = { date: '2026-09-13', commit: 'abc1234', engines: { chromium: '142.0', firefox: '145.0', webkit: '26.0', msedge: '142.0' } };
 
@@ -76,5 +76,37 @@ describe('buildReport table cell escaping', () => {
     ];
     const md = buildReport(ariaCells, meta);
     expect(md).toContain('Nav \\| Main');
+  });
+});
+
+describe('buildReport error rendering and completeness', () => {
+  it('strips ANSI colour codes from errors and shows the line after the expect( header', () => {
+    const ESC = String.fromCharCode(27);
+    const error = `${ESC}[2mexpect(${ESC}[22m${ESC}[31mlocator${ESC}[39m${ESC}[2m).${ESC}[22mtoBeVisible${ESC}[2m()${ESC}[22m failed\n\nLocator: locator('#main-content')\nExpected: visible`;
+    const errCells = [
+      { kind: 'aria', page: 'themes', route: '/dashboard/themes', engine: 'webkit', width: 1280, height: 800, mode: 'light', error },
+    ];
+    const md = buildReport(errCells, meta);
+    expect(md).not.toContain(ESC);
+    expect(md).not.toMatch(/\[\d+m/);
+    expect(md).toContain('aria themes/webkit/1280/light: `Locator: locator(\'#main-content\')`');
+  });
+
+  it('lists every expected cell that produced no result file', () => {
+    const md = buildReport(cells, meta);
+    // 393 expected minus the 5 fixture cells (3 matrix + 1 keyboard + 1 aria).
+    expect(md).toMatch(/## Cells with no result file/);
+    expect(md).toContain('- `matrix-leads-list-msedge-360-light`');
+    expect(md).toContain('- `keyboard-dashboard-onboarding-webkit-1280-light`');
+    expect(md).not.toContain('- `matrix-leads-list-chromium-360-light`');
+    const listed = md.split('## Cells with no result file')[1].split('\n').filter(l => l.startsWith('- `')).length;
+    expect(listed).toBe(expectedCellIds().length - cells.length);
+  });
+
+  it('notes viewport-only screenshots with the page height', () => {
+    const tall = [{ kind: 'matrix', page: 'accounts-list', route: '/dashboard/accounts', engine: 'firefox', width: 1280, height: 800, mode: 'light',
+      screenshot: 'screenshots/accounts-list/firefox-1280-light.png', screenshotMode: 'viewport', scrollHeight: 33048,
+      layout: { passed: true, offenders: [] }, axe: { passed: true, violations: [], disabledRules: [] } }];
+    expect(buildReport(tall, meta)).toContain('accounts-list firefox 1280 light: viewport screenshot — page is 33048px tall');
   });
 });

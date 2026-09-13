@@ -13,11 +13,40 @@ const OUT = path.join(HERE, 'REPORT.md');
 const ENGINES = ['chromium', 'firefox', 'webkit', 'msedge'];
 const WIDTHS = [360, 768, 1280, 1920];
 const MODES = ['light', 'dark'];
+// Mirrors tests/design-system/pages.ts (this file can't import the TS). Keep in sync.
+export const PAGE_KEYS = [
+  'auth', 'dashboard', 'leads-list', 'lead-detail', 'leads-kanban',
+  'contacts-list', 'accounts-list', 'opportunities-list', 'opportunity-new', 'themes',
+];
+const KEYBOARD_ENGINES = ['chromium', 'firefox', 'webkit']; // msedge is excluded via testIgnore
+const DESKTOP_WIDTH = 1280;
 
 const cellPassed = c => (c.layout?.passed ?? true) && (c.axe?.passed ?? true) && !c.error;
 
 /** Markdown table cells: escape pipes and collapse newlines so dynamic text can't break the row. */
 const cell = s => String(s ?? '').replace(/\|/g, '\\|').replace(/\s*\n\s*/g, ' ');
+
+/** Playwright error messages carry ANSI colour codes; REPORT.md is plain Markdown. */
+const ANSI = new RegExp(String.fromCharCode(27) + '?\\[[0-9;]*m', 'g');
+export const stripAnsi = s => String(s ?? '').replace(ANSI, '');
+
+/** One-line summary of an `error`: the first non-empty line after an `expect(` header, else the first line. */
+export function errorSummary(error) {
+  const lines = stripAnsi(error).split('\n').map(l => l.trim()).filter(Boolean);
+  if (!lines.length) return '';
+  const header = lines.findIndex(l => /expect\(/.test(l));
+  return (header >= 0 && lines[header + 1]) || lines[0];
+}
+
+/** Every cell id the full run should have produced: `${kind}-${page}-${engine}-${width}-${mode}`. */
+export function expectedCellIds() {
+  const ids = [];
+  for (const p of PAGE_KEYS) for (const e of ENGINES) for (const w of WIDTHS) for (const m of MODES) ids.push(`matrix-${p}-${e}-${w}-${m}`);
+  for (const p of [...PAGE_KEYS, 'dashboard-onboarding']) for (const e of KEYBOARD_ENGINES) ids.push(`keyboard-${p}-${e}-${DESKTOP_WIDTH}-light`);
+  for (const p of PAGE_KEYS) for (const e of ENGINES) ids.push(`aria-${p}-${e}-${DESKTOP_WIDTH}-light`);
+  return ids;
+}
+const cellId = c => `${c.kind}-${c.page}-${c.engine}-${c.width}-${c.mode}`;
 
 export function buildReport(cells, meta) {
   const matrix = cells.filter(c => c.kind === 'matrix');
@@ -46,6 +75,13 @@ export function buildReport(cells, meta) {
   L.push('npm run audit:design-system:quick    # chromium only');
   L.push('```');
   L.push('');
+  L.push('Start the backend services first (`npm run services:start`) or CRM pages render with degraded data.');
+  L.push('');
+  if (meta.notes?.length) {
+    L.push('Run metadata:');
+    for (const n of meta.notes) L.push(`- ${n}`);
+    L.push('');
+  }
 
   for (const mode of MODES) {
     L.push(`## Matrix — ${mode} mode`);
@@ -98,6 +134,12 @@ export function buildReport(cells, meta) {
     for (const o of c.layout.offenders) L.push(`  - \`${o}\``);
   }
   L.push('');
+  const viewportShots = matrix.filter(c => c.screenshotMode === 'viewport');
+  if (viewportShots.length) {
+    L.push('Screenshots that are viewport-only because the engine refused a full-page capture (the page height is itself a finding):');
+    for (const c of viewportShots) L.push(`- ${c.page} ${c.engine} ${c.width} ${c.mode}: viewport screenshot — page is ${c.scrollHeight ?? '?'}px tall`);
+    L.push('');
+  }
 
   L.push('## Keyboard walk (1280, light)');
   L.push('');
@@ -105,7 +147,7 @@ export function buildReport(cells, meta) {
   L.push('|---|---|---|---|---|');
   for (const c of keyboard) {
     const k = c.keyboard;
-    L.push(`| ${cell(c.page)} | ${cell(c.engine)} | ${k?.stops.length ?? 0} | ${k?.passed ? '✅' : '❌'} | ${cell(k?.failures[0] ?? c.error ?? '')} |`);
+    L.push(`| ${cell(c.page)} | ${cell(c.engine)} | ${k?.stops.length ?? 0} | ${k?.passed ? '✅' : '❌'} | ${cell(k?.failures[0] ?? errorSummary(c.error))} |`);
   }
   L.push('');
   for (const c of keyboard) {
@@ -125,7 +167,7 @@ export function buildReport(cells, meta) {
   L.push('|---|---|---|---|---|');
   for (const c of aria) {
     const a = c.aria;
-    L.push(`| ${cell(c.page)} | ${cell(c.engine)} | ${a?.passed ? '✅' : '❌'} | ${cell(a?.failures.join('; ') ?? c.error ?? '')} | ${a ? `[yaml](${a.snapshot})` : ''} |`);
+    L.push(`| ${cell(c.page)} | ${cell(c.engine)} | ${a?.passed ? '✅' : '❌'} | ${cell(a?.failures.join('; ') ?? errorSummary(c.error))} | ${a ? `[yaml](${a.snapshot})` : ''} |`);
   }
   L.push('');
 
@@ -156,9 +198,18 @@ export function buildReport(cells, meta) {
   if (errored.length) {
     L.push('## Cells that did not complete');
     L.push('');
-    for (const c of errored) L.push(`- ${c.kind} ${c.page}/${c.engine}/${c.width}/${c.mode}: \`${c.error.split('\n')[0]}\``);
+    for (const c of errored) L.push(`- ${c.kind} ${c.page}/${c.engine}/${c.width}/${c.mode}: \`${errorSummary(c.error)}\``);
     L.push('');
   }
+
+  // A cell with no JSON at all died before its `finally` (or the engine never ran) — it must not disappear silently.
+  const present = new Set(cells.map(cellId));
+  const missing = expectedCellIds().filter(id => !present.has(id));
+  L.push('## Cells with no result file');
+  L.push('');
+  if (!missing.length) L.push('_None — every expected cell wrote a result._');
+  for (const id of missing) L.push(`- \`${id}\``);
+  L.push('');
 
   return L.join('\n');
 }
@@ -186,10 +237,12 @@ function engineVersions() {
   return out;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const { execSync } = await import('node:child_process');
   const commit = execSync('git rev-parse --short HEAD', { cwd: REPO_ROOT }).toString().trim();
-  const md = buildReport(loadCells(), { date: new Date().toISOString().slice(0, 10), commit, engines: engineVersions() });
+  // Free-text run facts the runner can't observe (e.g. whether backend services were up): `|`-separated.
+  const notes = (process.env.DS_REPORT_NOTES ?? '').split('|').map(s => s.trim()).filter(Boolean);
+  const md = buildReport(loadCells(), { date: new Date().toISOString().slice(0, 10), commit, engines: engineVersions(), notes });
   fs.writeFileSync(OUT, md + '\n');
   console.log(`wrote ${path.relative(REPO_ROOT, OUT)}`);
 }

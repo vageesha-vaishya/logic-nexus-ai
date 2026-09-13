@@ -1,20 +1,19 @@
-import { request as pwRequest } from '@playwright/test';
-import { AUTH_STATE, resolveRoute, type PageDef, type ResolveContext } from '../pages';
-import { readAccessToken, supabaseEnv } from './env';
+import fs from 'node:fs';
+import { ROUTES_FILE, type PageDef } from '../pages';
 
-// Resolved once per worker; dynamic routes (lead-detail) need the admin's access token.
-const resolved = new Map<string, string>();
+// Dynamic routes are resolved once, in auth.setup.ts (with a fresh token), and
+// read back here — no token, no network, so a late engine can't hit an expired JWT.
+let routes: Record<string, string> | undefined;
 
-export async function routeFor(def: PageDef): Promise<string> {
-  const hit = resolved.get(def.key);
-  if (hit) return hit;
-  const ctx: ResolveContext = {
-    request: await pwRequest.newContext(),
-    ...supabaseEnv(),
-    accessToken: readAccessToken(AUTH_STATE),
-  };
-  const route = await resolveRoute(def, ctx);
-  await ctx.request.dispose();
-  resolved.set(def.key, route);
+export function routeFor(def: PageDef): string {
+  if (typeof def.route === 'string') return def.route;
+  if (!routes) {
+    if (!fs.existsSync(ROUTES_FILE)) {
+      throw new Error(`${ROUTES_FILE} not found; did auth.setup.ts run (--project=setup)?`);
+    }
+    routes = JSON.parse(fs.readFileSync(ROUTES_FILE, 'utf8')) as Record<string, string>;
+  }
+  const route = routes[def.key];
+  if (!route) throw new Error(`No resolved route for "${def.key}" in ${ROUTES_FILE}; re-run auth.setup.ts.`);
   return route;
 }

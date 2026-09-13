@@ -73,6 +73,8 @@ export const REPO_ROOT = path.resolve(__dirname, '..', '..');
 export const VERIFICATION_DIR = path.join(REPO_ROOT, 'docs', 'design-system', 'verification');
 export const DATA_DIR = path.join(REPO_ROOT, 'test-results', 'design-system', 'data');
 export const AUTH_STATE = path.join(REPO_ROOT, 'tests', 'design-system', '.auth', 'user.json');
+/** `{ [pageKey]: route }` for every dynamic route, resolved once by auth.setup.ts. */
+export const ROUTES_FILE = path.join(REPO_ROOT, 'tests', 'design-system', '.auth', 'routes.json');
 
 export function screenshotRelPath(pageKey: string, engine: string, width: number, mode: Mode): string {
   return `screenshots/${pageKey}/${engine}-${width}-${mode}.png`;
