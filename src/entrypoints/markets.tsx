@@ -20,6 +20,7 @@ import "@fontsource/source-serif-pro/400-italic.css";
 import "@fontsource/inter/400.css";
 import "@fontsource/inter/500.css";
 import "@fontsource/inter/600.css";
+import "@fontsource/inter/700.css";
 
 if (typeof window !== "undefined") {
   const storedDark = localStorage.getItem(DARK_MODE_STORAGE_KEY);

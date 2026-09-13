@@ -5,12 +5,16 @@ import "./index.css";
 
 // Sthira mobile-brand fonts (lazy-loaded via @fontsource subsets).
 // Source Serif Pro = headlines + tabular numerals; Inter = body/UI.
+// Inter also doubles as the main platform's base UI typeface (see
+// index.css's `body` rule) -- these weights cover both uses, so there is
+// no separate/duplicate font load for the main app shell.
 import "@fontsource/source-serif-pro/400.css";
 import "@fontsource/source-serif-pro/600.css";
 import "@fontsource/source-serif-pro/400-italic.css";
 import "@fontsource/inter/400.css";
 import "@fontsource/inter/500.css";
 import "@fontsource/inter/600.css";
+import "@fontsource/inter/700.css";
 
 // Apply dark mode before first render to prevent flash
 if (typeof window !== "undefined") {

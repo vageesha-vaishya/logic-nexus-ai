@@ -15,6 +15,8 @@ export default {
     },
     extend: {
       fontFamily: {
+        // Platform base typeface (see index.css's `body` rule for why).
+        sans: ["Inter", "ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "Roboto", "sans-serif"],
         outlook: ["Calibri", "Segoe UI", "Arial", "sans-serif"],
         // Sthira mobile app brand — see docs/plans/2026-05-20-sthira-…-design.md
         sthiraSerif: ["'Source Serif Pro'", "Georgia", "serif"],
