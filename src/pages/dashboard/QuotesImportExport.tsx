@@ -563,7 +563,6 @@ export default function QuotesImportExport() {
           onImportExport={() => navigate('/dashboard/quotes/import-export')}
           controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
           iconOnly
-          layout="compact"
         />
       }
     />

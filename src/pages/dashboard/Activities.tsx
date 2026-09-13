@@ -421,6 +421,7 @@ export default function Activities() {
             onRefresh={refreshActivities}
             onImportExport={() => navigate('/dashboard/activities/import-export')}
             controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
+            iconOnly
           />
           <Button asChild variant="outline" size="sm">
             <Link to="/dashboard/activities/new?type=email">

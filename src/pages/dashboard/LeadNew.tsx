@@ -177,7 +177,6 @@ export default function LeadNew() {
             onImportExport={() => navigate('/dashboard/leads/import-export')}
             controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
             iconOnly
-            layout="compact"
           />
         </div>
 

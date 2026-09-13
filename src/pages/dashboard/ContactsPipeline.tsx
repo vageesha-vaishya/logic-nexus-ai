@@ -205,6 +205,7 @@ export default function ContactsPipeline() {
             onRefresh={refreshContacts}
             onImportExport={() => navigate("/dashboard/contacts/import-export")}
             controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
+            iconOnly
           />
         </div>
         {isDbFallbackActive && (

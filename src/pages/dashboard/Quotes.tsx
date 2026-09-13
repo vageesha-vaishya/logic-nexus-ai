@@ -776,7 +776,6 @@ export default function Quotes() {
               onCreate={() => navigate('/dashboard/quotes/new')}
               createLabel="New Quote"
               iconOnly
-              layout="compact"
               onRefresh={refreshQuotes}
               onImportExport={() => navigate('/dashboard/quotes/import-export')}
               controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}

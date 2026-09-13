@@ -486,6 +486,7 @@ export default function OpportunitiesPipeline() {
             onRefresh={refreshOpportunities}
             onImportExport={() => navigate("/dashboard/opportunities/import-export")}
             controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
+            iconOnly
           />
         </div>
 

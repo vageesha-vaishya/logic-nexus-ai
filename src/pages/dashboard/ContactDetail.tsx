@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { DeleteConfirmDialog } from '@/components/common/DeleteConfirmDialog';
 import { UnifiedPartnerForm } from '@/components/crm/UnifiedPartnerForm';
 import { EmailHistoryPanel } from '@/features/module-communications/components/email/EmailHistoryPanel';
-import { Building2, Phone, Mail, User, Linkedin, Star, Clock, Trash2 } from 'lucide-react';
+import { Building2, Phone, Mail, User, Linkedin, Star, Clock } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { 
@@ -166,31 +166,9 @@ export default function ContactDetail() {
                 { label: 'Contacts', to: '/dashboard/contacts' },
                 { label: `${contact.first_name} ${contact.last_name}` },
             ]}
-            actions={
-                !isEditing && (
-                    <div className="flex items-center gap-2">
-                        <Button
-                            variant="outline"
-                            onClick={() => setIsEditing(true)}
-                        >
-                            Edit
-                        </Button>
-                        <Button
-                            variant="outline"
-                            onClick={() => navigate('/dashboard/contacts/new')}
-                        >
-                            Create
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setShowDeleteDialog(true)}
-                        >
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
-                    </div>
-                )
-            }
+            // Edit/New/Delete already live in the sticky bottom action bar
+            // (StickyActionsRegister above) -- this used to duplicate the
+            // exact same buttons/handlers up here too.
         >
             <EnterpriseSheet
                 smartButtons={

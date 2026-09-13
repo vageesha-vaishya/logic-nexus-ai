@@ -54,7 +54,6 @@ interface CRMModuleHeaderNavigationProps {
   iconOnly?: boolean;
   showSecondaryLabels?: boolean;
   createLabel?: string;
-  layout?: 'full' | 'compact';
   className?: string;
   iconOverrides?: Partial<Record<CRMHeaderControl, ReactNode>>;
 }
@@ -76,7 +75,6 @@ export function CRMModuleHeaderNavigation({
   iconOnly = false,
   showSecondaryLabels = false,
   createLabel = 'New',
-  layout = 'full',
   className,
   iconOverrides,
 }: CRMModuleHeaderNavigationProps) {

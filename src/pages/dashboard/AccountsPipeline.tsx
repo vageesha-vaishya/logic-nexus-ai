@@ -320,6 +320,7 @@ export default function AccountsPipeline() {
             onRefresh={refreshAccounts}
             onImportExport={() => navigate("/dashboard/accounts/import-export")}
             controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
+            iconOnly
           />
         </div>
         {isDbFallbackActive && (

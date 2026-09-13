@@ -1011,7 +1011,6 @@ export default function QuoteDetail() {
                 onImportExport={() => navigate('/dashboard/quotes/import-export')}
                 controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
                 iconOnly
-                layout="compact"
                 className="!ml-0 !flex-none"
                 iconOverrides={{
                   create: <QuoteActionIcon name="newQuote" label="New Quote" />,

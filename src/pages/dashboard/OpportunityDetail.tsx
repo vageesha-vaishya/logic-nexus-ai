@@ -366,18 +366,9 @@ export default function OpportunityDetail() {
             { label: 'Opportunities', to: '/dashboard/opportunities' },
             { label: opportunity.name },
           ]}
-          actions={
-            <>
-              <Button variant="outline" onClick={() => setIsEditing(!isEditing)}>
-                <Edit className="mr-2 h-4 w-4" />
-                {isEditing ? 'Cancel' : 'Edit'}
-              </Button>
-              <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </Button>
-            </>
-          }
+          // Edit/New/Cancel/Delete already live in the sticky bottom action
+          // bar (StickyActionsRegister above) -- this used to duplicate the
+          // exact same buttons/handlers up here too.
         >
         {isEditing ? (
           <>

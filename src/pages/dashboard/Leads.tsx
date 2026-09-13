@@ -1618,7 +1618,6 @@ export default function Leads() {
               onCreate={openCreateLeadModal}
               createLabel="New Lead"
               iconOnly
-              layout="compact"
               onRefresh={refreshLeads}
               onImportExport={() => {
                 const params = buildLeadsImportExportParams({

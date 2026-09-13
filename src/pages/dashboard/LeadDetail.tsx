@@ -811,7 +811,6 @@ export default function LeadDetail() {
                 onImportExport={() => navigate('/dashboard/leads/import-export')}
                 controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
                 iconOnly
-                layout="compact"
               />
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <Badge variant={isEditing ? 'default' : 'outline'}>

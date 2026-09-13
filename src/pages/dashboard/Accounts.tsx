@@ -215,6 +215,7 @@ export default function Accounts() {
               onRefresh={refreshAccounts}
               onImportExport={() => navigate('/dashboard/accounts/import-export')}
               controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
+              iconOnly
             />
             <Button variant={hasDuplicates ? 'default' : 'outline'} className="ml-2" onClick={onMergeDuplicates}>
               {hasDuplicates ? `DeDup (${duplicateGroups.length})` : 'Find Duplicates'}

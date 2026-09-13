@@ -205,7 +205,6 @@ export default function LeadAssignment() {
               onImportExport={() => navigate('/dashboard/leads/import-export')}
               controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
               iconOnly
-              layout="compact"
             />
             <Button onClick={handleProcessQueue}>
               <Play className="mr-2 h-4 w-4" />

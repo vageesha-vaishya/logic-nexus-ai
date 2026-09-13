@@ -146,6 +146,7 @@ export default function Opportunities() {
             onRefresh={refreshOpportunities}
             onImportExport={() => navigate('/dashboard/opportunities/import-export')}
             controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
+            iconOnly
           />
         </div>
         {isDbFallbackActive && (

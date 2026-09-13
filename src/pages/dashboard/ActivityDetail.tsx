@@ -10,6 +10,7 @@ import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { DeleteConfirmDialog } from '@/components/common/DeleteConfirmDialog';
 import { DetailScreenTemplate } from '@/components/system/DetailScreenTemplate';
+import { useStickyActions } from '@/components/layout/StickyActionsContext';
 import { formatDate } from '@/lib/utils';
 import { logger } from "@/lib/logger";
 
@@ -224,8 +225,46 @@ export default function ActivityDetail() {
 
   const title = activity.subject || typeLabels[activity.activity_type] || 'Activity';
 
+  const StickyActionsRegister = () => {
+    const { setActions, clearActions } = useStickyActions();
+
+    useEffect(() => {
+      if (isEditing) {
+        setActions({
+          right: [
+            <Button key="cancel-edit" variant="outline" onClick={() => setIsEditing(false)}>
+              Cancel
+            </Button>,
+          ],
+        });
+        return () => clearActions();
+      }
+
+      setActions({
+        right: [
+          <Button key="new-activity" variant="outline" onClick={() => navigate('/dashboard/activities/new')}>
+            New Activity
+          </Button>,
+          <Button key="edit-activity" variant="outline" onClick={() => setIsEditing(true)}>
+            <Edit className="mr-2 h-4 w-4" />
+            Edit
+          </Button>,
+          <Button key="delete-activity" variant="destructive" onClick={() => setShowDeleteDialog(true)}>
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete
+          </Button>,
+        ],
+      });
+
+      return () => clearActions();
+    }, [clearActions, isEditing, navigate, setActions]);
+
+    return null;
+  };
+
   return (
     <DashboardLayout>
+      <StickyActionsRegister />
       <DetailScreenTemplate
         title={title}
         subtitle={
@@ -238,20 +277,9 @@ export default function ActivityDetail() {
           { label: 'Activities', to: '/dashboard/activities' },
           { label: title },
         ]}
-        actions={
-          !isEditing && (
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit
-              </Button>
-              <Button variant="destructive" size="sm" onClick={() => setShowDeleteDialog(true)}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </Button>
-            </div>
-          )
-        }
+        // Edit/New/Cancel/Delete now live in the sticky bottom action bar,
+        // matching Account/Contact/Opportunity Detail, instead of this
+        // page's own top-of-page button row.
       >
         {isEditing ? (
           <div className="space-y-6">
