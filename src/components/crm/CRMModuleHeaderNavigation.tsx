@@ -9,6 +9,13 @@ import { THEME_PRESETS } from '@/theme/themes';
 export type CRMHeaderControl = CRMModuleViewMode | 'analytics' | 'create' | 'refresh' | 'importExport' | 'theme';
 
 const VIEW_MODE_SEQUENCE: CRMModuleViewMode[] = ['pipeline', 'card', 'grid', 'list'];
+// 'theme' (the per-page accent-color picker) is deliberately left out of
+// this default sequence -- the header's single dark/light toggle is now
+// the only supported way to change the app's appearance. Picking a
+// per-page accent here (e.g. "Ocean Breeze") independent of that toggle
+// is what produced mismatched colors when the two disagreed. The
+// underlying theme state/plumbing stays intact; only this control is
+// hidden.
 export const CRM_HEADER_PRIMARY_CONTROL_SEQUENCE: CRMHeaderControl[] = [
   'pipeline',
   'card',
@@ -17,7 +24,6 @@ export const CRM_HEADER_PRIMARY_CONTROL_SEQUENCE: CRMHeaderControl[] = [
   'create',
   'refresh',
   'importExport',
-  'theme',
 ];
 
 function toLabel(mode: CRMModuleViewMode): string {
@@ -105,7 +111,7 @@ export function CRMModuleHeaderNavigation({
   const effectiveControlSequence = useMemo(() => {
     if (controlSequence) return controlSequence;
     const sequence: CRMHeaderControl[] = [...viewModeSequence];
-    sequence.push('create', 'refresh', 'importExport', 'theme');
+    sequence.push('create', 'refresh', 'importExport');
     return sequence;
   }, [controlSequence, viewModeSequence]);
 
