@@ -963,7 +963,7 @@ git commit -m "test(design-system): keyboard tab-walk with visible-focus and tra
 - Create: `tests/design-system/aria.spec.ts`
 
 **Interfaces:**
-- Consumes: `ariaRelPath, VERIFICATION_DIR, DESKTOP, PAGES` (Task 1); `writeCellResult` (Task 3).
+- Consumes: `ariaRelPath, VERIFICATION_DIR, DESKTOP, PAGES` (Task 1); `writeCellResult` (Task 3); `routeFor(def)` from `helpers/route.ts` (extracted in Task 5 fix round — do NOT duplicate it).
 - Produces: `checkAriaSnapshot(yaml: string): { passed: boolean; failures: string[] }` (pure, unit-tested).
 
 - [ ] **Step 1: Write the failing unit test**
@@ -1049,31 +1049,12 @@ Expected: 4 passed.
 ```ts
 import fs from 'node:fs';
 import path from 'node:path';
-import { test, expect, request as pwRequest } from '@playwright/test';
-import {
-  AUTH_STATE, DESKTOP, PAGES, VERIFICATION_DIR, ariaRelPath, resolveRoute,
-  type PageDef, type ResolveContext,
-} from './pages';
+import { test, expect } from '@playwright/test';
+import { DESKTOP, PAGES, VERIFICATION_DIR, ariaRelPath } from './pages';
 import { applyModeInitScript, expectMode } from './helpers/theme';
 import { checkAriaSnapshot } from './helpers/aria';
+import { routeFor } from './helpers/route';
 import { writeCellResult, type CellResult } from './helpers/results';
-import { readAccessToken, supabaseEnv } from './helpers/env';
-
-let resolved: Map<string, string> | undefined;
-async function routeFor(def: PageDef): Promise<string> {
-  if (!resolved) resolved = new Map();
-  const hit = resolved.get(def.key);
-  if (hit) return hit;
-  const ctx: ResolveContext = {
-    request: await pwRequest.newContext(),
-    ...supabaseEnv(),
-    accessToken: readAccessToken(AUTH_STATE),
-  };
-  const route = await resolveRoute(def, ctx);
-  await ctx.request.dispose();
-  resolved.set(def.key, route);
-  return route;
-}
 
 test.use({ viewport: DESKTOP });
 
