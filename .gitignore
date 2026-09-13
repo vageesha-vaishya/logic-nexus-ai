@@ -89,3 +89,8 @@ __pycache__/
 # host, never committed (mirrors upstream supabase/supabase's own .gitignore
 # entry for docker/volumes/db/data).
 deploy/selfhosted-supabase/volumes/db/data/
+
+# Playwright design-system harness (evidence is committed under docs/design-system/verification/)
+test-results/
+tests/design-system/.auth/
+playwright-report/design-system.json
