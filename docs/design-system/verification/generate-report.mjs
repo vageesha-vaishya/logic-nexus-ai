@@ -16,6 +16,9 @@ const MODES = ['light', 'dark'];
 
 const cellPassed = c => (c.layout?.passed ?? true) && (c.axe?.passed ?? true) && !c.error;
 
+/** Markdown table cells: escape pipes and collapse newlines so dynamic text can't break the row. */
+const cell = s => String(s ?? '').replace(/\|/g, '\\|').replace(/\s*\n\s*/g, ' ');
+
 export function buildReport(cells, meta) {
   const matrix = cells.filter(c => c.kind === 'matrix');
   const keyboard = cells.filter(c => c.kind === 'keyboard');
@@ -58,7 +61,7 @@ export function buildReport(cells, meta) {
         const mark = cellPassed(c) ? '✅' : '❌';
         return c.screenshot ? `[${mark}](${c.screenshot})` : mark;
       }));
-      L.push(`| ${p} | ${row.join(' | ')} |`);
+      L.push(`| ${cell(p)} | ${row.join(' | ')} |`);
     }
     L.push('');
   }
@@ -102,14 +105,14 @@ export function buildReport(cells, meta) {
   L.push('|---|---|---|---|---|');
   for (const c of keyboard) {
     const k = c.keyboard;
-    L.push(`| ${c.page} | ${c.engine} | ${k?.stops.length ?? 0} | ${k?.passed ? '✅' : '❌'} | ${k?.failures[0] ?? c.error ?? ''} |`);
+    L.push(`| ${cell(c.page)} | ${cell(c.engine)} | ${k?.stops.length ?? 0} | ${k?.passed ? '✅' : '❌'} | ${cell(k?.failures[0] ?? c.error ?? '')} |`);
   }
   L.push('');
   for (const c of keyboard) {
     if (!c.keyboard) continue;
     L.push(`<details><summary>${c.page} / ${c.engine} — tab order (${c.keyboard.stops.length} stops)</summary>`);
     L.push('');
-    for (const s of c.keyboard.stops) L.push(`${s.index + 1}. \`${s.tag}${s.role ? `[role=${s.role}]` : ''}\` ${s.name || '_(unnamed)_'}${s.visibleFocus ? '' : ' — **no visible focus**'}`);
+    for (const s of c.keyboard.stops) L.push(`${s.index + 1}. \`${s.tag}${s.role ? `[role=${s.role}]` : ''}\` ${cell(s.name) || '_(unnamed)_'}${s.visibleFocus ? '' : ' — **no visible focus**'}`);
     for (const f of c.keyboard.failures) L.push(`- ❌ ${f}`);
     L.push('');
     L.push('</details>');
@@ -122,7 +125,7 @@ export function buildReport(cells, meta) {
   L.push('|---|---|---|---|---|');
   for (const c of aria) {
     const a = c.aria;
-    L.push(`| ${c.page} | ${c.engine} | ${a?.passed ? '✅' : '❌'} | ${a?.failures.join('; ') ?? c.error ?? ''} | ${a ? `[yaml](${a.snapshot})` : ''} |`);
+    L.push(`| ${cell(c.page)} | ${cell(c.engine)} | ${a?.passed ? '✅' : '❌'} | ${cell(a?.failures.join('; ') ?? c.error ?? '')} | ${a ? `[yaml](${a.snapshot})` : ''} |`);
   }
   L.push('');
 
@@ -162,10 +165,15 @@ export function buildReport(cells, meta) {
 
 function loadCells() {
   if (!fs.existsSync(DATA_DIR)) throw new Error(`${DATA_DIR} not found — run the Playwright suite first.`);
-  return fs.readdirSync(DATA_DIR).filter(f => f.endsWith('.json')).map(f => {
-    const kind = f.split('-')[0];
-    return { kind, ...JSON.parse(fs.readFileSync(path.join(DATA_DIR, f), 'utf8')) };
-  });
+  const cells = [];
+  for (const f of fs.readdirSync(DATA_DIR).filter(f => f.endsWith('.json'))) {
+    try {
+      cells.push({ kind: f.split('-')[0], ...JSON.parse(fs.readFileSync(path.join(DATA_DIR, f), 'utf8')) });
+    } catch (e) {
+      console.error(`skipping unreadable cell file ${f}: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+  return cells;
 }
 
 function engineVersions() {

@@ -52,3 +52,29 @@ describe('buildReport', () => {
     expect(md).toMatch(/Engine-specific divergences[\s\S]*\*\*leads-list\*\* 360px light: passes in webkit; fails in chromium, firefox/);
   });
 });
+
+describe('buildReport table cell escaping', () => {
+  it('escapes a literal pipe in a keyboard failure so the table row stays intact', () => {
+    const kbCells = [
+      { kind: 'keyboard', page: 'leads-list', route: '/dashboard/leads', engine: 'chromium', width: 1280, height: 800, mode: 'light',
+        keyboard: { passed: false, stops: [], failures: ['stop #2 <button> "Home | Settings" has no visible focus indicator'] } },
+    ];
+    const md = buildReport(kbCells, meta);
+    expect(md).toContain('Home \\| Settings');
+    const row = md.split('\n').find(l => l.startsWith('| leads-list | chromium |'));
+    expect(row).toBeDefined();
+    // 5 columns (Page | Engine | Stops | Result | First failure) means 6 unescaped
+    // pipe delimiters, which split into 7 parts including the two empty string ends.
+    const parts = row.split(/(?<!\\)\|/);
+    expect(parts.length).toBe(7);
+  });
+
+  it('escapes a literal pipe in an aria failure', () => {
+    const ariaCells = [
+      { kind: 'aria', page: 'leads-list', route: '/dashboard/leads', engine: 'chromium', width: 1280, height: 800, mode: 'light',
+        aria: { passed: false, failures: ['expected landmark "Nav | Main" not found'], snapshot: 'aria/leads-list-chromium.yaml' } },
+    ];
+    const md = buildReport(ariaCells, meta);
+    expect(md).toContain('Nav \\| Main');
+  });
+});
