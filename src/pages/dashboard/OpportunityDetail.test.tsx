@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, vi, expect } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import OpportunityDetail from './OpportunityDetail';
@@ -68,8 +68,10 @@ describe('OpportunityDetail', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByRole('heading', { name: 'Acme Logistics Expansion' })).toBeInTheDocument();
+    expect((await screen.findAllByRole('heading', { name: 'Acme Logistics Expansion' })).length).toBeGreaterThan(0);
     expect(screen.getByText('$50,000.00')).toBeInTheDocument();
-    expect(screen.getByTestId('opportunity-items-editor')).toBeInTheDocument();
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Line Items' }), { button: 0 });
+    expect(await screen.findByTestId('opportunity-items-editor')).toBeInTheDocument();
   });
 });

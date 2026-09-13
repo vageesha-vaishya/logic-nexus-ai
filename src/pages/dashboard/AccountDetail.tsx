@@ -15,7 +15,6 @@ import {
 } from '@/components/ui/enterprise/EnterpriseComponents';
 import { DetailScreenTemplate } from '@/components/system/DetailScreenTemplate';
 import { EnterpriseNotebook, EnterpriseTab } from '@/components/ui/enterprise/EnterpriseTabs';
-import { EnterpriseActivityFeed } from '@/components/ui/enterprise/EnterpriseActivityFeed';
 import { EnterpriseTable, type Column, EnterpriseCard } from '@/components/ui/enterprise';
 import { Badge } from '@/components/ui/badge';
 import { useStickyActions } from '@/components/layout/StickyActionsContext';
@@ -259,9 +258,7 @@ export default function AccountDetail() {
                 )
             }
         >
-            <div className="flex flex-col xl:flex-row gap-6 items-stretch">
-                {/* Main Sheet */}
-                <EnterpriseSheet
+            <EnterpriseSheet
                     smartButtons={
                         !isEditing && (
                             <>
@@ -412,10 +409,6 @@ export default function AccountDetail() {
                         </EnterpriseNotebook>
                     )}
                 </EnterpriseSheet>
-
-                {/* Chatter Sidebar */}
-                <EnterpriseActivityFeed className="hidden xl:flex shrink-0 w-[400px]" />
-            </div>
         </DetailScreenTemplate>
 
         <DeleteConfirmDialog

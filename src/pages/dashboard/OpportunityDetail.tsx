@@ -9,14 +9,19 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { matchText, TextOp, formatCurrency, formatDate } from '@/lib/utils';
 import { OpportunityForm } from '@/components/crm/OpportunityForm';
-import { Edit, Trash2 } from 'lucide-react';
+import { DollarSign, Edit, FileText, Trash2 } from 'lucide-react';
 import { DetailScreenTemplate } from '@/components/system/DetailScreenTemplate';
 import { useCRM } from '@/hooks/useCRM';
 import { invokeFunction } from '@/lib/supabase-functions';
 import { toast } from 'sonner';
 import { DeleteConfirmDialog } from '@/components/common/DeleteConfirmDialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  EnterpriseSheet,
+  EnterpriseField,
+  EnterpriseStatButton,
+} from '@/components/ui/enterprise/EnterpriseComponents';
+import { EnterpriseNotebook, EnterpriseTab } from '@/components/ui/enterprise/EnterpriseTabs';
+import { EnterpriseCard } from '@/components/ui/enterprise';
 import { OpportunityItemsEditor } from '@/components/crm/OpportunityItemsEditor';
 import { EmailHistoryPanel } from '@/features/module-communications/components/email/EmailHistoryPanel';
 import { OpportunityHistoryTab } from '@/components/crm/OpportunityHistoryTab';
@@ -82,6 +87,7 @@ export default function OpportunityDetail() {
 
   useEffect(() => {
     fetchOpportunity();
+    fetchHistory();
   }, [fetchOpportunity]);
 
   const fetchHistory = async () => {
@@ -349,7 +355,6 @@ export default function OpportunityDetail() {
   return (
     <DashboardLayout>
       <StickyActionsRegister />
-      <div className="max-w-4xl mx-auto">
         <DetailScreenTemplate
           title={opportunity.name}
           subtitle={
@@ -426,232 +431,225 @@ export default function OpportunityDetail() {
           </Card>
           </>
         ) : (
-          <Tabs defaultValue="details" onValueChange={(val) => {
-            if (val === 'history') fetchHistory();
-          }}>
-            <TabsList>
-              <TabsTrigger value="details">Details</TabsTrigger>
-              <TabsTrigger value="history">Stage & Probability History</TabsTrigger>
-            </TabsList>
+          <EnterpriseSheet
+            smartButtons={
+              <>
+                <EnterpriseStatButton
+                  icon={<FileText className="h-5 w-5" />}
+                  label="Quotes"
+                  value={quotes.length}
+                />
+                <EnterpriseStatButton
+                  icon={<DollarSign className="h-5 w-5" />}
+                  label="Amount"
+                  value={formatCurrency(opportunity.amount)}
+                />
+              </>
+            }
+            header={
+              <div className="flex flex-col md:flex-row gap-6 w-full">
+                <div className="w-24 h-24 bg-muted rounded-sm flex items-center justify-center border shadow-sm shrink-0">
+                  <DollarSign className="h-10 w-10 text-muted-foreground/50" />
+                </div>
 
-            <TabsContent value="details" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Opportunity Information</CardTitle>
-                </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex-1 flex flex-col gap-4">
                   <div>
-                    <p className="text-sm text-muted-foreground">Stage</p>
                     <Badge className={stageColors[opportunity.stage]}>
                       {stageLabels[opportunity.stage]}
                     </Badge>
+                    <h1 className="text-3xl font-bold text-gray-900 mt-2">{opportunity.name}</h1>
                   </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Amount</p>
-                    <p className="text-lg font-semibold">{formatCurrency(opportunity.amount)}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Probability</p>
-                    <p className="font-medium">{opportunity.probability ? `${opportunity.probability}%` : '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Expected Close Date</p>
-                    <p className="font-medium">{formatDate(opportunity.close_date)}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Account</p>
-                    <p className="font-medium">{opportunity.accounts?.name || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Primary Contact</p>
-                    <p className="font-medium">
-                      {opportunity.contacts
-                        ? `${opportunity.contacts.first_name} ${opportunity.contacts.last_name}`
-                        : '-'}
-                    </p>
-                  </div>
-                  {opportunity.lead_source && (
-                    <div>
-                      <p className="text-sm text-muted-foreground">Lead Source</p>
-                      <p className="font-medium capitalize">{opportunity.lead_source.replace('_', ' ')}</p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-1 mt-2">
+                    <div className="space-y-1">
+                      <EnterpriseField label="Probability" value={opportunity.probability ? `${opportunity.probability}%` : undefined} />
+                      <EnterpriseField label="Expected Close" value={opportunity.close_date ? formatDate(opportunity.close_date) : undefined} />
+                      <EnterpriseField label="Type" value={opportunity.type} />
                     </div>
-                  )}
-                  {opportunity.type && (
-                    <div>
-                      <p className="text-sm text-muted-foreground">Type</p>
-                      <p className="font-medium">{opportunity.type}</p>
+                    <div className="space-y-1">
+                      <EnterpriseField label="Account" value={opportunity.accounts?.name} />
+                      <EnterpriseField
+                        label="Primary Contact"
+                        value={opportunity.contacts ? `${opportunity.contacts.first_name} ${opportunity.contacts.last_name}` : undefined}
+                      />
+                      <EnterpriseField label="Lead Source" value={opportunity.lead_source ? opportunity.lead_source.replace('_', ' ') : undefined} />
                     </div>
-                  )}
+                  </div>
                 </div>
-
-                {opportunity.description && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">Description</p>
-                    <p className="mt-1">{opportunity.description}</p>
-                  </div>
-                )}
-
-                {opportunity.next_step && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">Next Step</p>
-                    <p className="mt-1">{opportunity.next_step}</p>
-                  </div>
-                )}
-
-                {opportunity.competitors && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">Competitors</p>
-                    <p className="mt-1">{opportunity.competitors}</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex items-center justify-between">
-                <CardTitle>Quotes</CardTitle>
-                <Button 
-                  size="sm" 
-                  onClick={() => navigate('/dashboard/quotes/new', { 
-                    state: { 
-                      opportunityId: id,
-                      accountId: opportunity.account_id,
-                      contactId: opportunity.contact_id
-                    } 
-                  })} 
-                  data-testid="new-quote-btn"
-                >
-                  New Quote
-                </Button>
-              </CardHeader>
-              <CardContent>
-                {quotesLoading ? (
-                  <div className="text-sm text-muted-foreground">Loading quotes...</div>
-                ) : quotes.length === 0 ? (
-                  <div className="text-sm text-muted-foreground">No quotes linked to this opportunity.</div>
-                ) : (
+              </div>
+            }
+          >
+            <EnterpriseNotebook>
+              <EnterpriseTab label="Details" value="details">
+                <EnterpriseCard title="Opportunity Information">
                   <div className="space-y-4">
-                    <div className="space-y-3 p-3 border rounded-md">
-                      <p className="text-sm text-muted-foreground">Filter related quotes by number, status, total, and date.</p>
-                      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                        <div className="space-y-2">
-                          <Label>Quote number</Label>
-                          <div className="flex gap-2">
-                            <Select value={quoteNumberOp} onValueChange={(v) => setQuoteNumberOp(v as TextOp)}>
-                              <SelectTrigger className="w-[160px]"><SelectValue placeholder="Operator" /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="contains">Contains</SelectItem>
-                                <SelectItem value="startsWith">Starts With</SelectItem>
-                                <SelectItem value="equals">Equals</SelectItem>
-                                <SelectItem value="endsWith">Ends With</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <Input placeholder="Search number" value={quoteNumberQuery} onChange={(e) => setQuoteNumberQuery(e.target.value)} data-testid="quote-search-input" />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Status</Label>
-                          <Select value={quoteStatus} onValueChange={setQuoteStatus}>
-                            <SelectTrigger data-testid="quote-status-filter"><SelectValue placeholder="Any status" /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="any">Any</SelectItem>
-                              <SelectItem value="draft">Draft</SelectItem>
-                              <SelectItem value="sent">Sent</SelectItem>
-                              <SelectItem value="accepted">Accepted</SelectItem>
-                              <SelectItem value="rejected">Rejected</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Total amount</Label>
-                          <div className="flex gap-2">
-                            <Input type="number" placeholder="Min" value={quoteMinTotal} onChange={(e) => setQuoteMinTotal(e.target.value)} />
-                            <Input type="number" placeholder="Max" value={quoteMaxTotal} onChange={(e) => setQuoteMaxTotal(e.target.value)} />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Created range</Label>
-                          <div className="flex gap-2">
-                            <Input type="date" value={quoteStartDate} onChange={(e) => setQuoteStartDate(e.target.value)} />
-                            <Input type="date" value={quoteEndDate} onChange={(e) => setQuoteEndDate(e.target.value)} />
-                          </div>
-                        </div>
+                    {opportunity.description && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Description</p>
+                        <p className="mt-1">{opportunity.description}</p>
                       </div>
+                    )}
+                    {opportunity.next_step && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Next Step</p>
+                        <p className="mt-1">{opportunity.next_step}</p>
+                      </div>
+                    )}
+                    {opportunity.competitors && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Competitors</p>
+                        <p className="mt-1">{opportunity.competitors}</p>
+                      </div>
+                    )}
+                    {!opportunity.description && !opportunity.next_step && !opportunity.competitors && (
+                      <p className="text-sm text-muted-foreground">No additional details.</p>
+                    )}
+                  </div>
+                </EnterpriseCard>
+
+                <EnterpriseCard title="Timeline" className="mt-6">
+                  <div className="space-y-2">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Created</p>
+                      <p className="font-medium">{formatDate(opportunity.created_at)}</p>
                     </div>
-
-                    {filteredQuotesAdvanced.length === 0 ? (
-                      <div className="text-sm text-muted-foreground">No matching quotes.</div>
-                    ) : (
-                      <div className="space-y-3">
-                    {filteredQuotesAdvanced.map((q) => (
-                      <div key={q.id} className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">{q.quote_number || q.id.slice(0,8)}</p>
-                          <p className="text-xs text-muted-foreground">Status: {q.status} • Total: {String(q.total_amount ?? 0)}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {(q as unknown as { is_primary?: boolean }).is_primary ? (
-                            <span className="text-xs px-2 py-1 rounded bg-green-100 text-green-700">Primary</span>
-                          ) : (
-                            <Button size="sm" variant="outline" onClick={() => makePrimary(q.id)}>Make Primary</Button>
-                          )}
-                          <Button size="sm" onClick={() => navigate(`/dashboard/quotes/${q.id}`)}>View</Button>
-                        </div>
-                      </div>
-                    ))}
+                    <div>
+                      <p className="text-sm text-muted-foreground">Last Updated</p>
+                      <p className="font-medium">{formatDate(opportunity.updated_at)}</p>
+                    </div>
+                    {opportunity.closed_at && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Closed</p>
+                        <p className="font-medium">{formatDate(opportunity.closed_at)}</p>
                       </div>
                     )}
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                </EnterpriseCard>
+              </EnterpriseTab>
 
-            {/* Opportunity Items Editor */}
-            <OpportunityItemsEditor opportunityId={id!} />
+              <EnterpriseTab label="Quotes" value="quotes">
+                <EnterpriseCard
+                  title="Quotes"
+                  actions={
+                    <Button
+                      size="sm"
+                      onClick={() => navigate('/dashboard/quotes/new', {
+                        state: {
+                          opportunityId: id,
+                          accountId: opportunity.account_id,
+                          contactId: opportunity.contact_id
+                        }
+                      })}
+                      data-testid="new-quote-btn"
+                    >
+                      New Quote
+                    </Button>
+                  }
+                >
+                  {quotesLoading ? (
+                    <div className="text-sm text-muted-foreground">Loading quotes...</div>
+                  ) : quotes.length === 0 ? (
+                    <div className="text-sm text-muted-foreground">No quotes linked to this opportunity.</div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="space-y-3 p-3 border rounded-md">
+                        <p className="text-sm text-muted-foreground">Filter related quotes by number, status, total, and date.</p>
+                        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                          <div className="space-y-2">
+                            <Label>Quote number</Label>
+                            <div className="flex gap-2">
+                              <Select value={quoteNumberOp} onValueChange={(v) => setQuoteNumberOp(v as TextOp)}>
+                                <SelectTrigger className="w-[160px]"><SelectValue placeholder="Operator" /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="contains">Contains</SelectItem>
+                                  <SelectItem value="startsWith">Starts With</SelectItem>
+                                  <SelectItem value="equals">Equals</SelectItem>
+                                  <SelectItem value="endsWith">Ends With</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <Input placeholder="Search number" value={quoteNumberQuery} onChange={(e) => setQuoteNumberQuery(e.target.value)} data-testid="quote-search-input" />
+                            </div>
+                          </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Timeline</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div>
-                  <p className="text-sm text-muted-foreground">Created</p>
-                  <p className="font-medium">{formatDate(opportunity.created_at)}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Last Updated</p>
-                  <p className="font-medium">{formatDate(opportunity.updated_at)}</p>
-                </div>
-                {opportunity.closed_at && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">Closed</p>
-                    <p className="font-medium">{formatDate(opportunity.closed_at)}</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-            </TabsContent>
+                          <div className="space-y-2">
+                            <Label>Status</Label>
+                            <Select value={quoteStatus} onValueChange={setQuoteStatus}>
+                              <SelectTrigger data-testid="quote-status-filter"><SelectValue placeholder="Any status" /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="any">Any</SelectItem>
+                                <SelectItem value="draft">Draft</SelectItem>
+                                <SelectItem value="sent">Sent</SelectItem>
+                                <SelectItem value="accepted">Accepted</SelectItem>
+                                <SelectItem value="rejected">Rejected</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
 
-            <TabsContent value="history" className="space-y-6">
-              <OpportunityHistoryTab history={history} onRefresh={fetchHistory} />
-            </TabsContent>
+                          <div className="space-y-2">
+                            <Label>Total amount</Label>
+                            <div className="flex gap-2">
+                              <Input type="number" placeholder="Min" value={quoteMinTotal} onChange={(e) => setQuoteMinTotal(e.target.value)} />
+                              <Input type="number" placeholder="Max" value={quoteMaxTotal} onChange={(e) => setQuoteMaxTotal(e.target.value)} />
+                            </div>
+                          </div>
 
-            <TabsContent value="emails" className="space-y-6">
-              <EmailHistoryPanel 
-                emailAddress={opportunity.contacts?.email || opportunity.leads?.email} 
-                entityType="opportunity" 
-                entityId={opportunity.id} 
-                tenantId={opportunity.tenant_id}
-              />
-            </TabsContent>
-          </Tabs>
+                          <div className="space-y-2">
+                            <Label>Created range</Label>
+                            <div className="flex gap-2">
+                              <Input type="date" value={quoteStartDate} onChange={(e) => setQuoteStartDate(e.target.value)} />
+                              <Input type="date" value={quoteEndDate} onChange={(e) => setQuoteEndDate(e.target.value)} />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {filteredQuotesAdvanced.length === 0 ? (
+                        <div className="text-sm text-muted-foreground">No matching quotes.</div>
+                      ) : (
+                        <div className="space-y-3">
+                          {filteredQuotesAdvanced.map((q) => (
+                            <div key={q.id} className="flex items-center justify-between">
+                              <div>
+                                <p className="font-medium">{q.quote_number || q.id.slice(0,8)}</p>
+                                <p className="text-xs text-muted-foreground">Status: {q.status} • Total: {String(q.total_amount ?? 0)}</p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {(q as unknown as { is_primary?: boolean }).is_primary ? (
+                                  <span className="text-xs px-2 py-1 rounded bg-green-100 text-green-700">Primary</span>
+                                ) : (
+                                  <Button size="sm" variant="outline" onClick={() => makePrimary(q.id)}>Make Primary</Button>
+                                )}
+                                <Button size="sm" onClick={() => navigate(`/dashboard/quotes/${q.id}`)}>View</Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </EnterpriseCard>
+              </EnterpriseTab>
+
+              <EnterpriseTab label="Line Items" value="items">
+                <OpportunityItemsEditor opportunityId={id!} />
+              </EnterpriseTab>
+
+              <EnterpriseTab label="Stage & Probability History" value="history">
+                <OpportunityHistoryTab history={history} onRefresh={fetchHistory} />
+              </EnterpriseTab>
+
+              <EnterpriseTab label="Emails" value="emails">
+                <EmailHistoryPanel
+                  emailAddress={opportunity.contacts?.email || opportunity.leads?.email}
+                  entityType="opportunity"
+                  entityId={opportunity.id}
+                  tenantId={opportunity.tenant_id}
+                />
+              </EnterpriseTab>
+            </EnterpriseNotebook>
+          </EnterpriseSheet>
         )}
         </DetailScreenTemplate>
-      </div>
 
       <DeleteConfirmDialog
         open={showDeleteDialog}

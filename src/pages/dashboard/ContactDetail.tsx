@@ -15,7 +15,6 @@ import {
 } from '@/components/ui/enterprise/EnterpriseComponents';
 import { DetailScreenTemplate } from '@/components/system/DetailScreenTemplate';
 import { EnterpriseNotebook, EnterpriseTab } from '@/components/ui/enterprise/EnterpriseTabs';
-import { EnterpriseActivityFeed } from '@/components/ui/enterprise/EnterpriseActivityFeed';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useStickyActions } from '@/components/layout/StickyActionsContext';
@@ -193,7 +192,6 @@ export default function ContactDetail() {
                 )
             }
         >
-            <div className="flex flex-col xl:flex-row gap-6 items-stretch">
             <EnterpriseSheet
                 smartButtons={
                     !isEditing && (
@@ -311,9 +309,6 @@ export default function ContactDetail() {
                     </EnterpriseNotebook>
                 )}
             </EnterpriseSheet>
-
-            <EnterpriseActivityFeed className="hidden xl:flex shrink-0 w-[400px]" />
-            </div>
         </DetailScreenTemplate>
 
         <DeleteConfirmDialog

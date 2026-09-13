@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, vi, expect } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import ActivityDetail from './ActivityDetail';
@@ -40,7 +40,7 @@ vi.mock('@/hooks/useCRM', () => ({
 }));
 
 describe('ActivityDetail', () => {
-  it('renders the activity header and form without crashing', async () => {
+  it('renders a read-only summary view by default, without crashing', async () => {
     render(
       <MemoryRouter initialEntries={['/dashboard/activities/activity-1']}>
         <Routes>
@@ -49,8 +49,23 @@ describe('ActivityDetail', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByTestId('activity-form')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Edit Activity' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Follow-up call' })).toBeInTheDocument();
+    expect(screen.queryByTestId('activity-form')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Edit/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Delete/i })).toBeInTheDocument();
+  });
+
+  it('switches to the edit form when Edit is clicked', async () => {
+    render(
+      <MemoryRouter initialEntries={['/dashboard/activities/activity-1']}>
+        <Routes>
+          <Route path="/dashboard/activities/:id" element={<ActivityDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: /Edit/i }));
+
+    expect(await screen.findByTestId('activity-form')).toBeInTheDocument();
   });
 });

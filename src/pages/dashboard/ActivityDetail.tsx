@@ -2,14 +2,38 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ActivityForm } from '@/components/crm/ActivityForm';
-import { Trash2 } from 'lucide-react';
+import { Edit, Trash2 } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { DeleteConfirmDialog } from '@/components/common/DeleteConfirmDialog';
 import { DetailScreenTemplate } from '@/components/system/DetailScreenTemplate';
+import { formatDate } from '@/lib/utils';
 import { logger } from "@/lib/logger";
+
+const typeLabels: Record<string, string> = {
+  call: 'Call',
+  email: 'Email',
+  meeting: 'Meeting',
+  task: 'Task',
+  note: 'Note',
+};
+
+const statusLabels: Record<string, string> = {
+  planned: 'Planned',
+  in_progress: 'In Progress',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+};
+
+const priorityLabels: Record<string, string> = {
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+  urgent: 'Urgent',
+};
 
 export default function ActivityDetail() {
   const { id } = useParams();
@@ -19,6 +43,7 @@ export default function ActivityDetail() {
   const [activity, setActivity] = useState<any>(null);
   const [rawActivity, setRawActivity] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const autoSave = Boolean((location.state as { autoSave?: boolean } | null)?.autoSave);
 
@@ -39,13 +64,13 @@ export default function ActivityDetail() {
       if (error) throw error;
 
       setRawActivity(data);
-      
+
       // Flatten custom_fields into top-level for form compatibility
       const flattened = {
         ...data,
         ...(data.custom_fields || {}),
       };
-      
+
       setActivity(flattened);
     } catch (error: any) {
       toast.error('Failed to load activity');
@@ -134,8 +159,7 @@ export default function ActivityDetail() {
         toast.success('Activity updated successfully');
       }
       if (!options?.keepEditing) {
-        navigate('/dashboard/activities');
-        return;
+        setIsEditing(false);
       }
       fetchActivity();
     } catch (error: any) {
@@ -198,68 +222,148 @@ export default function ActivityDetail() {
   const emailFrom = (customFields?.from ?? (activity?.from as any)) as string | undefined;
   const emailBody = (customFields?.email_body ?? (activity?.email_body as any)) as string | undefined;
 
+  const title = activity.subject || typeLabels[activity.activity_type] || 'Activity';
+
   return (
     <DashboardLayout>
       <DetailScreenTemplate
-        title="Edit Activity"
-        subtitle="Update activity details"
+        title={title}
+        subtitle={
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="secondary">{typeLabels[activity.activity_type] || activity.activity_type}</Badge>
+            {activity.status && <Badge variant="outline">{statusLabels[activity.status] || activity.status}</Badge>}
+          </div>
+        }
         breadcrumbs={[
           { label: 'Activities', to: '/dashboard/activities' },
-          { label: 'Edit Activity' },
+          { label: title },
         ]}
         actions={
-          <Button variant="destructive" size="sm" onClick={() => setShowDeleteDialog(true)}>
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete
-          </Button>
+          !isEditing && (
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+                <Edit className="mr-2 h-4 w-4" />
+                Edit
+              </Button>
+              <Button variant="destructive" size="sm" onClick={() => setShowDeleteDialog(true)}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </Button>
+            </div>
+          )
         }
       >
-        <div className="space-y-6">
-          {activity?.activity_type === 'email' && (emailTo || emailFrom || emailBody) && (
+        {isEditing ? (
+          <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Email</CardTitle>
+                <CardTitle>Activity Details</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {emailFrom ? (
-                  <div className="space-y-1">
-                    <div className="text-sm font-medium">From</div>
-                    <div className="text-sm text-muted-foreground">{emailFrom}</div>
-                  </div>
-                ) : null}
-                {emailTo ? (
-                  <div className="space-y-1">
-                    <div className="text-sm font-medium">To</div>
-                    <div className="text-sm text-muted-foreground">{emailTo}</div>
-                  </div>
-                ) : null}
-                {emailBody ? (
-                  <div className="space-y-1">
-                    <div className="text-sm font-medium">Body</div>
-                    <div className="rounded-md border p-3 text-sm whitespace-pre-wrap break-words">
-                      {emailBody}
-                    </div>
-                  </div>
-                ) : null}
+              <CardContent>
+                <ActivityForm
+                  initialData={activity}
+                  onSubmit={handleUpdate}
+                  onAutoSave={autoSave ? handleAutoSaveUpdate : undefined}
+                  onCancel={() => setIsEditing(false)}
+                  autoSave={autoSave}
+                />
               </CardContent>
             </Card>
-          )}
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {activity.activity_type === 'email' && (emailTo || emailFrom || emailBody) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Email</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {emailFrom ? (
+                    <div className="space-y-1">
+                      <div className="text-sm font-medium">From</div>
+                      <div className="text-sm text-muted-foreground">{emailFrom}</div>
+                    </div>
+                  ) : null}
+                  {emailTo ? (
+                    <div className="space-y-1">
+                      <div className="text-sm font-medium">To</div>
+                      <div className="text-sm text-muted-foreground">{emailTo}</div>
+                    </div>
+                  ) : null}
+                  {emailBody ? (
+                    <div className="space-y-1">
+                      <div className="text-sm font-medium">Body</div>
+                      <div className="rounded-md border p-3 text-sm whitespace-pre-wrap break-words">
+                        {emailBody}
+                      </div>
+                    </div>
+                  ) : null}
+                </CardContent>
+              </Card>
+            )}
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Activity Details</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ActivityForm
-                initialData={activity}
-                onSubmit={handleUpdate}
-                onAutoSave={autoSave ? handleAutoSaveUpdate : undefined}
-                onCancel={() => navigate('/dashboard/activities')}
-                autoSave={autoSave}
-              />
-            </CardContent>
-          </Card>
-        </div>
+            <Card>
+              <CardHeader>
+                <CardTitle>Activity Details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Type</p>
+                    <p className="font-medium">{typeLabels[activity.activity_type] || activity.activity_type}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Status</p>
+                    <p className="font-medium">{statusLabels[activity.status] || activity.status}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Priority</p>
+                    <p className="font-medium">{priorityLabels[activity.priority] || activity.priority || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">{activity.activity_type === 'meeting' ? 'Start Time' : 'Due Date'}</p>
+                    <p className="font-medium">{activity.due_date ? formatDate(activity.due_date) : '-'}</p>
+                  </div>
+                </div>
+
+                {(activity.lead_id || activity.account_id || activity.contact_id) && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Related To</p>
+                    <div className="flex flex-wrap gap-2">
+                      {activity.lead_id && (
+                        <Button variant="link" className="p-0 h-auto" onClick={() => navigate(`/dashboard/leads/${activity.lead_id}`)}>
+                          View Lead
+                        </Button>
+                      )}
+                      {activity.account_id && (
+                        <Button variant="link" className="p-0 h-auto" onClick={() => navigate(`/dashboard/accounts/${activity.account_id}`)}>
+                          View Account
+                        </Button>
+                      )}
+                      {activity.contact_id && (
+                        <Button variant="link" className="p-0 h-auto" onClick={() => navigate(`/dashboard/contacts/${activity.contact_id}`)}>
+                          View Contact
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {activity.location && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Location</p>
+                    <p className="mt-1">{activity.location}</p>
+                  </div>
+                )}
+
+                <div>
+                  <p className="text-sm text-muted-foreground">{activity.activity_type === 'email' ? 'Body' : 'Description / Notes'}</p>
+                  <p className="mt-1 whitespace-pre-wrap">{activity.description || 'No description.'}</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </DetailScreenTemplate>
       <DeleteConfirmDialog
         open={showDeleteDialog}

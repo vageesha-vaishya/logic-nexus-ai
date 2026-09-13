@@ -8,21 +8,20 @@ const TabsTrigger = TabsPrimitive.Trigger;
 const TabsContent = TabsPrimitive.Content;
 
 export function EnterpriseNotebook({ children, className }: { children: React.ReactNode, className?: string }) {
+    const tabChildren = React.Children.toArray(children).filter(Boolean) as React.ReactElement<{ value: string; label: string }>[];
+    const firstValue = tabChildren[0]?.props.value;
     return (
-        <Tabs defaultValue="tab1" className={cn("w-full flex flex-col mt-6 border-t", className)}>
+        <Tabs defaultValue={firstValue} className={cn("w-full flex flex-col mt-6 border-t", className)}>
             <TabsList className="flex items-center gap-6 border-b bg-muted/20 px-6 py-2">
-                {React.Children.map(children, (child: any) => {
-                    if (!child) return null;
-                    return (
-                        <TabsTrigger 
-                            key={child.props.value} 
-                            value={child.props.value}
-                            className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary transition-all"
-                        >
-                            {child.props.label}
-                        </TabsTrigger>
-                    );
-                })}
+                {tabChildren.map((child) => (
+                    <TabsTrigger
+                        key={child.props.value}
+                        value={child.props.value}
+                        className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary transition-all"
+                    >
+                        {child.props.label}
+                    </TabsTrigger>
+                ))}
             </TabsList>
             <div className="p-6">
                 {children}
