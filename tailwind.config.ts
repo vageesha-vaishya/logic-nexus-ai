@@ -109,6 +109,14 @@ export default {
         'gradient-success': 'var(--gradient-success)',
       },
       boxShadow: {
+        // Elevation scale lives in index.css (--shadow-*) so it can differ
+        // per light/dark mode; mapping Tailwind's built-in shadow-* onto it
+        // upgrades every existing usage in one place.
+        xs: 'var(--shadow-xs)',
+        sm: 'var(--shadow-sm)',
+        md: 'var(--shadow-md)',
+        lg: 'var(--shadow-lg)',
+        xl: 'var(--shadow-xl)',
         'primary': 'var(--shadow-primary)',
       },
       transitionProperty: {

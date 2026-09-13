@@ -188,7 +188,7 @@ export default function Contacts() {
             </CardHeader>
             <CardContent>
               <Table>
-              <TableHeader className="bg-[hsl(var(--title-strip))] [&_th]:text-white [&_th]:font-semibold [&_th]:text-xs [&_th]:px-3 [&_th]:py-2 [&_th]:border-l [&_th]:border-white/60">
+              <TableHeader className="bg-[hsl(var(--title-strip))] [&_th]:text-[hsl(var(--title-strip-foreground))] [&_th]:font-semibold [&_th]:text-xs [&_th]:px-3 [&_th]:py-2 [&_th]:border-l [&_th]:border-[hsl(var(--title-strip-foreground)/0.4)]">
                 <TableRow className="border-b-2" style={{ borderBottomColor: 'hsl(var(--title-strip))' }}>
                   <SortableHead field="name" activeField={sortField} direction={sortDirection} onSort={onSort}>Name</SortableHead>
                   <SortableHead field="title" activeField={sortField} direction={sortDirection} onSort={onSort}>Title</SortableHead>

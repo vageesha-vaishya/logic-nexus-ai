@@ -276,30 +276,30 @@ export default function Opportunities() {
                   <div className="space-y-2">
                     <Label>Amount range</Label>
                     <div className="flex gap-2">
-                      <Input type="number" placeholder="Min" value={amountMin} onChange={(e) => setAmountMin(e.target.value)} />
-                      <Input type="number" placeholder="Max" value={amountMax} onChange={(e) => setAmountMax(e.target.value)} />
+                      <Input type="number" placeholder="Min" aria-label="Minimum amount" value={amountMin} onChange={(e) => setAmountMin(e.target.value)} />
+                      <Input type="number" placeholder="Max" aria-label="Maximum amount" value={amountMax} onChange={(e) => setAmountMax(e.target.value)} />
                     </div>
                   </div>
 
                   <div className="space-y-2">
                     <Label>Close date range</Label>
                     <div className="flex gap-2">
-                      <Input type="date" value={closeStart} onChange={(e) => setCloseStart(e.target.value)} />
-                      <Input type="date" value={closeEnd} onChange={(e) => setCloseEnd(e.target.value)} />
+                      <Input type="date" aria-label="Close date from" value={closeStart} onChange={(e) => setCloseStart(e.target.value)} />
+                      <Input type="date" aria-label="Close date to" value={closeEnd} onChange={(e) => setCloseEnd(e.target.value)} />
                     </div>
                   </div>
 
                   <div className="space-y-2">
                     <Label>Probability range (%)</Label>
                     <div className="flex gap-2">
-                      <Input type="number" placeholder="Min" value={probMin} onChange={(e) => setProbMin(e.target.value)} />
-                      <Input type="number" placeholder="Max" value={probMax} onChange={(e) => setProbMax(e.target.value)} />
+                      <Input type="number" placeholder="Min" aria-label="Minimum probability percent" value={probMin} onChange={(e) => setProbMin(e.target.value)} />
+                      <Input type="number" placeholder="Max" aria-label="Maximum probability percent" value={probMax} onChange={(e) => setProbMax(e.target.value)} />
                     </div>
                   </div>
                 </div>
               </div>
               <Table>
-                <TableHeader className="bg-[hsl(var(--title-strip))] [&_th]:text-white [&_th]:font-semibold [&_th]:text-xs [&_th]:px-3 [&_th]:py-2 [&_th]:border-l [&_th]:border-white/60">
+                <TableHeader className="bg-[hsl(var(--title-strip))] [&_th]:text-[hsl(var(--title-strip-foreground))] [&_th]:font-semibold [&_th]:text-xs [&_th]:px-3 [&_th]:py-2 [&_th]:border-l [&_th]:border-[hsl(var(--title-strip-foreground)/0.4)]">
                   <TableRow className="border-b-2" style={{ borderBottomColor: 'hsl(var(--title-strip))' }}>
                     <SortableHead field="name" activeField={sortField} direction={sortDirection} onSort={onSort}>Name</SortableHead>
                     <SortableHead field="account" activeField={sortField} direction={sortDirection} onSort={onSort}>Account</SortableHead>

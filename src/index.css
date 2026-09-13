@@ -117,7 +117,23 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    --primary: 217 91% 60%;
+    /* WCAG 2.1 AA color-contrast audit (computed, not eyeballed -- see
+       docs/design-system/README.md): white text at the *original*
+       lightness values below measured 2.14:1-3.78:1 against primary/
+       destructive/success/warning/accent, all failing the 4.5:1 minimum
+       for normal-size text (buttons/badges are ~14px, not "large text"
+       by WCAG's size threshold even when bold). Two different fixes
+       depending on how much darkening a color could take before losing
+       its brand identity: primary/destructive got a small lightness trim
+       (60%->53%/50%) since that keeps the established white-text-on-color
+       convention users expect for primary/danger actions; accent/success/
+       warning kept their original vivid lightness (darkening enough for
+       white text would have muddied them) and instead switched to dark
+       ink text, which clears the same bar with a large margin (6.7-8.4:1)
+       -- the same pairing most design systems use for amber/warning tones
+       specifically, since amber's luminance stays high even at moderate
+       lightness. */
+    --primary: 217 91% 53%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 210 40% 96%;
@@ -127,16 +143,16 @@ All colors MUST be HSL.
     --muted-foreground: 215 16% 47%;
 
     --accent: 197 71% 52%;
-    --accent-foreground: 0 0% 100%;
+    --accent-foreground: 222 47% 11%;
 
-    --destructive: 0 84% 60%;
+    --destructive: 0 84% 50%;
     --destructive-foreground: 0 0% 100%;
 
     --success: 142 71% 45%;
-    --success-foreground: 0 0% 100%;
+    --success-foreground: 222 47% 11%;
 
     --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
+    --warning-foreground: 222 47% 11%;
 
     /* Markets / financial up-down semantics (ADR-026 §5).
        Muted ~50% saturation for long-session legibility; pair with arrows in UI. */
@@ -148,9 +164,16 @@ All colors MUST be HSL.
     --down-soft: 0 70% 96%;
     --neutral: 215 16% 47%;
 
+    /* --border stays a light, subtle divider for cards/tables/sections --
+       a deliberate trade-off shared with most production enterprise SaaS
+       (see docs/design-system/README.md's accessibility section): full
+       3:1 non-text contrast on every decorative hairline would make the
+       whole UI read as heavily boxed. --input is a real interactive
+       component boundary (WCAG 1.4.11 unambiguously applies) and is
+       darkened enough to clear 3:1 against the page background. */
     --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 217 91% 60%;
+    --input: 214 20% 58%;
+    --ring: 217 91% 53%;
 
     --radius: 0.5rem;
 
@@ -164,7 +187,13 @@ All colors MUST be HSL.
     --sidebar-ring: 217 91% 60%;
 
     /* Custom design tokens */
-    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(197 71% 52%) 100%);
+    /* Colored table-header "title strip" used by CRM list pages. The
+       ThemeProvider recomputes both at runtime for whatever accent the
+       active theme applies, picking a text color that clears WCAG AA
+       (white on gold/yellow accents fails; dark ink is chosen instead). */
+    --title-strip: 217 91% 53%;
+    --title-strip-foreground: 0 0% 100%;
+    --gradient-primary: linear-gradient(135deg, hsl(217 91% 53%) 0%, hsl(197 71% 52%) 100%);
     /* Golden shaded brand gradient for logo marks */
     /* Table defaults to ensure variables always exist; theme can override */
     --table-background: 0 0% 100%;
@@ -193,8 +222,22 @@ All colors MUST be HSL.
     --brand-gold-dark: 35 88% 48%;
     --gradient-hero: linear-gradient(135deg, hsl(222 47% 11%) 0%, hsl(217 32% 17%) 100%);
     --gradient-success: linear-gradient(135deg, hsl(142 71% 45%) 0%, hsl(142 71% 55%) 100%);
-    --shadow-lg: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-    --shadow-primary: 0 10px 30px -10px hsl(217 91% 60% / 0.3);
+
+    /* ==========================================================================
+       ELEVATION SCALE
+       Tinted toward the palette's navy ink (222 47% 11%) rather than pure
+       black, so shadows read as part of the surface family instead of a
+       gray smudge. Kept restrained -- 2026 enterprise SaaS leans flatter,
+       using elevation to separate stacked layers (card < popover < dialog),
+       not as decoration. Tailwind's shadow-sm/md/lg/xl map onto these, so
+       every existing usage picks them up without per-file edits.
+       ========================================================================== */
+    --shadow-xs: 0 1px 2px 0 hsl(222 47% 11% / 0.05);
+    --shadow-sm: 0 1px 3px 0 hsl(222 47% 11% / 0.08), 0 1px 2px -1px hsl(222 47% 11% / 0.06);
+    --shadow-md: 0 4px 6px -1px hsl(222 47% 11% / 0.08), 0 2px 4px -2px hsl(222 47% 11% / 0.06);
+    --shadow-lg: 0 10px 15px -3px hsl(222 47% 11% / 0.10), 0 4px 6px -4px hsl(222 47% 11% / 0.06);
+    --shadow-xl: 0 20px 25px -5px hsl(222 47% 11% / 0.12), 0 8px 10px -6px hsl(222 47% 11% / 0.08);
+    --shadow-primary: 0 10px 30px -10px hsl(217 91% 53% / 0.3);
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --mdm-template-canvas: 186 84% 41%;
     --mdm-template-surface: 0 0% 100%;
@@ -260,7 +303,8 @@ All colors MUST be HSL.
     --popover: 222 33% 17%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 217 91% 60%;
+    /* Same WCAG-driven values as :root -- see the comment there. */
+    --primary: 217 91% 53%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 222 25% 20%;
@@ -270,7 +314,7 @@ All colors MUST be HSL.
     --muted-foreground: 215 20% 70%;
 
     --accent: 197 71% 52%;
-    --accent-foreground: 0 0% 100%;
+    --accent-foreground: 222 47% 11%;
 
     /* Brightened from 30% lightness -- the old value read as near-black
        and made destructive actions/badges hard to spot on dark surfaces. */
@@ -278,10 +322,10 @@ All colors MUST be HSL.
     --destructive-foreground: 0 0% 100%;
 
     --success: 142 71% 45%;
-    --success-foreground: 0 0% 100%;
+    --success-foreground: 222 47% 11%;
 
     --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
+    --warning-foreground: 222 47% 11%;
 
     /* Markets / financial up-down semantics — dark theme (ADR-026 §5). */
     --up: 142 58% 50%;
@@ -293,10 +337,13 @@ All colors MUST be HSL.
     --neutral: 215 14% 65%;
 
     /* Was identical to --card, so panels/inputs had no visible edge at
-       all -- lifted well clear of card lightness for real separation. */
+       all -- lifted well clear of card lightness for real separation.
+       --input goes further still (same --border-vs---input split as
+       :root) since it needs to clear WCAG 1.4.11's 3:1 non-text minimum
+       as an interactive component boundary, not just be "visible". */
     --border: 217 22% 28%;
-    --input: 217 22% 28%;
-    --ring: 217 91% 60%;
+    --input: 217 20% 46%;
+    --ring: 217 91% 53%;
 
     /* Unified onto the same 222 navy hue as --background/--card instead
        of a mismatched neutral gray (240), so the sidebar reads as part
@@ -308,7 +355,18 @@ All colors MUST be HSL.
     --sidebar-accent: 222 28% 16%;
     --sidebar-accent-foreground: 210 30% 96%;
     --sidebar-border: 222 40% 13%;
-    --sidebar-ring: 217 91% 60%;
+    --sidebar-ring: 217 91% 53%;
+
+    /* Dark-mode elevation: the light-mode navy-tinted shadows all but
+       vanish against dark surfaces, so these use deeper, more opaque
+       black. Layer separation in dark mode still comes primarily from the
+       surface-lightness steps above (background < card < popover); shadows
+       are a secondary cue here, not the main one. */
+    --shadow-xs: 0 1px 2px 0 hsl(0 0% 0% / 0.3);
+    --shadow-sm: 0 1px 3px 0 hsl(0 0% 0% / 0.4), 0 1px 2px -1px hsl(0 0% 0% / 0.3);
+    --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.4), 0 2px 4px -2px hsl(0 0% 0% / 0.3);
+    --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.5), 0 4px 6px -4px hsl(0 0% 0% / 0.3);
+    --shadow-xl: 0 20px 25px -5px hsl(0 0% 0% / 0.55), 0 8px 10px -6px hsl(0 0% 0% / 0.35);
     --menu-strip-crm: 272 85% 68%;
     --menu-strip-sales: 217 91% 72%;
     --menu-strip-financials: 150 70% 58%;

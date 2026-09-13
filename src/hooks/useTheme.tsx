@@ -106,6 +106,41 @@ const normalizeHslToken = (value: string | undefined, fallback: string) => {
   return trimmed;
 };
 
+// WCAG 2.1 relative luminance + contrast ratio for an "H S% L%" triple.
+const hslTripleToLuminance = (triple: string): number | null => {
+  const m = triple.trim().match(/^(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)%\s+(\d+(?:\.\d+)?)%/);
+  if (!m) return null;
+  const h = parseFloat(m[1]);
+  const s = parseFloat(m[2]) / 100;
+  const l = parseFloat(m[3]) / 100;
+  const k = (n: number) => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  const channel = (v: number) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+  return 0.2126 * channel(f(0)) + 0.7152 * channel(f(8)) + 0.0722 * channel(f(4));
+};
+
+const WHITE_FOREGROUND = '0 0% 100%';
+const INK_FOREGROUND = '222 47% 11%';
+const WHITE_LUMINANCE = 1;
+const INK_LUMINANCE = hslTripleToLuminance(INK_FOREGROUND) ?? 0.0106;
+
+// Pick the text color for a solid-colored surface (primary/accent
+// buttons, badges) so it clears WCAG AA's 4.5:1 for normal-size text.
+// Themes only ever set the *surface* color; without this, white text
+// stayed hardcoded and became illegible on any light preset (yellows,
+// golds, pastels). Prefers white when it passes, since that's the
+// conventional look for primary/danger actions; falls back to dark ink
+// otherwise -- the same pairing most design systems use for amber.
+const contrastSafeForeground = (surface: string): string => {
+  const lum = hslTripleToLuminance(surface);
+  if (lum === null) return WHITE_FOREGROUND;
+  const whiteRatio = (WHITE_LUMINANCE + 0.05) / (lum + 0.05);
+  if (whiteRatio >= 4.5) return WHITE_FOREGROUND;
+  const inkRatio = (lum + 0.05) / (INK_LUMINANCE + 0.05);
+  return inkRatio >= whiteRatio ? INK_FOREGROUND : WHITE_FOREGROUND;
+};
+
 const buildPresetTheme = (preset: (typeof THEME_PRESETS)[number]): SavedTheme => ({
   name: preset.name,
   start: preset.start,
@@ -195,14 +230,21 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       root.style.setProperty('--primary', t.primary);
       root.style.setProperty('--sidebar-primary', t.primary);
       root.style.setProperty('--ring', t.primary);
+      const primaryFg = contrastSafeForeground(t.primary);
+      root.style.setProperty('--primary-foreground', primaryFg);
+      root.style.setProperty('--sidebar-primary-foreground', primaryFg);
     }
     if (t.accent) {
       root.style.setProperty('--accent', t.accent);
       root.style.setProperty('--sidebar-accent', t.accent);
+      const accentFg = contrastSafeForeground(t.accent);
+      root.style.setProperty('--accent-foreground', accentFg);
+      root.style.setProperty('--sidebar-accent-foreground', accentFg);
     }
     const titleStrip = t.titleStrip || t.accent || t.primary;
     if (titleStrip) {
       root.style.setProperty('--title-strip', titleStrip);
+      root.style.setProperty('--title-strip-foreground', contrastSafeForeground(titleStrip));
     }
     const isDark = typeof t.dark === 'boolean' ? t.dark : document.documentElement.classList.contains('dark');
     
@@ -248,6 +290,19 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
     if (!tableFg) {
       tableFg = isDark ? '210 40% 98%' : '222.2 84% 4.9%';
+    }
+    // Header text must actually be legible on whatever header background
+    // was resolved above -- including an explicit value persisted in a
+    // saved theme, which was never contrast-checked when saved (a real
+    // "High Contrast Blue" row shipped white text on a gold header). Keep
+    // a stored/derived choice only if it clears WCAG AA; otherwise derive.
+    if (thBg) {
+      const bgLum = hslTripleToLuminance(thBg);
+      const textLum = thText ? hslTripleToLuminance(thText) : null;
+      const ratio = bgLum !== null && textLum !== null
+        ? (Math.max(bgLum, textLum) + 0.05) / (Math.min(bgLum, textLum) + 0.05)
+        : 0;
+      if (ratio < 4.5) thText = contrastSafeForeground(thBg);
     }
     // Apply CSS variables used by table components
     if (thText) root.style.setProperty('--table-header-text', thText);

@@ -203,7 +203,7 @@ export default function ContactDetail() {
                                             {contact.title || 'Contact'}
                                         </span>
                                     </div>
-                                    <h1 className="text-3xl font-bold text-foreground">{contact.first_name} {contact.last_name}</h1>
+                                    <h2 className="text-3xl font-bold text-foreground">{contact.first_name} {contact.last_name}</h2>
                                     {contact.accounts && (
                                         <div className="flex items-center gap-2 mt-1 text-muted-foreground">
                                             <Building2 className="h-4 w-4" />

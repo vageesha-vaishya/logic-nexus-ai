@@ -62,6 +62,10 @@ const TableHead = React.forwardRef<HTMLTableCellElement, React.ThHTMLAttributes<
   ({ className, ...props }, ref) => (
     <th
       ref={ref}
+      // Column-header scope by default (WCAG 1.3.1 / technique H63) so
+      // screen readers announce the header for each cell; overridable
+      // via props for the rare row-header case.
+      scope="col"
       className={cn(
         "h-11 px-4 text-left align-middle font-semibold text-sm text-foreground/70 bg-muted/30 border-b [&:has([role=checkbox])]:pr-0 first:rounded-tl-md last:rounded-tr-md",
         className,

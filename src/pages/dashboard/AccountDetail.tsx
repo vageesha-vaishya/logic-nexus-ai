@@ -285,15 +285,18 @@ export default function AccountDetail() {
                                     <div>
                                         <div className="flex items-center gap-6 mb-2">
                                             <div className="flex items-center gap-2">
-                                                <input type="radio" checked={account.account_type !== 'individual'} readOnly className="accent-primary h-4 w-4" />
+                                                <input type="radio" aria-label="Company" checked={account.account_type !== 'individual'} readOnly className="accent-primary h-4 w-4" />
                                                 <span className="text-sm font-semibold text-foreground">Company</span>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                <input type="radio" checked={account.account_type === 'individual'} readOnly className="accent-primary h-4 w-4" />
+                                                <input type="radio" aria-label="Individual" checked={account.account_type === 'individual'} readOnly className="accent-primary h-4 w-4" />
                                                 <span className="text-sm font-semibold text-foreground">Individual</span>
                                             </div>
                                         </div>
-                                        <h1 className="text-3xl font-bold text-foreground">{account.name}</h1>
+                                        {/* h2, not h1: DetailScreenTemplate already renders the
+                                            page's single h1 title; this is the record header
+                                            inside the sheet. */}
+                                        <h2 className="text-3xl font-bold text-foreground">{account.name}</h2>
                                     </div>
 
                                     {/* Address & Metadata Grid */}
