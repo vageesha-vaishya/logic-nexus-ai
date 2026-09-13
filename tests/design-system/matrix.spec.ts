@@ -7,6 +7,7 @@ import {
 } from './pages';
 import { applyModeInitScript, expectMode } from './helpers/theme';
 import { checkLayout } from './helpers/layout';
+import { runAxe } from './helpers/axe';
 import { writeCellResult, type CellResult } from './helpers/results';
 import { readAccessToken, supabaseEnv } from './helpers/env';
 
@@ -63,7 +64,7 @@ for (const def of PAGES) {
 
               result.layout = await checkLayout(page);
 
-              // Task 4 adds: result.axe = await runAxe(page, def.disabledAxeRules ?? []);
+              result.axe = await runAxe(page, def.disabledAxeRules ?? []);
             } catch (e) {
               result.error = e instanceof Error ? e.message : String(e);
               throw e;
@@ -72,6 +73,12 @@ for (const def of PAGES) {
             }
 
             expect.soft(result.layout?.passed, `layout offenders:\n${result.layout?.offenders.join('\n')}`).toBe(true);
+
+            const gated = result.axe?.violations.filter(v => v.impact === 'serious' || v.impact === 'critical') ?? [];
+            expect.soft(
+              gated,
+              `axe serious/critical:\n${gated.map(v => `${v.id} (${v.impact}, ${v.nodes} nodes): ${v.help}`).join('\n')}`,
+            ).toEqual([]);
           });
         });
       }
