@@ -11,6 +11,7 @@
  */
 import { createRoot } from "react-dom/client";
 import MarketsApp from "../MarketsApp";
+import { DARK_MODE_STORAGE_KEY } from "../lib/theme-storage-keys";
 import "../index.css";
 
 import "@fontsource/source-serif-pro/400.css";
@@ -21,7 +22,7 @@ import "@fontsource/inter/500.css";
 import "@fontsource/inter/600.css";
 
 if (typeof window !== "undefined") {
-  const storedDark = localStorage.getItem("lnai_dark_mode");
+  const storedDark = localStorage.getItem(DARK_MODE_STORAGE_KEY);
   if (
     storedDark === "true" ||
     (!storedDark && typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: dark)").matches)

@@ -294,6 +294,15 @@ All colors MUST be HSL.
     --menu-strip-uim: 239 84% 72%;
     --menu-strip-administration: 310 78% 70%;
     --menu-strip-other: 220 15% 72%;
+
+    /* Dark-mode fallbacks for table tokens (mirrors useTheme.tsx's
+       applyTheme() isDark-derived defaults) so tables render correctly
+       via the CSS cascade even before/without the JS theme provider. */
+    --table-background: 222 47% 11%;
+    --table-header-background: 217 32% 17%;
+    --table-header-text: 210 40% 98%;
+    --table-header-separator: 0 0% 100% / 0.15;
+    --table-foreground: 210 40% 98%;
   }
 
   /* ==========================================================================

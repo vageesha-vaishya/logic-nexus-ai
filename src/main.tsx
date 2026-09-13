@@ -1,5 +1,6 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
+import { DARK_MODE_STORAGE_KEY } from "./lib/theme-storage-keys";
 import "./index.css";
 
 // Sthira mobile-brand fonts (lazy-loaded via @fontsource subsets).
@@ -13,7 +14,7 @@ import "@fontsource/inter/600.css";
 
 // Apply dark mode before first render to prevent flash
 if (typeof window !== "undefined") {
-  const storedDark = localStorage.getItem("lnai_dark_mode");
+  const storedDark = localStorage.getItem(DARK_MODE_STORAGE_KEY);
   if (
     storedDark === "true" ||
     (!storedDark && typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: dark)").matches)

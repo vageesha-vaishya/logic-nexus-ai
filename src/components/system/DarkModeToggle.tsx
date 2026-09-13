@@ -1,9 +1,11 @@
 /**
  * DarkModeToggle — persisted dark/light mode switch.
  *
- * - Reads from localStorage key "lnai_dark_mode" on mount.
- * - Falls back to system prefers-color-scheme if no stored value.
- * - Manipulates document.documentElement.classList directly.
+ * Delegates to useTheme()'s isDark/toggleDark so this button drives the
+ * same source of truth as the ThemeProvider -- toggling here re-applies
+ * the active theme's isDark-derived CSS variables (table colors, etc),
+ * not just the `dark` class. Previously this held its own separate
+ * state and localStorage key, which never synced with ThemeProvider.
  *
  * Also exports useDarkMode() hook for reactive reading of current mode.
  */
@@ -11,8 +13,7 @@
 import { useEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const LS_KEY = "lnai_dark_mode";
+import { useTheme } from "@/hooks/useTheme";
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
@@ -44,26 +45,12 @@ interface DarkModeToggleProps {
 }
 
 export function DarkModeToggle({ className }: DarkModeToggleProps) {
-  const [isDark, setIsDark] = useState(() => {
-    if (typeof window === "undefined") return false;
-    const stored = localStorage.getItem(LS_KEY);
-    if (stored !== null) return stored === "true";
-    return window.matchMedia("(prefers-color-scheme: dark)").matches;
-  });
-
-  useEffect(() => {
-    if (isDark) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-    localStorage.setItem(LS_KEY, String(isDark));
-  }, [isDark]);
+  const { isDark, toggleDark } = useTheme();
 
   return (
     <button
       type="button"
-      onClick={() => setIsDark(d => !d)}
+      onClick={() => toggleDark(!isDark)}
       className={cn(
         "inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground",
         "hover:bg-accent hover:text-accent-foreground",

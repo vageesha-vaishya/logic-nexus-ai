@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { THEME_PRESETS } from '@/theme/themes';
 import { useCRM } from '@/hooks/useCRM';
+import { DARK_MODE_STORAGE_KEY } from '@/lib/theme-storage-keys';
 
 export type SavedTheme = {
   name: string;
@@ -168,8 +169,14 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return 'user';
   });
   const [themesFetchDisabled, setThemesFetchDisabled] = useState(false);
-  const LS_DARK_KEY = 'soslogicpro.darkMode';
+  const LS_DARK_KEY = DARK_MODE_STORAGE_KEY;
   const { supabase, context } = useCRM();
+  // Read inside the Supabase-fetch effect without making isDark a reactive
+  // dependency -- toggling dark mode shouldn't re-trigger a theme re-fetch.
+  const isDarkRef = useRef(isDark);
+  useEffect(() => {
+    isDarkRef.current = isDark;
+  }, [isDark]);
   const setScope = useCallback((nextScope: 'platform' | 'tenant' | 'franchise' | 'user') => {
     setScopeState(nextScope);
     localStorage.setItem(LS_SCOPE_KEY, nextScope);
@@ -298,7 +305,23 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     root.setAttribute('data-header-banner-content', headerBannerContent);
   }, []);
 
+  const resolveTheme = useCallback((name: string | null) => {
+    if (!name) return undefined;
+    return themes.find(t => t.name === name)
+      ?? (() => {
+        const preset = THEME_PRESETS.find((p) => p.name === name);
+        return preset ? buildPresetTheme(preset) : undefined;
+      })();
+  }, [themes]);
+
   const toggleDark = useCallback((enabled: boolean) => {
+    // The header's sun/moon toggle switches between the two dedicated
+    // built-in themes (Default Simple / Default Dark), independent of
+    // whatever decorative gradient theme is separately picked in
+    // Settings -- see setActive() for that path, which instead follows
+    // the chosen preset's own `dark` field.
+    const targetThemeName = enabled ? 'Default Dark' : 'Default Simple';
+    const target = resolveTheme(targetThemeName);
     const root = document.documentElement;
     if (enabled) {
       root.classList.add('dark');
@@ -307,13 +330,32 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
     setIsDark(enabled);
     localStorage.setItem(LS_DARK_KEY, String(enabled));
-  }, [LS_DARK_KEY]);
+    setActiveThemeName(targetThemeName);
+    localStorage.setItem(LS_ACTIVE_KEY, targetThemeName);
+    if (target) {
+      applyTheme({ ...target, dark: enabled });
+    }
+  }, [LS_DARK_KEY, resolveTheme]);
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(LS_THEMES_KEY);
       const active = localStorage.getItem(LS_ACTIVE_KEY);
       const darkStored = localStorage.getItem(LS_DARK_KEY);
+
+      // Resolve + apply dark/light mode first, and pass it explicitly into
+      // every applyTheme() call below -- applyTheme's isDark-derived vars
+      // (table colors, etc.) must reflect the real mode from the start,
+      // not whatever document.documentElement.classList happened to say
+      // before this effect ran.
+      const enabled = darkStored !== null ? darkStored === 'true' : false;
+      setIsDark(enabled);
+      if (enabled) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+
       const parsed = raw ? (JSON.parse(raw) as SavedTheme[]) : [];
       const normalized = parsed.map(normalizeSavedThemeForStartup);
       const normalizedRaw = JSON.stringify(normalized);
@@ -329,14 +371,14 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             return preset ? buildPresetTheme(preset) : undefined;
           })();
         if (found) {
-          applyTheme(found);
+          applyTheme({ ...found, dark: enabled });
         } else {
           const fallbackPreset = THEME_PRESETS.find((p) => p.name === 'Default Simple');
           if (fallbackPreset) {
             const fallbackTheme = buildPresetTheme(fallbackPreset);
             setActiveThemeName(fallbackTheme.name);
             localStorage.setItem(LS_ACTIVE_KEY, fallbackTheme.name);
-            applyTheme(fallbackTheme);
+            applyTheme({ ...fallbackTheme, dark: enabled });
           }
         }
       } else {
@@ -345,21 +387,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const fallbackTheme = buildPresetTheme(preset);
           setActiveThemeName(fallbackTheme.name);
           localStorage.setItem(LS_ACTIVE_KEY, fallbackTheme.name);
-          applyTheme(fallbackTheme);
+          applyTheme({ ...fallbackTheme, dark: enabled });
         }
-      }
-      if (darkStored !== null) {
-        const enabled = darkStored === 'true';
-        setIsDark(enabled);
-        if (enabled) {
-          document.documentElement.classList.add('dark');
-        } else {
-          document.documentElement.classList.remove('dark');
-        }
-      } else {
-        // Default to light
-        setIsDark(false);
-        document.documentElement.classList.remove('dark');
       }
     } catch {
       // ignore
@@ -484,7 +513,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           if (selected) {
             setActiveThemeName(selected.name);
             localStorage.setItem(LS_ACTIVE_KEY, selected.name);
-            applyTheme(selected);
+            applyTheme({ ...selected, dark: isDarkRef.current });
           }
         }
       } catch {
@@ -585,12 +614,24 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const setActive = (name: string) => {
     setActiveThemeName(name);
     localStorage.setItem(LS_ACTIVE_KEY, name);
-    const found = themes.find(t => t.name === name)
-      ?? (() => {
-        const preset = THEME_PRESETS.find((p) => p.name === name);
-        return preset ? buildPresetTheme(preset) : undefined;
-      })();
-    if (found) applyTheme(found);
+    const found = resolveTheme(name);
+    if (found) {
+      // A preset authored as dark (or light) should actually put the app
+      // in that mode -- previously this kept whatever isDark already was,
+      // so picking a dark-authored preset applied dark gradient colors
+      // without ever adding the `dark` class, leaving :root's light
+      // --background/--foreground/etc mismatched against it.
+      const enabled = typeof found.dark === 'boolean' ? found.dark : isDark;
+      setIsDark(enabled);
+      localStorage.setItem(LS_DARK_KEY, String(enabled));
+      const root = document.documentElement;
+      if (enabled) {
+        root.classList.add('dark');
+      } else {
+        root.classList.remove('dark');
+      }
+      applyTheme({ ...found, dark: enabled });
+    }
     // Mark default in Supabase for current scope
     (async () => {
       try {
