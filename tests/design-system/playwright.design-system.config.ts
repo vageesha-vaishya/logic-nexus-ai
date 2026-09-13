@@ -21,7 +21,7 @@ const firefoxNoSandbox =
 
 export default defineConfig({
   testDir: __dirname,
-  testMatch: ['**/*.spec.ts', '**/*.setup.ts'],
+  testMatch: ['**/*.spec.ts'],
   outputDir: path.join(repoRoot, 'test-results', 'design-system', 'artifacts'),
   fullyParallel: false,
   workers: 2,
