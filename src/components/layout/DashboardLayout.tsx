@@ -56,7 +56,6 @@ import { GlobalSearch } from '@/components/ui/global-search';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ServiceStatusBadge } from '@/components/dev/ServiceStatusBadge';
 import { DarkModeToggle } from '@/components/system/DarkModeToggle';
-import { TradingModeToggle } from '@/components/system/TradingModeToggle';
 import { AIAssistantPanel } from '@/features/markets/components/AIAssistantPanel';
 import { InAppNotificationBell, useNotificationsRealtime } from '@/features/notifications';
 import { OAuthWelcomeBanner } from '@/components/onboarding/OAuthWelcomeBanner';
@@ -740,7 +739,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               <div className="flex-1" />
               <GlobalSearch />
               <ServiceStatusBadge />
-              <TradingModeToggle />
               <DarkModeToggle />
               <InAppNotificationBell />
               <HelpDialog />
@@ -760,12 +758,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               <ObjectMenu />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="h-9 px-2 gap-2">
+                  <Button variant="ghost" className="h-9 px-2 gap-2" aria-label={userDisplayName}>
                     <Avatar className="h-7 w-7 border">
                       <AvatarImage src={profile?.avatar_url || undefined} alt={userDisplayName} />
                       <AvatarFallback className="text-[11px] font-semibold">{userInitials}</AvatarFallback>
                     </Avatar>
-                    <span className="hidden lg:inline-block max-w-[16ch] truncate">{userDisplayName}</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-64">
