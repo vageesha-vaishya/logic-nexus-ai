@@ -235,11 +235,16 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
     if (!thBg) {
       if (primaryParsed) {
-        thBg = isDark ? lighten(primaryParsed, 5) : lighten(primaryParsed, 45);
+        // Dark mode: a subtle hue-tinted lift off the table surface, not a
+        // full block of saturated primary color -- a bright brand-blue
+        // header row read as loud/clumsy against a muted dark table body.
+        thBg = isDark ? `${primaryParsed.h} 25% 20%` : lighten(primaryParsed, 45);
       }
     }
     if (!tableBg) {
-      tableBg = isDark ? '222.2 84% 4.9%' : '0 0% 100%';
+      // Matches --card's tone family so the table reads as a panel on the
+      // page rather than a disconnected near-black slab.
+      tableBg = isDark ? '222 35% 13%' : '0 0% 100%';
     }
     if (!tableFg) {
       tableFg = isDark ? '210 40% 98%' : '222.2 84% 4.9%';
@@ -342,19 +347,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const raw = localStorage.getItem(LS_THEMES_KEY);
       const active = localStorage.getItem(LS_ACTIVE_KEY);
       const darkStored = localStorage.getItem(LS_DARK_KEY);
-
-      // Resolve + apply dark/light mode first, and pass it explicitly into
-      // every applyTheme() call below -- applyTheme's isDark-derived vars
-      // (table colors, etc.) must reflect the real mode from the start,
-      // not whatever document.documentElement.classList happened to say
-      // before this effect ran.
-      const enabled = darkStored !== null ? darkStored === 'true' : false;
-      setIsDark(enabled);
-      if (enabled) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
+      const storedEnabled = darkStored !== null ? darkStored === 'true' : false;
 
       const parsed = raw ? (JSON.parse(raw) as SavedTheme[]) : [];
       const normalized = parsed.map(normalizeSavedThemeForStartup);
@@ -363,32 +356,40 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         localStorage.setItem(LS_THEMES_KEY, normalizedRaw);
       }
       setThemes(normalized);
-      setActiveThemeName(active);
-      if (active) {
-        const found = normalized.find(t => t.name === active)
+
+      let resolvedActiveName = active;
+      let found = active
+        ? (normalized.find(t => t.name === active)
           ?? (() => {
             const preset = THEME_PRESETS.find((p) => p.name === active);
             return preset ? buildPresetTheme(preset) : undefined;
-          })();
-        if (found) {
-          applyTheme({ ...found, dark: enabled });
+          })())
+        : undefined;
+      if (!found) {
+        const fallbackPreset = THEME_PRESETS.find((p) => p.name === 'Default Simple');
+        found = fallbackPreset ? buildPresetTheme(fallbackPreset) : undefined;
+        resolvedActiveName = found?.name ?? null;
+      }
+      if (found) {
+        // Derive dark/light mode from the resolved theme's OWN `dark`
+        // field when it declares one, falling back to the stored toggle
+        // preference otherwise -- previously this always forced whatever
+        // the toggle last said, so a light-authored preset (e.g. a
+        // gallery pick like "High Contrast Blue") could render with the
+        // `dark` class forced on, leaving its light-designed inline
+        // colors (white sidebar, bright table header) mismatched against
+        // dark base tokens. Matches setActive()'s reconciliation below.
+        const enabled = typeof found.dark === 'boolean' ? found.dark : storedEnabled;
+        setIsDark(enabled);
+        localStorage.setItem(LS_DARK_KEY, String(enabled));
+        if (enabled) {
+          document.documentElement.classList.add('dark');
         } else {
-          const fallbackPreset = THEME_PRESETS.find((p) => p.name === 'Default Simple');
-          if (fallbackPreset) {
-            const fallbackTheme = buildPresetTheme(fallbackPreset);
-            setActiveThemeName(fallbackTheme.name);
-            localStorage.setItem(LS_ACTIVE_KEY, fallbackTheme.name);
-            applyTheme({ ...fallbackTheme, dark: enabled });
-          }
+          document.documentElement.classList.remove('dark');
         }
-      } else {
-        const preset = THEME_PRESETS.find(p => p.name === 'Default Simple');
-        if (preset) {
-          const fallbackTheme = buildPresetTheme(preset);
-          setActiveThemeName(fallbackTheme.name);
-          localStorage.setItem(LS_ACTIVE_KEY, fallbackTheme.name);
-          applyTheme({ ...fallbackTheme, dark: enabled });
-        }
+        setActiveThemeName(resolvedActiveName);
+        if (resolvedActiveName) localStorage.setItem(LS_ACTIVE_KEY, resolvedActiveName);
+        applyTheme({ ...found, dark: enabled });
       }
     } catch {
       // ignore
@@ -511,9 +512,22 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const fallback = mapped.find((theme) => theme.name === 'Default Simple') ?? mapped[0];
           const selected = def ? mapped.find((theme) => theme.name === def.name) : fallback;
           if (selected) {
+            // Same reconciliation as setActive()/the initial-load effect:
+            // a persisted scope theme's own `dark` field wins over the
+            // current toggle state so a light-authored DB theme can't end
+            // up rendered with the dark class forced on.
+            const enabled = typeof selected.dark === 'boolean' ? selected.dark : isDarkRef.current;
+            setIsDark(enabled);
+            localStorage.setItem(LS_DARK_KEY, String(enabled));
+            const root = document.documentElement;
+            if (enabled) {
+              root.classList.add('dark');
+            } else {
+              root.classList.remove('dark');
+            }
             setActiveThemeName(selected.name);
             localStorage.setItem(LS_ACTIVE_KEY, selected.name);
-            applyTheme({ ...selected, dark: isDarkRef.current });
+            applyTheme({ ...selected, dark: enabled });
           }
         }
       } catch {

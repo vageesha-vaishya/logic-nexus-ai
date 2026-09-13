@@ -734,10 +734,13 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 </BreadcrumbList>
               </Breadcrumb>
               <div className="flex-1" />
+              {/* Scope/context switchers first -- they define what tenant/
+                  domain the rest of the page's data belongs to, so they sit
+                  closest to the breadcrumb rather than mixed in with
+                  personal utility controls on the far right. */}
+              <DomainSwitcher />
+              <AdminScopeSwitcher />
               <GlobalSearch />
-              <DarkModeToggle />
-              <InAppNotificationBell />
-              <HelpDialog />
               {canShowDebugButton && (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -748,8 +751,12 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   <TooltipContent side="bottom">Open Pipeline Debugger</TooltipContent>
                 </Tooltip>
               )}
-              <DomainSwitcher />
-              <AdminScopeSwitcher />
+              {/* Utility icons ordered least- to most-personal, ending with
+                  the appearance toggle immediately before the account menu
+                  (matches the common GitHub/Linear/Vercel pattern). */}
+              <HelpDialog />
+              <InAppNotificationBell />
+              <DarkModeToggle />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="h-9 px-2 gap-2" aria-label={userDisplayName}>

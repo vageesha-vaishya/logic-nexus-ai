@@ -38,17 +38,20 @@ export const THEME_PRESETS: ThemePreset[] = [
   // introducing a separate one.
   {
     name: 'Default Dark',
-    start: '222 47% 15%',
-    end: '217 32% 20%',
+    start: '222 40% 16%',
+    end: '217 30% 22%',
     primary: '217 91% 60%',
     accent: '197 71% 52%',
     angle: 120,
     radius: '0.5rem',
-    sidebarBackground: '240 5.9% 10%',
-    sidebarAccent: '240 3.7% 15.9%',
+    // Same 222-navy hue family as bgStart/bgEnd below (and index.css's
+    // .dark block) rather than a neutral gray, so the sidebar reads as
+    // part of one cohesive surface instead of a mismatched panel.
+    sidebarBackground: '222 50% 7%',
+    sidebarAccent: '222 28% 16%',
     dark: true,
-    bgStart: '222 47% 11%',
-    bgEnd: '217 32% 17%',
+    bgStart: '222 47% 9%',
+    bgEnd: '222 35% 14%',
     bgAngle: 120,
   },
   { name: 'Ocean Breeze', start: '200 90% 56%', end: '187 92% 45%', primary: '199 89% 48%', accent: '187 92% 45%' },

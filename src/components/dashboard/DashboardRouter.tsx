@@ -145,7 +145,7 @@ export function DashboardRouter() {
 
   return (
     <DashboardLayout>
-      <div className="flex-1 overflow-auto p-6 bg-gray-50 space-y-4">
+      <div className="flex-1 overflow-auto p-6 bg-background space-y-4">
         {/* "Get set up" panel — self-hides for retail memberships, all-
             completed tenants, and when there's nothing to show. See
             docs/plans/2026-05-22-unified-platform-onboarding-design.md. */}

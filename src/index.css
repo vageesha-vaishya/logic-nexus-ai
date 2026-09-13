@@ -234,28 +234,32 @@ All colors MUST be HSL.
   }
 
   .dark {
-    --background: 222 47% 11%;
+    --background: 222 47% 9%;
     --foreground: 210 40% 98%;
 
-    --card: 217 32% 17%;
+    /* Card sits one clear step above background; popover one step above
+       card again so stacked surfaces (dropdown over card) stay legible. */
+    --card: 222 35% 14%;
     --card-foreground: 210 40% 98%;
 
-    --popover: 217 32% 17%;
+    --popover: 222 33% 17%;
     --popover-foreground: 210 40% 98%;
 
     --primary: 217 91% 60%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 217 32% 17%;
+    --secondary: 222 25% 20%;
     --secondary-foreground: 210 40% 98%;
 
-    --muted: 217 32% 17%;
-    --muted-foreground: 215 20% 65%;
+    --muted: 222 22% 18%;
+    --muted-foreground: 215 20% 70%;
 
     --accent: 197 71% 52%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 62% 30%;
+    /* Brightened from 30% lightness -- the old value read as near-black
+       and made destructive actions/badges hard to spot on dark surfaces. */
+    --destructive: 0 70% 48%;
     --destructive-foreground: 0 0% 100%;
 
     --success: 142 71% 45%;
@@ -273,17 +277,22 @@ All colors MUST be HSL.
     --down-soft: 0 50% 14%;
     --neutral: 215 14% 65%;
 
-    --border: 217 32% 17%;
-    --input: 217 32% 17%;
+    /* Was identical to --card, so panels/inputs had no visible edge at
+       all -- lifted well clear of card lightness for real separation. */
+    --border: 217 22% 28%;
+    --input: 217 22% 28%;
     --ring: 217 91% 60%;
 
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    /* Unified onto the same 222 navy hue as --background/--card instead
+       of a mismatched neutral gray (240), so the sidebar reads as part
+       of the same surface family rather than a bolted-on panel. */
+    --sidebar-background: 222 50% 7%;
+    --sidebar-foreground: 210 25% 92%;
+    --sidebar-primary: 217 91% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-accent: 222 28% 16%;
+    --sidebar-accent-foreground: 210 30% 96%;
+    --sidebar-border: 222 40% 13%;
     --sidebar-ring: 217 91% 60%;
     --menu-strip-crm: 272 85% 68%;
     --menu-strip-sales: 217 91% 72%;
@@ -297,11 +306,14 @@ All colors MUST be HSL.
 
     /* Dark-mode fallbacks for table tokens (mirrors useTheme.tsx's
        applyTheme() isDark-derived defaults) so tables render correctly
-       via the CSS cascade even before/without the JS theme provider. */
-    --table-background: 222 47% 11%;
-    --table-header-background: 217 32% 17%;
+       via the CSS cascade even before/without the JS theme provider.
+       Table matches --card rather than pure --background so it reads as
+       a panel on the page instead of a disconnected black slab, and the
+       header is a subtle tinted lift rather than a flat gray band. */
+    --table-background: 222 35% 14%;
+    --table-header-background: 222 28% 19%;
     --table-header-text: 210 40% 98%;
-    --table-header-separator: 0 0% 100% / 0.15;
+    --table-header-separator: 0 0% 100% / 0.12;
     --table-foreground: 210 40% 98%;
   }
 
