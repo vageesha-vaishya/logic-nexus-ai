@@ -82,6 +82,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [platformAdminAccess, setPlatformAdminAccess] = useState(false);
   const [loading, setLoading] = useState(true);
   const isFetchingRef = useRef(false);
+  // Which user's data is currently being loaded. Late-arriving permission
+  // results (see loadUserData) only apply if this still matches, so a
+  // sign-out / user switch mid-flight never gets overwritten by stale data.
+  const activeLoadUserIdRef = useRef<string | null>(null);
 
   const fetchUserRoles = async (userId: string) => {
     const { data, error } = await supabase
@@ -149,25 +153,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const loadUserData = async (currentUser: User) => {
+    activeLoadUserIdRef.current = currentUser.id;
     try {
       logger.info('Loading user data', { userId: currentUser.id, component: 'AuthProvider' });
 
       // Load roles first so admin-gated UI (AdminScopeSwitcher, Transfer Center, etc.)
       // can appear even if other (slower) lookups are still running.
-      const timeout = <T,>(ms: number, fallback: T, name: string) =>
-        new Promise<T>((resolve) => setTimeout(() => {
-          logger.warn(`Timeout loading ${name}`, { userId: currentUser.id, component: 'AuthProvider' });
+      // `real` lets the timer know whether the genuine fetch already won the
+      // race. Without it the warning fired unconditionally 5s after start --
+      // even on fast loads where nothing timed out -- which made the logs
+      // read as if every permission lookup was failing all the time.
+      const timeout = <T,>(ms: number, fallback: T, name: string, real?: Promise<unknown>) => {
+        let settled = false;
+        real?.then(() => { settled = true; }, () => { settled = true; });
+        return new Promise<T>((resolve) => setTimeout(() => {
+          if (!settled) {
+            logger.warn(`Timeout loading ${name}`, { userId: currentUser.id, component: 'AuthProvider' });
+          }
           resolve(fallback);
         }, ms));
+      };
 
+      const profileReal = fetchProfile(currentUser.id);
       const profilePromise = Promise.race([
-        fetchProfile(currentUser.id),
-        timeout(5000, null, 'profile')
+        profileReal,
+        timeout(5000, null, 'profile', profileReal)
       ]);
 
+      // The `*Real` promises are kept separately from the timeout races so
+      // that when a timeout wins, the genuine result isn't silently dropped
+      // (Promise.race discards the loser) -- it's applied late instead. See
+      // the late-apply block after the initial setPermissions below.
+      const emptyCustomPerms = { granted: [] as Permission[], denied: [] as Permission[] };
+      const customPermsReal = fetchCustomPermissions(currentUser.id).catch((e) => {
+        logger.warn('Failed to load custom permissions', { error: e, component: 'AuthProvider' });
+        return emptyCustomPerms;
+      });
       const customPermsPromise = Promise.race([
-        fetchCustomPermissions(currentUser.id),
-        timeout(5000, { granted: [], denied: [] } as { granted: Permission[], denied: Permission[] }, 'customPermissions')
+        customPermsReal,
+        timeout(5000, emptyCustomPerms, 'customPermissions', customPermsReal)
       ]);
 
       // Create a temporary scoped access with minimal context for fetching system definitions
@@ -181,32 +205,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const sda = new ScopedDataAccess(supabase, systemContext);
       const roleService = new RoleService(sda);
 
+      const rolesReal = fetchUserRoles(currentUser.id);
       const rolesResult = await Promise.race([
-        fetchUserRoles(currentUser.id),
-        timeout(5000, [], 'userRoles')
+        rolesReal,
+        timeout(5000, [], 'userRoles', rolesReal)
       ]) as any[];
 
       setRoles(rolesResult);
 
+      const dynamicMapReal = roleService.getRolePermissions(rolesResult).catch((e) => {
+        logger.warn('Failed to load dynamic permissions', { error: e, component: 'AuthProvider' });
+        return {} as Record<string, string[]>;
+      });
       const dynamicMapPromise = Promise.race([
-        roleService.getRolePermissions(rolesResult).catch((e) => {
-          logger.warn('Failed to load dynamic permissions', { error: e, component: 'AuthProvider' });
-          return {} as Record<string, string[]>;
-        }),
-        timeout(5000, {} as Record<string, string[]>, 'dynamicPermissions'),
+        dynamicMapReal,
+        timeout(5000, {} as Record<string, string[]>, 'dynamicPermissions', dynamicMapReal),
       ]);
 
+      const emptyHierarchy = { parentsToChildren: {}, childrenToParents: {}, available: false };
+      const hierarchyReal = roleService.getRoleHierarchy().catch((e) => {
+        logger.warn('Failed to load role hierarchy', { error: e, component: 'AuthProvider' });
+        return emptyHierarchy;
+      });
       const hierarchyPromise = Promise.race([
-        roleService.getRoleHierarchy().catch((e) => {
-          logger.warn('Failed to load role hierarchy', { error: e, component: 'AuthProvider' });
-          return { parentsToChildren: {}, childrenToParents: {}, available: false };
-        }),
-        timeout(5000, { parentsToChildren: {}, childrenToParents: {}, available: false }, 'roleHierarchy'),
+        hierarchyReal,
+        timeout(5000, emptyHierarchy, 'roleHierarchy', hierarchyReal),
       ]);
 
+      const platformAdminReal = fetchPlatformAdminAccess();
       const platformAdminPromise = Promise.race([
-        fetchPlatformAdminAccess(),
-        timeout(5000, false, 'platformAdminAccess'),
+        platformAdminReal,
+        timeout(5000, false, 'platformAdminAccess', platformAdminReal),
       ]);
 
       const [profileResult, customPermsResult, dynamicMapResult, hierarchyResult, platformAdminResult] = await Promise.all([
@@ -220,38 +249,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfile(profileResult);
       setPlatformAdminAccess(Boolean(platformAdminResult));
 
-      const dynamicMap = dynamicMapResult || {};
-      const hierarchyParents = (hierarchyResult as any)?.childrenToParents || {};
+      const computeFinalPerms = (
+        dynamicMapInput: Record<string, string[]> | null | undefined,
+        hierarchyInput: unknown,
+        customPerms: { granted: Permission[]; denied: Permission[] },
+      ): Permission[] => {
+        const dynamicMap = dynamicMapInput || {};
+        const hierarchyParents = (hierarchyInput as any)?.childrenToParents || {};
 
-      const standardPerms = unionPermissions(
-        ...rolesResult.map((r) => {
-          const base = (dynamicMap[r.role] as Permission[]) || ROLE_PERMISSIONS[r.role] || [];
-          const collectAncestors = (roleId: string, visited = new Set<string>()): string[] => {
-            if (visited.has(roleId)) return [];
-            visited.add(roleId);
-            const direct = hierarchyParents[roleId] || [];
-            const all = [...direct];
-            direct.forEach((pr: string) => {
-              all.push(...collectAncestors(pr, visited));
-            });
-            return Array.from(new Set(all));
-          };
-          const parents = collectAncestors(r.role);
-          const inherited = parents.flatMap((p: string) => ((dynamicMap[p] as Permission[]) || ROLE_PERMISSIONS[p] || []));
-          return unionPermissions(base, inherited);
-        })
-      );
+        const standardPerms = unionPermissions(
+          ...rolesResult.map((r) => {
+            const base = (dynamicMap[r.role] as Permission[]) || ROLE_PERMISSIONS[r.role] || [];
+            const collectAncestors = (roleId: string, visited = new Set<string>()): string[] => {
+              if (visited.has(roleId)) return [];
+              visited.add(roleId);
+              const direct = hierarchyParents[roleId] || [];
+              const all = [...direct];
+              direct.forEach((pr: string) => {
+                all.push(...collectAncestors(pr, visited));
+              });
+              return Array.from(new Set(all));
+            };
+            const parents = collectAncestors(r.role);
+            const inherited = parents.flatMap((p: string) => ((dynamicMap[p] as Permission[]) || ROLE_PERMISSIONS[p] || []));
+            return unionPermissions(base, inherited);
+          })
+        );
 
-      const { granted, denied } = customPermsResult;
+        const { granted, denied } = customPerms;
+        // Merge granted permissions with standard permissions, then remove
+        // denied ones (custom roles override).
+        return unionPermissions(standardPerms, granted).filter((p) => !denied.includes(p));
+      };
 
-      // Merge granted permissions with standard permissions
-      const mergedPerms = unionPermissions(standardPerms, granted);
-
-      // Remove denied permissions (custom roles override)
-      const finalPerms = mergedPerms.filter((p) => !denied.includes(p));
-
+      const finalPerms = computeFinalPerms(dynamicMapResult, hierarchyResult, customPermsResult);
       setPermissions(finalPerms);
       logger.info('User data loaded successfully', { userId: currentUser.id, roleCount: rolesResult.length, permCount: finalPerms.length, component: 'AuthProvider' });
+
+      // Late-apply. If any of the 5s timeouts above won its race, the
+      // permission set just applied was computed from empty fallbacks --
+      // and for a custom (non-built-in) role there is no static
+      // ROLE_PERMISSIONS entry to fall back on, so it came out empty.
+      // Previously that was permanent: the real fetch kept running but
+      // Promise.race threw its result away, so one slow RPC on a slow
+      // network left the whole session reading as "Access Denied" on
+      // every ProtectedRoute. Now the genuine results are applied once
+      // they land, guarded so they can't overwrite a different user's
+      // session if the account changed in the meantime.
+      void Promise.all([dynamicMapReal, hierarchyReal, customPermsReal]).then(
+        ([realDynamic, realHierarchy, realCustom]) => {
+          if (activeLoadUserIdRef.current !== currentUser.id) return;
+          const latePerms = computeFinalPerms(realDynamic, realHierarchy, realCustom);
+          if (latePerms.length === finalPerms.length && latePerms.every((p) => finalPerms.includes(p))) return;
+          setPermissions(latePerms);
+          logger.info('Applied late-arriving permission data', { userId: currentUser.id, permCount: latePerms.length, component: 'AuthProvider' });
+        }
+      );
     } catch (error: any) {
       logger.error('Error loading user data', { error: error.message, stack: error.stack, component: 'AuthProvider' });
       // Ensure we don't leave the app in a broken state

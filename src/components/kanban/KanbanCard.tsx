@@ -72,11 +72,13 @@ export const KanbanCard = memo(function KanbanCard({ item, isOverlay, onUpdate, 
     transform: CSS.Translate.toString(transform),
   };
 
+  // Light-tint badge in light mode; deep low-opacity tint + light text in
+  // dark mode so the pill sits on a dark card instead of glowing on it.
   const priorityColors = {
-    low: "bg-slate-100 text-slate-700 border-slate-200",
-    medium: "bg-blue-100 text-blue-700 border-blue-200",
-    high: "bg-amber-100 text-amber-700 border-amber-200",
-    critical: "bg-red-100 text-red-700 border-red-200",
+    low: "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800/60 dark:text-slate-300 dark:border-slate-700",
+    medium: "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800",
+    high: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800",
+    critical: "bg-red-100 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800",
   };
 
   const priorityBorderColors = {

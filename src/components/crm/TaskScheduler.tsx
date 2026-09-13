@@ -37,9 +37,9 @@ interface TaskSchedulerProps {
 
 const getPriorityColor = (priority: Task['priority']) => {
   switch (priority) {
-    case 'high': return 'text-red-600 bg-red-50 border-red-200';
-    case 'medium': return 'text-orange-600 bg-orange-50 border-orange-200';
-    case 'low': return 'text-blue-600 bg-blue-50 border-blue-200';
+    case 'high': return 'text-red-600 bg-red-50 border-red-200 dark:text-red-300 dark:bg-red-950/40 dark:border-red-800';
+    case 'medium': return 'text-orange-600 bg-orange-50 border-orange-200 dark:text-orange-300 dark:bg-orange-950/40 dark:border-orange-800';
+    case 'low': return 'text-blue-600 bg-blue-50 border-blue-200 dark:text-blue-300 dark:bg-blue-950/40 dark:border-blue-800';
     default: return 'text-muted-foreground bg-muted border-border';
   }
 };

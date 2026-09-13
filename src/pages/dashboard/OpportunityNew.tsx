@@ -1,11 +1,9 @@
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Button } from '@/components/ui/button';
 import { OpportunityForm } from '@/components/crm/OpportunityForm';
-import { ArrowLeft } from 'lucide-react';
+import { EntityNewPageHeader } from '@/components/crm/EntityNewPageHeader';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
-import { H1 } from '@/components/ui/Heading';
 
 export default function OpportunityNew() {
   const navigate = useNavigate();
@@ -62,15 +60,11 @@ export default function OpportunityNew() {
   return (
     <DashboardLayout>
       <div className="max-w-4xl mx-auto space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={handleCancel}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <H1>New Opportunity</H1>
-            <p className="text-muted-foreground">Create a new sales opportunity</p>
-          </div>
-        </div>
+        <EntityNewPageHeader
+          title="New Opportunity"
+          subtitle="Create a new sales opportunity"
+          onBack={handleCancel}
+        />
 
         <OpportunityForm onSubmit={handleSubmit} onCancel={handleCancel} />
       </div>

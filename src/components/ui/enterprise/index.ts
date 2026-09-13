@@ -8,9 +8,6 @@ export type { EnterpriseFormLayoutProps } from './EnterpriseFormLayout';
 // Tab Components
 export { EnterpriseNotebook, EnterpriseTab } from './EnterpriseTabs';
 
-// Activity Components
-export { EnterpriseActivityFeed } from './EnterpriseActivityFeed';
-
 // Table Component
 export { EnterpriseTable } from './EnterpriseTable';
 export type { Column, EnterpriseTableProps } from './EnterpriseTable';
@@ -19,30 +16,5 @@ export type { Column, EnterpriseTableProps } from './EnterpriseTable';
 export { EnterpriseCard } from './EnterpriseCard';
 export type { EnterpriseCardProps } from './EnterpriseCard';
 
-// Modal Component
-export { EnterpriseModal } from './EnterpriseModal';
-export type { EnterpriseModalProps } from './EnterpriseModal';
-
-// Header Component
-export { EnterpriseHeader } from './EnterpriseHeader';
-export type { EnterpriseHeaderProps } from './EnterpriseHeader';
-
-// Button Component
-export { EnterpriseButton } from './EnterpriseButton';
-export type { EnterpriseButtonProps } from './EnterpriseButton';
-
-// Form Components
-export {
-  EnterpriseForm,
-  EnterpriseFormSection,
-  EnterpriseFormRow,
-  EnterpriseFormField,
-} from './EnterpriseForm';
-export type {
-  EnterpriseFormProps,
-  EnterpriseFormSectionProps,
-  EnterpriseFormRowProps,
-  EnterpriseFormFieldProps,
-} from './EnterpriseForm';
 export { PlatformWidgetRail, PlatformWidgetSlot } from './PlatformWidgetContracts';
 export type { PlatformWidgetContract } from './PlatformWidgetContracts';

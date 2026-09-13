@@ -43,14 +43,31 @@ export default function ContactDetail() {
 
   const fetchContact = async () => {
     try {
+      // No `accounts(name)` embed: v_contacts was rebuilt on core.parties +
+      // crm.contact_extensions (migration 20260529070000) and no longer
+      // references the legacy public.accounts table, so PostgREST can't
+      // resolve that relationship and returns 400 -- every contact page
+      // failed to load. Resolve the account name with a separate lookup
+      // against v_accounts instead, keeping `contact.accounts.name` shaped
+      // the way the rest of this component expects.
       const { data, error } = await scopedDb
         .from('v_contacts')
-        .select('*, accounts(name)')
+        .select('*')
         .eq('id', id)
         .single();
 
       if (error) throw error;
-      setContact(data);
+
+      let accounts: { name: string } | null = null;
+      if (data?.account_id) {
+        const { data: account } = await scopedDb
+          .from('v_accounts')
+          .select('name')
+          .eq('id', data.account_id)
+          .maybeSingle();
+        if (account?.name) accounts = { name: account.name };
+      }
+      setContact({ ...data, accounts });
     } catch (error: any) {
       toast.error('Failed to load contact');
     } finally {
@@ -224,7 +241,7 @@ export default function ContactDetail() {
                                         <EnterpriseField label="Tags" value={
                                             <div className="flex gap-1 flex-wrap">
                                                 {contact.lead_source && <Badge variant="outline" className="rounded-full px-2 font-normal">{contact.lead_source}</Badge>}
-                                                {contact.lifecycle_stage && <Badge variant="secondary" className="rounded-full px-2 font-normal bg-green-100 text-green-800 hover:bg-green-200">{contact.lifecycle_stage}</Badge>}
+                                                {contact.lifecycle_stage && <Badge variant="secondary" className="rounded-full px-2 font-normal bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-950/40 dark:text-green-300 dark:hover:bg-green-900/50">{contact.lifecycle_stage}</Badge>}
                                             </div>
                                         } />
                                     </div>

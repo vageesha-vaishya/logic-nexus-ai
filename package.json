@@ -12,6 +12,7 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
+    "audit:contrast": "node docs/design-system/contrast-audit.mjs",
     "lint": "eslint . --ext .ts,.tsx,.mdx",
     "lint:unit": "eslint src --ext .ts,.tsx,.mdx",
     "lint:unit:fix": "eslint src --ext .ts,.tsx,.mdx --fix",
@@ -300,6 +301,7 @@
   },
   "lint-staged": {
     "src/**/*.{ts,tsx}": "eslint --fix",
-    "supabase/functions/**/*.ts": "eslint --fix"
+    "supabase/functions/**/*.ts": "eslint --fix",
+    "src/index.css": "node docs/design-system/contrast-audit.mjs"
   }
 }

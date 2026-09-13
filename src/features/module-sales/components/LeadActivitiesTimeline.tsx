@@ -247,9 +247,9 @@ export function LeadActivitiesTimeline({ leadId, eventBus }: LeadActivitiesTimel
 
   const getPriorityColor = (priority: string | null) => {
     switch ((priority || '').toLowerCase()) {
-      case 'high': return 'text-red-600 bg-red-50 border-red-200';
-      case 'medium': return 'text-amber-600 bg-amber-50 border-amber-200';
-      case 'low': return 'text-green-600 bg-green-50 border-green-200';
+      case 'high': return 'text-red-600 bg-red-50 border-red-200 dark:text-red-300 dark:bg-red-950/40 dark:border-red-800';
+      case 'medium': return 'text-amber-600 bg-amber-50 border-amber-200 dark:text-amber-300 dark:bg-amber-950/40 dark:border-amber-800';
+      case 'low': return 'text-green-600 bg-green-50 border-green-200 dark:text-green-300 dark:bg-green-950/40 dark:border-green-800';
       default: return 'text-muted-foreground bg-muted border-border';
     }
   };

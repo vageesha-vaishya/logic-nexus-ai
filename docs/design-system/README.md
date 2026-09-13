@@ -277,13 +277,13 @@ Earlier in the same day (separate commits): dark/light theme unification, header
 
 ## Appendix A — Re-running the contrast audit
 
-Run after **any** token change:
-
 ```bash
-node docs/design-system/contrast-audit.mjs
+npm run audit:contrast
 ```
 
-Edit the token table at the top of the script when values change. Thresholds: 4.5:1 normal text, 3:1 large text and UI component boundaries.
+The script parses the live token values straight out of `src/index.css`'s `:root` and `.dark` blocks — there is no hand-maintained copy to drift out of sync. It also runs automatically as a **pre-commit hook** (via `lint-staged`) whenever `src/index.css` is staged, and blocks the commit on any failure. Thresholds: 4.5:1 normal text, 3:1 large text and UI component boundaries.
+
+To add a new pair to check, append to the `PAIRS` table in the script. A missing token is reported as a failure, so renaming a token without updating the audit is caught too.
 
 ## Appendix B — Not done / open items
 

@@ -1,74 +1,60 @@
 // WCAG 2.1 contrast audit for the design tokens in src/index.css.
-// Run after ANY token change:   node docs/design-system/contrast-audit.mjs
-// Keep the two token tables below in sync with :root / .dark in index.css.
+//
+//   node docs/design-system/contrast-audit.mjs
+//
+// Reads the live token values straight out of index.css's `:root` and
+// `.dark` blocks (no hand-maintained copy to drift), so it genuinely gates
+// token changes. Wired into lint-staged for the files that define or apply
+// color tokens; exits non-zero on any failure.
 //
 // Thresholds (WCAG 2.1 AA):
 //   4.5:1  normal text (buttons/badges are 12-14px -> normal, even when bold)
 //   3.0:1  large text (>=18.66px bold or >=24px) and UI component boundaries (1.4.11)
 
-const LIGHT = {
-  background: '0 0% 100%',
-  card: '0 0% 100%',
-  foreground: '222 47% 11%',
-  mutedForeground: '215 16% 47%',
-  muted: '210 40% 96%',
-  secondary: '210 40% 96%',
-  secondaryForeground: '222 47% 11%',
-  primary: '217 91% 53%',
-  primaryForeground: '0 0% 100%',
-  accent: '197 71% 52%',
-  accentForeground: '222 47% 11%',
-  destructive: '0 84% 50%',
-  destructiveForeground: '0 0% 100%',
-  success: '142 71% 45%',
-  successForeground: '222 47% 11%',
-  warning: '38 92% 50%',
-  warningForeground: '222 47% 11%',
-  border: '214 32% 91%',
-  input: '214 20% 58%',
-  ring: '217 91% 53%',
-  sidebarBackground: '0 0% 98%',
-  sidebarForeground: '240 5.3% 26.1%',
-};
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 
-const DARK = {
-  background: '222 47% 9%',
-  card: '222 35% 14%',
-  foreground: '210 40% 98%',
-  mutedForeground: '215 20% 70%',
-  muted: '222 22% 18%',
-  secondary: '222 25% 20%',
-  secondaryForeground: '210 40% 98%',
-  primary: '217 91% 53%',
-  primaryForeground: '0 0% 100%',
-  accent: '197 71% 52%',
-  accentForeground: '222 47% 11%',
-  destructive: '0 70% 48%',
-  destructiveForeground: '0 0% 100%',
-  success: '142 71% 45%',
-  successForeground: '222 47% 11%',
-  warning: '38 92% 50%',
-  warningForeground: '222 47% 11%',
-  border: '217 22% 28%',
-  input: '217 20% 46%',
-  ring: '217 91% 53%',
-  sidebarBackground: '222 50% 7%',
-  sidebarForeground: '210 25% 92%',
-};
+const here = dirname(fileURLToPath(import.meta.url));
+const css = readFileSync(resolve(here, '../../src/index.css'), 'utf8');
 
-// [label, foregroundKey, backgroundKey, threshold]
+// Pull `--name: H S% L%;` declarations out of one selector block. Only the
+// first block matching the selector is used (`:root` appears once; `.dark`
+// appears once at top level -- the Sthira `:root[data-sthira-theme]` blocks
+// use a different selector and are ignored).
+function tokensFor(selector) {
+  const start = css.indexOf(`${selector} {`);
+  if (start < 0) throw new Error(`Could not find "${selector} {" in index.css`);
+  let depth = 0, i = start + selector.length + 1, end = -1;
+  for (; i < css.length; i++) {
+    if (css[i] === '{') depth++;
+    else if (css[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
+  }
+  const block = css.slice(start, end);
+  const out = {};
+  for (const m of block.matchAll(/--([a-z0-9-]+):\s*([\d.]+\s+[\d.]+%\s+[\d.]+%)\s*;/g)) {
+    out[m[1]] = m[2];
+  }
+  return out;
+}
+
+const LIGHT = tokensFor(':root');
+const DARK = { ...LIGHT, ...tokensFor('.dark') }; // .dark overrides :root; unset tokens inherit
+
+// [label, foregroundToken, backgroundToken, threshold]. threshold 0 = report only.
 const PAIRS = [
   ['foreground on background', 'foreground', 'background', 4.5],
   ['foreground on card', 'foreground', 'card', 4.5],
-  ['muted-foreground on background', 'mutedForeground', 'background', 4.5],
-  ['muted-foreground on card', 'mutedForeground', 'card', 4.5],
-  ['secondary-foreground on secondary', 'secondaryForeground', 'secondary', 4.5],
-  ['primary-foreground on primary', 'primaryForeground', 'primary', 4.5],
-  ['accent-foreground on accent', 'accentForeground', 'accent', 4.5],
-  ['destructive-foreground on destructive', 'destructiveForeground', 'destructive', 4.5],
-  ['success-foreground on success', 'successForeground', 'success', 4.5],
-  ['warning-foreground on warning', 'warningForeground', 'warning', 4.5],
-  ['sidebar-foreground on sidebar-bg', 'sidebarForeground', 'sidebarBackground', 4.5],
+  ['muted-foreground on background', 'muted-foreground', 'background', 4.5],
+  ['muted-foreground on card', 'muted-foreground', 'card', 4.5],
+  ['secondary-foreground on secondary', 'secondary-foreground', 'secondary', 4.5],
+  ['primary-foreground on primary', 'primary-foreground', 'primary', 4.5],
+  ['accent-foreground on accent', 'accent-foreground', 'accent', 4.5],
+  ['destructive-foreground on destructive', 'destructive-foreground', 'destructive', 4.5],
+  ['success-foreground on success', 'success-foreground', 'success', 4.5],
+  ['warning-foreground on warning', 'warning-foreground', 'warning', 4.5],
+  ['sidebar-foreground on sidebar-bg', 'sidebar-foreground', 'sidebar-background', 4.5],
+  ['title-strip-foreground on title-strip', 'title-strip-foreground', 'title-strip', 4.5],
   ['primary as icon/link on background', 'primary', 'background', 3.0],
   ['ring (focus) vs background', 'ring', 'background', 3.0],
   ['input border vs background', 'input', 'background', 3.0],
@@ -88,12 +74,12 @@ function luminance([r, g, b]) {
   const ch = (v) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
   return 0.2126 * ch(r) + 0.7152 * ch(g) + 0.0722 * ch(b);
 }
-function parse(t) {
-  const [h, s, l] = t.trim().split(/\s+/).map(parseFloat);
+function lum(triple) {
+  const [h, s, l] = triple.trim().split(/\s+/).map(parseFloat);
   return luminance(hslToRgb(h, s, l));
 }
 function ratio(fg, bg) {
-  const a = parse(fg), b = parse(bg);
+  const a = lum(fg), b = lum(bg);
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }
 
@@ -101,11 +87,17 @@ let failures = 0;
 for (const [mode, T] of [['LIGHT', LIGHT], ['DARK', DARK]]) {
   console.log(`\n=== ${mode} ===`);
   for (const [label, fgKey, bgKey, threshold] of PAIRS) {
-    const r = ratio(T[fgKey], T[bgKey]);
+    const fg = T[fgKey], bg = T[bgKey];
+    if (!fg || !bg) {
+      console.log(`${label.padEnd(40)}  MISSING TOKEN (${!fg ? fgKey : bgKey})`);
+      failures++;
+      continue;
+    }
+    const r = ratio(fg, bg);
     const status = threshold === 0 ? 'documented trade-off' : r >= threshold ? 'PASS' : 'FAIL';
     if (status === 'FAIL') failures++;
     console.log(`${label.padEnd(40)} ${r.toFixed(2).padStart(6)}:1   need ${threshold || '-'}   ${status}`);
   }
 }
-console.log(failures ? `\n${failures} FAILURE(S)` : '\nAll thresholds met.');
+console.log(failures ? `\n${failures} FAILURE(S) -- see docs/design-system/README.md section 5` : '\nAll thresholds met.');
 process.exit(failures ? 1 : 0);

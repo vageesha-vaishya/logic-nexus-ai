@@ -1,13 +1,10 @@
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ActivityForm } from '@/components/crm/ActivityForm';
-import { ArrowLeft } from 'lucide-react';
+import { EntityNewPageHeader } from '@/components/crm/EntityNewPageHeader';
 import { useCRM } from '@/hooks/useCRM';
 import { invokeFunction } from "@/lib/supabase-functions";
 import { toast } from 'sonner';
-import { H1 } from '@/components/ui/Heading';
 import { logger } from "@/lib/logger";
 
 export default function ActivityNew() {
@@ -251,17 +248,13 @@ export default function ActivityNew() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(backPath)}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <H1>New Activity</H1>
-            <p className="text-muted-foreground">Schedule a new activity or task</p>
-          </div>
-        </div>
+        <EntityNewPageHeader
+          title="New Activity"
+          subtitle="Schedule a new activity or task"
+          onBack={() => navigate(backPath)}
+        />
 
-        <ActivityForm 
+        <ActivityForm
           initialData={initialData}
           onSubmit={handleCreate}
           onCancel={() => navigate(backPath)}

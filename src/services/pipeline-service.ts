@@ -1014,9 +1014,17 @@ export const PipelineService = {
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
 
+    // This used to request `accounts(name)` as a PostgREST embed and fall
+    // back to a plain select when that failed. It *always* failed:
+    // v_contacts was rebuilt on core.parties + crm.contact_extensions
+    // (migration 20260529070000) and no longer references the legacy
+    // public.accounts table, so the relationship can't be resolved. That
+    // meant a guaranteed 400 on every load, no account names, and a
+    // permanent "relation data unavailable" banner. Resolve account names
+    // with one batched v_accounts lookup instead.
     let query = scopedDb
       .from('v_contacts')
-      .select('*, accounts(name)', { count: 'exact' });
+      .select('*', { count: 'exact' });
 
     if (search.trim()) {
       query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`);
@@ -1026,44 +1034,38 @@ export const PipelineService = {
       query = query.eq('account_id', accountId);
     }
 
-    const { data: relationData, error: relationError, count: relationCount } = await query
+    const { data, error, count } = await query
       .order(sortField, { ascending: sortDirection === 'asc' })
       .range(from, to);
 
-    if (!relationError) {
-      return {
-        data: (relationData || []) as unknown[],
-        totalCount: relationCount || 0,
-        source: 'scopedDb',
-        fallbackReason: null,
-      };
+    if (error) {
+      throw error;
     }
 
-    let fallbackQuery = scopedDb
-      .from('v_contacts')
-      .select('*', { count: 'exact' });
+    const rows = (data || []) as Array<Record<string, unknown> & { account_id?: string | null }>;
+    const accountIds = Array.from(
+      new Set(rows.map((r) => r.account_id).filter((v): v is string => typeof v === 'string' && v.length > 0))
+    );
 
-    if (search.trim()) {
-      fallbackQuery = fallbackQuery.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`);
-    }
-
-    if (accountId && accountId !== 'all') {
-      fallbackQuery = fallbackQuery.eq('account_id', accountId);
-    }
-
-    const { data: fallbackData, error: fallbackError, count: fallbackCount } = await fallbackQuery
-      .order(sortField, { ascending: sortDirection === 'asc' })
-      .range(from, to);
-
-    if (fallbackError) {
-      throw fallbackError;
+    const namesById: Record<string, string> = {};
+    if (accountIds.length > 0) {
+      const { data: accounts } = await scopedDb
+        .from('v_accounts')
+        .select('id, name')
+        .in('id', accountIds);
+      for (const a of (accounts || []) as Array<{ id: string; name: string | null }>) {
+        if (a.id && a.name) namesById[a.id] = a.name;
+      }
     }
 
     return {
-      data: (fallbackData || []) as unknown[],
-      totalCount: fallbackCount || 0,
+      data: rows.map((r) => ({
+        ...r,
+        accounts: r.account_id && namesById[r.account_id] ? { name: namesById[r.account_id] } : null,
+      })),
+      totalCount: count || 0,
       source: 'scopedDb',
-      fallbackReason: 'relations_query_failed',
+      fallbackReason: null,
     };
   },
 
