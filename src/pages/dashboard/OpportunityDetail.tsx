@@ -448,7 +448,7 @@ export default function OpportunityDetail() {
                     <Badge className={stageColors[opportunity.stage]}>
                       {stageLabels[opportunity.stage]}
                     </Badge>
-                    <h1 className="text-3xl font-bold text-gray-900 mt-2">{opportunity.name}</h1>
+                    <h1 className="text-3xl font-bold text-foreground mt-2">{opportunity.name}</h1>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-1 mt-2">

@@ -199,13 +199,13 @@ export default function ContactDetail() {
                             <div className="flex-1 flex flex-col gap-4">
                                 <div>
                                     <div className="flex items-center gap-4 mb-2">
-                                        <span className="text-sm font-medium text-gray-500">
+                                        <span className="text-sm font-medium text-muted-foreground">
                                             {contact.title || 'Contact'}
                                         </span>
                                     </div>
-                                    <h1 className="text-3xl font-bold text-gray-900">{contact.first_name} {contact.last_name}</h1>
+                                    <h1 className="text-3xl font-bold text-foreground">{contact.first_name} {contact.last_name}</h1>
                                     {contact.accounts && (
-                                        <div className="flex items-center gap-2 mt-1 text-gray-500">
+                                        <div className="flex items-center gap-2 mt-1 text-muted-foreground">
                                             <Building2 className="h-4 w-4" />
                                             <span className="font-medium text-primary hover:underline cursor-pointer">{contact.accounts.name}</span>
                                         </div>

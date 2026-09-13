@@ -40,12 +40,12 @@ const getPriorityColor = (priority: Task['priority']) => {
     case 'high': return 'text-red-600 bg-red-50 border-red-200';
     case 'medium': return 'text-orange-600 bg-orange-50 border-orange-200';
     case 'low': return 'text-blue-600 bg-blue-50 border-blue-200';
-    default: return 'text-slate-600 bg-slate-50 border-slate-200';
+    default: return 'text-muted-foreground bg-muted border-border';
   }
 };
 
 const TaskItem = ({ task, onComplete }: { task: Task; onComplete?: (id: string) => void }) => (
-  <div className="flex items-start gap-3 p-3 bg-white border rounded-lg hover:shadow-sm transition-shadow group">
+  <div className="flex items-start gap-3 p-3 bg-card border rounded-lg hover:shadow-sm transition-shadow group">
     <button 
       onClick={() => onComplete?.(task.id)}
       aria-label={task.status === 'completed' ? "Mark as incomplete" : "Mark as complete"}
@@ -53,7 +53,7 @@ const TaskItem = ({ task, onComplete }: { task: Task; onComplete?: (id: string) 
         "mt-0.5 h-5 w-5 rounded-full border-2 flex items-center justify-center transition-colors",
         task.status === 'completed' 
           ? "bg-green-500 border-green-500 text-white" 
-          : "border-slate-300 hover:border-green-500 text-transparent hover:text-green-500"
+          : "border-border hover:border-green-500 text-transparent hover:text-green-500"
       )}
     >
       <CheckCircle2 className="h-3.5 w-3.5" />
@@ -125,7 +125,7 @@ export function TaskScheduler({ tasks: initialTasks, onAddTask, onCompleteTask, 
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="upcoming">
               Upcoming
-              <Badge variant="secondary" className="ml-2 bg-slate-200 text-slate-700">{upcomingTasks.length}</Badge>
+              <Badge variant="secondary" className="ml-2">{upcomingTasks.length}</Badge>
             </TabsTrigger>
             <TabsTrigger value="overdue">
               Overdue

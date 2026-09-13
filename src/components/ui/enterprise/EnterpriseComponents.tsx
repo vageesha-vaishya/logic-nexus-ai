@@ -26,7 +26,7 @@ export function EnterpriseSheet({ children, className, header, actions, smartBut
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
         className={cn(
-            "bg-white border border-gray-200 rounded-sm shadow-[0_1px_4px_rgba(0,0,0,0.05)] flex flex-col relative overflow-visible",
+            "bg-card border border-border rounded-sm shadow-[0_1px_4px_rgba(0,0,0,0.05)] flex flex-col relative overflow-visible",
             "min-h-[600px]",
             className
         )}
@@ -35,7 +35,7 @@ export function EnterpriseSheet({ children, className, header, actions, smartBut
         <div className="flex flex-col h-full">
             {/* Header Section */}
             {header && (
-                <div className="p-6 md:p-8 pb-4 border-b border-gray-100">
+                <div className="p-6 md:p-8 pb-4 border-b border-border">
                     <div className="flex flex-col md:flex-row gap-8">
                         {header}
                     </div>
@@ -63,12 +63,12 @@ interface EnterpriseFieldProps {
 export function EnterpriseField({ label, value, icon, className, colSpan = 1 }: EnterpriseFieldProps) {
     return (
         <div className={cn("flex flex-col gap-0.5 mb-3", className, colSpan === 2 ? "col-span-2" : "")}>
-            <div className="flex items-center gap-2 text-[13px] font-semibold text-gray-900">
-                {icon && <span className="text-gray-400">{icon}</span>}
+            <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
+                {icon && <span className="text-muted-foreground">{icon}</span>}
                 {label}
             </div>
-            <div className="text-[13px] text-gray-700 min-h-[20px] leading-snug">
-                {value || <span className="text-gray-300 italic">Empty</span>}
+            <div className="text-[13px] text-foreground min-h-[20px] leading-snug">
+                {value || <span className="text-muted-foreground italic">Empty</span>}
             </div>
         </div>
     );
@@ -86,10 +86,10 @@ export function EnterpriseStatButton({ icon, label, value, to, onClick }: Enterp
     const content = (
         <button 
             onClick={onClick}
-            className="flex flex-col items-center justify-center min-w-[100px] h-[60px] bg-white border border-gray-200 border-b-0 rounded-t-md hover:bg-gray-50 transition-all relative top-[1px] shadow-[0_-1px_2px_rgba(0,0,0,0.02)]"
+            className="flex flex-col items-center justify-center min-w-[100px] h-[60px] bg-card border border-border border-b-0 rounded-t-md hover:bg-muted/50 transition-all relative top-[1px] shadow-[0_-1px_2px_rgba(0,0,0,0.02)]"
         >
-            <div className="flex items-center gap-2 text-gray-600 mb-0.5">
-                <span className="text-gray-500 scale-90">{icon}</span>
+            <div className="flex items-center gap-2 text-muted-foreground mb-0.5">
+                <span className="text-muted-foreground scale-90">{icon}</span>
                 <span className="text-[11px] font-semibold uppercase tracking-tight">{label}</span>
             </div>
             <span className="text-lg font-bold text-primary leading-none">{value}</span>

@@ -1394,7 +1394,7 @@ export default function Leads() {
       case 'score':
         return (
           <div className="flex items-center gap-2">
-            <div className="h-2 w-16 bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-2 w-16 bg-muted rounded-full overflow-hidden">
               <div
                 className={`h-full ${
                   (lead.lead_score || 0) > 80 ? 'bg-green-500' :
@@ -1737,7 +1737,7 @@ export default function Leads() {
         ) : viewMode === 'list' ? (
           <div ref={splitContainerRef} className="flex h-[calc(100vh-260px)] min-h-[640px] flex-col overflow-hidden rounded-md border bg-background">
             <div className="overflow-auto" style={listPaneHeight > 0 ? { height: `${listPaneHeight}px` } : undefined}>
-            <div className="rounded-md border bg-white overflow-x-auto">
+            <div className="rounded-md border bg-card overflow-x-auto">
               <Table className="text-sm">
                 <TableHeader>
                   <TableRow className="h-8">
@@ -1843,7 +1843,7 @@ export default function Leads() {
                           }}
                           key={lead.id}
                           tabIndex={-1}
-                          className={`h-8 hover:bg-slate-50/50 cursor-pointer ${focusedLead?.id === lead.id ? 'bg-slate-100/70' : ''} ${matchedLeadIds.includes(lead.id) ? 'border-l-2 border-l-primary/60 bg-primary/5' : ''} ${activeMatchedLeadId === lead.id ? 'ring-2 ring-inset ring-amber-500/80 bg-amber-500/10' : ''}`}
+                          className={`h-8 hover:bg-muted/50 cursor-pointer ${focusedLead?.id === lead.id ? 'bg-muted' : ''} ${matchedLeadIds.includes(lead.id) ? 'border-l-2 border-l-primary/60 bg-primary/5' : ''} ${activeMatchedLeadId === lead.id ? 'ring-2 ring-inset ring-amber-500/80 bg-amber-500/10' : ''}`}
                           onClick={() => handleLeadSingleClick(lead)}
                           onDoubleClick={() => handleLeadDoubleClick(lead)}
                         >

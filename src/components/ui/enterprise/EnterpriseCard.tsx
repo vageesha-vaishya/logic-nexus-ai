@@ -19,9 +19,9 @@ export interface EnterpriseCardProps {
 }
 
 const variantClasses = {
-  default: 'bg-white border border-gray-200 shadow-[0_1px_4px_rgba(0,0,0,0.05)]',
-  outlined: 'bg-white border border-gray-200',
-  elevated: 'bg-white border border-gray-200 shadow-[0_4px_12px_rgba(0,0,0,0.08)]',
+  default: 'bg-card border border-border shadow-[0_1px_4px_rgba(0,0,0,0.05)]',
+  outlined: 'bg-card border border-border',
+  elevated: 'bg-card border border-border shadow-[0_4px_12px_rgba(0,0,0,0.08)]',
 };
 
 export function EnterpriseCard({
@@ -57,14 +57,14 @@ export function EnterpriseCard({
       {(title || description || actions) && (
         <header
           className={cn(
-            'px-4 py-3 border-b border-gray-200 bg-gray-50/50 flex items-start justify-between',
+            'px-4 py-3 border-b border-border bg-muted/50 flex items-start justify-between',
             headerClassName
           )}
         >
           <div className="flex items-start gap-3">
-            {icon && <div className="text-gray-600 mt-0.5">{icon}</div>}
+            {icon && <div className="text-muted-foreground mt-0.5">{icon}</div>}
             <div>
-              {title && <h3 className="text-sm font-semibold text-gray-900">{title}</h3>}
+              {title && <h3 className="text-sm font-semibold text-foreground">{title}</h3>}
               {description && (
                 <p className="text-xs text-muted-foreground mt-1">{description}</p>
               )}
@@ -83,7 +83,7 @@ export function EnterpriseCard({
       {footer && (
         <footer
           className={cn(
-            'px-4 py-3 border-t border-gray-200 bg-gray-50/50',
+            'px-4 py-3 border-t border-border bg-muted/50',
             footerClassName
           )}
         >

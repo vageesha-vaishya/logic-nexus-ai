@@ -250,7 +250,7 @@ export function LeadActivitiesTimeline({ leadId, eventBus }: LeadActivitiesTimel
       case 'high': return 'text-red-600 bg-red-50 border-red-200';
       case 'medium': return 'text-amber-600 bg-amber-50 border-amber-200';
       case 'low': return 'text-green-600 bg-green-50 border-green-200';
-      default: return 'text-slate-600 bg-slate-50 border-slate-200';
+      default: return 'text-muted-foreground bg-muted border-border';
     }
   };
 
@@ -261,14 +261,14 @@ export function LeadActivitiesTimeline({ leadId, eventBus }: LeadActivitiesTimel
             case 'link_clicked': return <MousePointerClick className="h-4 w-4 text-purple-500" />;
             case 'page_view': return <Eye className="h-4 w-4 text-indigo-500" />;
             case 'form_submission': return <FileText className="h-4 w-4 text-green-500" />;
-            default: return <Clock className="h-4 w-4 text-slate-500" />;
+            default: return <Clock className="h-4 w-4 text-muted-foreground" />;
         }
     }
     switch (type) {
       case 'call': return <Phone className="h-4 w-4 text-blue-600" />;
       case 'email': return <Mail className="h-4 w-4 text-indigo-600" />;
       case 'meeting': return <Calendar className="h-4 w-4 text-orange-600" />;
-      default: return <Clock className="h-4 w-4 text-slate-600" />;
+      default: return <Clock className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
