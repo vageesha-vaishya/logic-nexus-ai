@@ -2,6 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
 import { defineConfig, devices } from '@playwright/test';
+import { AUTH_STATE } from './pages';
 
 // Secrets live in the gitignored repo-root `env` file; `.env` carries the Vite
 // public vars (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY). Load both.
@@ -12,7 +13,6 @@ loadEnv({ path: path.join(repoRoot, 'env') });
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:4173';
 const reuseServer = process.env.PLAYWRIGHT_REUSE_EXISTING_SERVER === 'true';
-const authState = path.join(__dirname, '.auth', 'user.json');
 
 // Mirrors the root config's Firefox sandbox handling.
 const firefoxNoSandbox =
@@ -43,14 +43,14 @@ export default defineConfig({
     {
       name: 'chromium',
       dependencies: ['setup'],
-      use: { ...devices['Desktop Chrome'], storageState: authState },
+      use: { ...devices['Desktop Chrome'], storageState: AUTH_STATE },
     },
     {
       name: 'firefox',
       dependencies: ['setup'],
       use: {
         ...devices['Desktop Firefox'],
-        storageState: authState,
+        storageState: AUTH_STATE,
         ...(firefoxNoSandbox
           ? {
               launchOptions: {
@@ -69,12 +69,12 @@ export default defineConfig({
     {
       name: 'webkit',
       dependencies: ['setup'],
-      use: { ...devices['Desktop Safari'], storageState: authState },
+      use: { ...devices['Desktop Safari'], storageState: AUTH_STATE },
     },
     {
       name: 'msedge',
       dependencies: ['setup'],
-      use: { ...devices['Desktop Edge'], channel: 'msedge', storageState: authState },
+      use: { ...devices['Desktop Edge'], channel: 'msedge', storageState: AUTH_STATE },
     },
   ],
   webServer: reuseServer

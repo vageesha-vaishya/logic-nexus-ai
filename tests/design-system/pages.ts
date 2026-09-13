@@ -1,5 +1,8 @@
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { APIRequestContext } from '@playwright/test';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export type Mode = 'light' | 'dark';
 export type Engine = 'chromium' | 'firefox' | 'webkit' | 'msedge';
