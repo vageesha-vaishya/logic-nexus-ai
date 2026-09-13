@@ -26,6 +26,7 @@ import { QuotationDeleteService } from '@/services/quotation/QuotationDeleteServ
 import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
+import { useTheme } from '@/hooks/useTheme';
 import { QuoteCard } from '@/components/quotation/QuoteCard';
 import { useTranslation } from 'react-i18next';
 import { CrmFallbackReason, resolveCrmFallbackBannerCopy } from './leadsListUtils';
@@ -79,6 +80,7 @@ export default function Quotes() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { scopedDb, supabase } = useCRM();
+  const { isDark } = useTheme();
   const { hasPermission } = useAuth();
   const { enabled: quoteImportExportEnabled } = useAppFeatureFlag(FEATURE_FLAGS.QUOTATION_IMPORT_EXPORT_V2, true);
   const canUseQuoteImportExport = quoteImportExportEnabled && (hasPermission('quotes.import_export') || hasPermission('import_quotation') || hasPermission('export_quotation'));
@@ -742,7 +744,7 @@ export default function Quotes() {
 
   return (
     <DashboardLayout>
-      <div style={themeStyleFromPreset(theme)} className="min-h-full transition-colors duration-300">
+      <div style={themeStyleFromPreset(theme, isDark)} className="min-h-full transition-colors duration-300">
       <FirstScreenTemplate
         title="Quotes"
         description="Manage sales quotes and opportunities. Shortcuts: ⌘/Ctrl+B (New), ⌘/Ctrl+R (Refresh)"

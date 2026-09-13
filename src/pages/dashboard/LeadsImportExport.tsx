@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { LeadsPrimaryView, useLeadsViewState } from '@/hooks/useLeadsViewState';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
+import { useTheme } from '@/hooks/useTheme';
 
 const leadFields: DataField[] = [
   { key: 'first_name', label: 'First Name', required: true, aliases: ['fname', 'given_name'] },
@@ -61,6 +62,7 @@ const defaultTemplate: ExportTemplate = {
 
 export default function LeadsImportExport() {
   const navigate = useNavigate();
+  const { isDark } = useTheme();
   const { state: viewState, setTheme, setView, setPipeline } = useLeadsViewState();
   const currentTheme = viewState.theme;
 
@@ -105,7 +107,7 @@ export default function LeadsImportExport() {
       defaultExportTemplate={defaultTemplate}
       listPath="/dashboard/leads"
       showBackToListButton={false}
-      containerStyle={themeStyleFromPreset(currentTheme)}
+      containerStyle={themeStyleFromPreset(currentTheme, isDark)}
       headerActions={
         <CRMModuleHeaderNavigation
           moduleLabel="Leads"

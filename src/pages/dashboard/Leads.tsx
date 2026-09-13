@@ -30,6 +30,7 @@ import { LeadsFilterToolbar } from '@/features/module-sales/components/LeadsFilt
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import LeadsMasterDataFormModal, { LeadMasterDataFormValues } from '@/features/module-sales/components/LeadsMasterDataFormModal';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
+import { useTheme } from '@/hooks/useTheme';
 import { Lead } from './leads-data';
 import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
 import { useLeadsViewState } from '@/hooks/useLeadsViewState';
@@ -121,6 +122,7 @@ export default function Leads() {
   const [leadActivities, setLeadActivities] = useState<WorkspaceActivity[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(false);
   const { supabase, context, scopedDb } = useCRM();
+  const { isDark } = useTheme();
   const {
     state: viewState,
     setView,
@@ -1590,7 +1592,7 @@ export default function Leads() {
 
   return (
     <DashboardLayout>
-      <div style={themeStyleFromPreset(currentTheme)} className="min-h-full space-y-4 p-4 lg:p-6 transition-colors duration-300">
+      <div style={themeStyleFromPreset(currentTheme, isDark)} className="min-h-full space-y-4 p-4 lg:p-6 transition-colors duration-300">
         <FirstScreenTemplate
           title={t('leads.title', 'Leads Workspace')}
           actionsRight={

@@ -24,6 +24,7 @@ import { ArrowDown, ArrowUp, Download, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { parseFileRows, exportCsv, exportExcel } from '@/lib/import-export';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
+import { useTheme } from '@/hooks/useTheme';
 import { THEME_PRESETS } from '@/theme/themes';
 import type { Lead } from '@/pages/dashboard/leads-data';
 import type { ColumnType } from '@/components/kanban/KanbanBoard';
@@ -227,6 +228,7 @@ export function AircraftLeadsManager({
   activeTab: activeTabProp,
   onActiveTabChange,
 }: AircraftLeadsManagerProps) {
+  const { isDark } = useTheme();
   const [rows, setRows] = useState<AircraftLeadRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -463,7 +465,7 @@ export function AircraftLeadsManager({
   );
   const totalPages = Math.max(1, Math.ceil(totalCount / Number(pageSize || '25')));
   const allSelected = listRows.length > 0 && listRows.every((row) => selectedIds.includes(row.id));
-  const themeStyle = useMemo(() => themeStyleFromPreset(activeTheme), [activeTheme]);
+  const themeStyle = useMemo(() => themeStyleFromPreset(activeTheme, isDark), [activeTheme, isDark]);
   const pipelineColumns = useMemo<ColumnType[]>(
     () => [
       { id: 'new', title: 'New' },

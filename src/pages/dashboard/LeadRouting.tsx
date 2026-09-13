@@ -14,6 +14,7 @@ import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
+import { useTheme } from '@/hooks/useTheme';
 import { LeadsPrimaryView, useLeadsViewState } from '@/hooks/useLeadsViewState';
 import { logger } from "@/lib/logger";
 
@@ -31,6 +32,7 @@ interface AssignmentRule {
 export default function LeadRouting() {
   const navigate = useNavigate();
   const { supabase, context, scopedDb } = useCRM();
+  const { isDark } = useTheme();
   const { state: viewState, setTheme, setView, setPipeline } = useLeadsViewState();
   const currentTheme = viewState.theme;
   const [rules, setRules] = useState<AssignmentRule[]>([]);
@@ -256,7 +258,7 @@ export default function LeadRouting() {
 
   return (
     <DashboardLayout>
-      <div style={themeStyleFromPreset(currentTheme)} className="space-y-6 transition-colors duration-300">
+      <div style={themeStyleFromPreset(currentTheme, isDark)} className="space-y-6 transition-colors duration-300">
         <div className="flex items-start justify-between gap-4 sm:items-center">
           <div>
             <h1 className="text-3xl font-bold">Lead Routing</h1>

@@ -18,6 +18,7 @@ import { KanbanFilters } from "@/components/kanban/KanbanFilters";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCRMModuleNavigationState } from "@/hooks/useCRMModuleNavigationState";
 import { themeStyleFromPreset } from "@/lib/theme-utils";
+import { useTheme } from "@/hooks/useTheme";
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from "@/components/crm/CRMModuleHeaderNavigation";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -45,6 +46,7 @@ const ANALYTICS_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444",
 export default function QuotationManager() {
   const { t } = useTranslation();
   const { scopedDb } = useCRM();
+  const { isDark } = useTheme();
   const { hasPermission } = useAuth();
   const { toast } = useToast();
   const { currentDomain } = useDomain();
@@ -438,7 +440,7 @@ export default function QuotationManager() {
 
   return (
     <DashboardLayout>
-      <div style={themeStyleFromPreset(theme)} className="flex flex-col h-[calc(100vh-140px)] gap-6 transition-colors duration-300">
+      <div style={themeStyleFromPreset(theme, isDark)} className="flex flex-col h-[calc(100vh-140px)] gap-6 transition-colors duration-300">
         <div className="flex-none">
           <div className="flex items-center justify-between mb-4">
             <div>

@@ -24,6 +24,7 @@ import { resolveCrmFallbackBannerCopy } from "./leadsListUtils";
 import { useCRMModuleNavigationState } from "@/hooks/useCRMModuleNavigationState";
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from "@/components/crm/CRMModuleHeaderNavigation";
 import { themeStyleFromPreset } from "@/lib/theme-utils";
+import { useTheme } from "@/hooks/useTheme";
 import { logger } from "@/lib/logger";
 
 type AccountStage = 'new_account' | 'kyc_pending' | 'active' | 'vip' | 'payment_issues' | 'inactive' | 'blocked';
@@ -69,6 +70,7 @@ export default function AccountsPipeline() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { context, scopedDb } = useCRM();
+  const { isDark } = useTheme();
   const { theme, setTheme, setViewMode } = useCRMModuleNavigationState("accounts", {
     viewMode: "pipeline",
     theme: "Azure Sky",
@@ -281,7 +283,7 @@ export default function AccountsPipeline() {
 
   return (
     <DashboardLayout>
-      <div style={themeStyleFromPreset(theme)} className="space-y-6 transition-colors duration-300">
+      <div style={themeStyleFromPreset(theme, isDark)} className="space-y-6 transition-colors duration-300">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Accounts Pipeline</h1>

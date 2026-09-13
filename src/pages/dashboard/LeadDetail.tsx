@@ -32,6 +32,7 @@ import { getScoreGrade } from '@/utils/leadScoring';
 import { DetailScreenTemplate } from '@/components/system/DetailScreenTemplate';
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
+import { useTheme } from '@/hooks/useTheme';
 import { useLeadsViewState, LeadsPrimaryView } from '@/hooks/useLeadsViewState';
 import { useStickyActions } from '@/components/layout/StickyActionsContext';
 import { FEATURE_FLAGS, useAppFeatureFlag } from '@/lib/feature-flags';
@@ -45,6 +46,7 @@ export default function LeadDetail() {
   const navigate = useNavigate();
   const location = useLocation();
   const { supabase, scopedDb, context } = useCRM();
+  const { isDark } = useTheme();
   const { state: viewState, setTheme, setView, setPipeline } = useLeadsViewState();
   const currentTheme = viewState.theme;
   const threeSectionLeadWorkspace = useAppFeatureFlag(FEATURE_FLAGS.LEAD_THREE_SECTION_LAYOUT);
@@ -737,7 +739,7 @@ export default function LeadDetail() {
   return (
     <DashboardLayout>
       <StickyActionsRegister />
-      <div style={themeStyleFromPreset(currentTheme)} className="transition-colors duration-300">
+      <div style={themeStyleFromPreset(currentTheme, isDark)} className="transition-colors duration-300">
         <DetailScreenTemplate
           title={`${lead.first_name} ${lead.last_name}`}
           subtitle={

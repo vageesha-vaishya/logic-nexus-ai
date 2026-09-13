@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
+import { useTheme } from '@/hooks/useTheme';
 
 const quoteFields: DataField[] = [
   { key: 'quote_number', label: 'Quote Number', required: true, aliases: ['quote no', 'quote id'] },
@@ -361,6 +362,7 @@ export default function QuotesImportExport() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { scopedDb } = useCRM();
+  const { isDark } = useTheme();
   const { viewMode, theme, setViewMode, setTheme } = useCRMModuleNavigationState('quotes', {
     viewMode: 'pipeline',
     theme: 'Azure Sky',
@@ -535,7 +537,7 @@ export default function QuotesImportExport() {
       additionalExportTemplates={[sectionTemplate]}
       listPath="/dashboard/quotes"
       showBackToListButton={false}
-      containerStyle={themeStyleFromPreset(theme)}
+      containerStyle={themeStyleFromPreset(theme, isDark)}
       onTransformRecord={transformQuoteRecord}
       onPrepareImportBatch={prepareQuoteImportBatch}
       onExportFilterApply={applyQuoteExportScope}

@@ -20,6 +20,7 @@ import { AssignmentHistory } from '@/features/module-sales/components/assignment
 import { AssignmentAnalytics } from '@/features/module-sales/components/assignment/AssignmentAnalytics';
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
+import { useTheme } from '@/hooks/useTheme';
 import { LeadsPrimaryView, useLeadsViewState } from '@/hooks/useLeadsViewState';
 import { logger } from "@/lib/logger";
 
@@ -29,6 +30,7 @@ export default function LeadAssignment() {
   const currentTab = searchParams.get('tab') || 'rules';
 
   const { supabase, context, scopedDb } = useCRM();
+  const { isDark } = useTheme();
   const { state: viewState, setTheme, setView, setPipeline } = useLeadsViewState();
   const currentTheme = viewState.theme;
   const [stats, setStats] = useState({
@@ -170,7 +172,7 @@ export default function LeadAssignment() {
 
   return (
     <DashboardLayout>
-      <div style={themeStyleFromPreset(currentTheme)} className="space-y-6 transition-colors duration-300">
+      <div style={themeStyleFromPreset(currentTheme, isDark)} className="space-y-6 transition-colors duration-300">
         <div className="flex items-start justify-between gap-4 sm:items-center">
           <div>
             <h1 className="text-3xl font-bold">Lead Assignment</h1>

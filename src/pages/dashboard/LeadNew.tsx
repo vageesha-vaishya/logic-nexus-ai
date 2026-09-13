@@ -11,12 +11,14 @@ import { logger } from '@/lib/logger';
 import * as Sentry from '@sentry/react';
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
+import { useTheme } from '@/hooks/useTheme';
 import { useLeadsViewState, LeadsPrimaryView } from '@/hooks/useLeadsViewState';
 import { FEATURE_FLAGS, useAppFeatureFlag } from '@/lib/feature-flags';
 
 export default function LeadNew() {
   const navigate = useNavigate();
   const { context, scopedDb } = useCRM();
+  const { isDark } = useTheme();
   const getCrmApiHeaders = useCrmApiHeaders();
   const { state: viewState, setTheme, setView, setPipeline } = useLeadsViewState();
   const currentTheme = viewState.theme;
@@ -145,7 +147,7 @@ export default function LeadNew() {
 
   return (
     <DashboardLayout>
-      <div style={themeStyleFromPreset(currentTheme)} className="space-y-6 transition-colors duration-300">
+      <div style={themeStyleFromPreset(currentTheme, isDark)} className="space-y-6 transition-colors duration-300">
         <div className="flex items-start justify-between gap-4 sm:items-center">
           <div>
             <H1>New Lead</H1>

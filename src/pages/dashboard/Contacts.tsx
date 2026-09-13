@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
+import { useTheme } from '@/hooks/useTheme';
 import { PipelineService } from '@/services/pipeline-service';
 import { useTranslation } from 'react-i18next';
 import { resolveCrmFallbackBannerCopy } from './leadsListUtils';
@@ -41,6 +42,7 @@ export default function Contacts() {
   const [isDbFallbackActive, setIsDbFallbackActive] = useState(false);
   const [dbFallbackReason, setDbFallbackReason] = useState<'relations_query_failed' | null>(null);
   const { context, scopedDb } = useCRM();
+  const { isDark } = useTheme();
   const {
     viewMode,
     theme,
@@ -111,7 +113,7 @@ export default function Contacts() {
 
   return (
     <DashboardLayout>
-      <div style={themeStyleFromPreset(theme)} className="space-y-6 transition-colors duration-300">
+      <div style={themeStyleFromPreset(theme, isDark)} className="space-y-6 transition-colors duration-300">
       <div className="flex justify-between items-center">
         <div>
           <H1>Contacts</H1>

@@ -18,6 +18,7 @@ import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { Lead, LeadStatus, stages, statusConfig } from './leads-data';
 import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
+import { useTheme } from '@/hooks/useTheme';
 import { DashboardOverview, ContactsSection, TasksSection, DashboardStats, CreateTaskDialog } from '@/features/module-sales/components/LeadsPipelineComponents';
 import { Task } from '@/components/crm/TaskScheduler';
 import { useLeadsViewState, LeadsPrimaryView } from '@/hooks/useLeadsViewState';
@@ -88,6 +89,7 @@ export default function LeadsPipeline() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { supabase, context, scopedDb } = useCRM();
+  const { isDark } = useTheme();
   const { state: viewState, setTheme, setView, setPipeline, setWorkspace } = useLeadsViewState();
   const currentTheme = viewState.theme;
   const isNavigatingAwayFromPipeline = useRef(false);
@@ -929,7 +931,7 @@ export default function LeadsPipeline() {
 
   return (
     <DashboardLayout>
-      <div style={themeStyleFromPreset(currentTheme)} className="flex flex-col h-[calc(100vh-140px)] gap-6 transition-colors duration-300">
+      <div style={themeStyleFromPreset(currentTheme, isDark)} className="flex flex-col h-[calc(100vh-140px)] gap-6 transition-colors duration-300">
         
         {/* Header */}
         <div className="flex-none">
@@ -1090,7 +1092,15 @@ export default function LeadsPipeline() {
                         onColumnDelete={handleDeleteColumnLeads}
                         className="h-full"
                         scrollPersistenceKey="leads-pipeline-board"
-                        themeVariant="reference"
+                        // "reference" hardcodes light-mode-only colors
+                        // (white cards/columns, dark-gray text) for a
+                        // specific reference design -- illegible in dark
+                        // mode since none of those literals react to the
+                        // .dark class. Fall back to the theme-token-driven
+                        // "default" variant when dark mode is on so cards
+                        // stay legible; keep the reference look in light
+                        // mode where it was designed to appear.
+                        themeVariant={isDark ? "default" : "reference"}
                       />
                     )}
                   </div>

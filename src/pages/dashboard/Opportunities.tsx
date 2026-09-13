@@ -17,6 +17,7 @@ import { Opportunity, OpportunityStage, stageColors, stageLabels } from './oppor
 import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
+import { useTheme } from '@/hooks/useTheme';
 import { PipelineService } from '@/services/pipeline-service';
 import { useTranslation } from 'react-i18next';
 import { resolveCrmFallbackBannerCopy } from './leadsListUtils';
@@ -25,6 +26,7 @@ export default function Opportunities() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { supabase, context, scopedDb } = useCRM();
+  const { isDark } = useTheme();
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDbFallbackActive, setIsDbFallbackActive] = useState(false);
@@ -120,7 +122,7 @@ export default function Opportunities() {
 
   return (
     <DashboardLayout>
-      <div style={themeStyleFromPreset(theme)} className="space-y-6 transition-colors duration-300">
+      <div style={themeStyleFromPreset(theme, isDark)} className="space-y-6 transition-colors duration-300">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold">Opportunities</h1>

@@ -23,6 +23,7 @@ import { matchText, TextOp } from '@/lib/utils';
 import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
+import { useTheme } from '@/hooks/useTheme';
 import { PipelineService } from '@/services/pipeline-service';
 import { useTranslation } from 'react-i18next';
 import { resolveCrmFallbackBannerCopy } from './leadsListUtils';
@@ -68,6 +69,7 @@ export default function Activities() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('all');
   const { supabase, context, scopedDb } = useCRM();
+  const { isDark } = useTheme();
   const { fetchAssignableUsers, formatLabel } = useAssignableUsers();
   const [typeFilter, setTypeFilter] = useState<'any' | 'email' | 'call' | 'task' | 'meeting' | 'note'>('any');
   const [ownerFilter, setOwnerFilter] = useState<'any' | 'unassigned' | 'me' | string>('any');
@@ -401,7 +403,7 @@ export default function Activities() {
   return (
     <DashboardLayout>
       <StickyActionsRegister items={pagedActivities} />
-      <div style={themeStyleFromPreset(theme)} className="space-y-6 transition-colors duration-300">
+      <div style={themeStyleFromPreset(theme, isDark)} className="space-y-6 transition-colors duration-300">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">Activities</h1>

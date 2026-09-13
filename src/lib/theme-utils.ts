@@ -11,7 +11,7 @@ export type ThemeTokens = {
   background?: string;
 };
 
-export function themeStyleFromPreset(name: string): React.CSSProperties | undefined {
+export function themeStyleFromPreset(name: string, isDarkMode?: boolean): React.CSSProperties | undefined {
   const preset = THEME_PRESETS.find(p => p.name === name);
   if (!preset) return undefined;
   
@@ -49,7 +49,20 @@ export function themeStyleFromPreset(name: string): React.CSSProperties | undefi
   // correctly dark/light-aware via ThemeProvider + index.css's .dark
   // cascade, so this helper now only skins the module's accent color and
   // table-header tint, and leaves surface tokens alone.
-  const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+  //
+  // Callers should pass `isDarkMode` explicitly from useTheme().isDark --
+  // that's a real React state value, so a component consuming it
+  // re-renders (and recomputes this style) the instant dark mode toggles.
+  // The DOM-read fallback below is a snapshot taken only whenever THIS
+  // component happens to render; pages that don't otherwise re-render
+  // after the toggle (most of them -- they don't consume theme context)
+  // freeze on whatever mode was active at their last render, which is
+  // often light (ThemeProvider adds the `dark` class in an effect that
+  // runs after first paint, so a fresh page load's first render sees no
+  // `dark` class yet and bakes light-mode colors in permanently).
+  const isDark = typeof isDarkMode === 'boolean'
+    ? isDarkMode
+    : typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
   const primaryParsed = parseHsl(preset.primary);
 
   const style: React.CSSProperties = {

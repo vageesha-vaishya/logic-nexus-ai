@@ -27,6 +27,7 @@ import { resolveCrmFallbackBannerCopy } from "./leadsListUtils";
 import { useCRMModuleNavigationState } from "@/hooks/useCRMModuleNavigationState";
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from "@/components/crm/CRMModuleHeaderNavigation";
 import { themeStyleFromPreset } from "@/lib/theme-utils";
+import { useTheme } from "@/hooks/useTheme";
 import { logger } from "@/lib/logger";
 type OpportunityStage = Stage;
 
@@ -35,6 +36,7 @@ export default function OpportunitiesPipeline() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { scopedDb } = useCRM();
+  const { isDark } = useTheme();
   const { theme, setTheme, setViewMode } = useCRMModuleNavigationState("opportunities", {
     viewMode: "pipeline",
     theme: "Azure Sky",
@@ -447,7 +449,7 @@ export default function OpportunitiesPipeline() {
 
   return (
     <DashboardLayout>
-      <div style={themeStyleFromPreset(theme)} className="space-y-6 transition-colors duration-300">
+      <div style={themeStyleFromPreset(theme, isDark)} className="space-y-6 transition-colors duration-300">
         <div className="flex items-center justify-between">
           <div>
             <H1>Opportunities Pipeline</H1>

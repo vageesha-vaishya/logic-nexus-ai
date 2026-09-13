@@ -15,6 +15,7 @@ import { EntityCard } from '@/components/system/EntityCard';
 import { EmptyState } from '@/components/system/EmptyState';
 import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
+import { useTheme } from '@/hooks/useTheme';
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { PipelineService } from '@/services/pipeline-service';
 import { useTranslation } from 'react-i18next';
@@ -42,6 +43,7 @@ export default function Accounts() {
   const [isDbFallbackActive, setIsDbFallbackActive] = useState(false);
   const [dbFallbackReason, setDbFallbackReason] = useState<'relations_query_failed' | null>(null);
   const { context, scopedDb } = useCRM();
+  const { isDark } = useTheme();
   const {
     viewMode: moduleViewMode,
     theme,
@@ -187,7 +189,7 @@ export default function Accounts() {
 
   return (
     <DashboardLayout>
-      <div style={themeStyleFromPreset(theme)} className="min-h-full transition-colors duration-300">
+      <div style={themeStyleFromPreset(theme, isDark)} className="min-h-full transition-colors duration-300">
       <FirstScreenTemplate
         title="Accounts"
         description="Manage your company accounts"
