@@ -24,6 +24,20 @@ export async function applyModeInitScript(
     [DARK_KEY, ACTIVE_KEY, String(mode === 'dark'), PRESET[mode]] as const,
   );
   if (!firstRun) await applyE2EStateInitScript(page);
+  await stubSavedTheme(page);
+}
+
+/**
+ * The E2E admin has a user-scoped saved theme (`ui_themes`, "Custom Theme",
+ * dark:false) that ThemeProvider applies 1.5–3 s after boot, overriding the
+ * requested mode on every engine. The baseline measures the design system's
+ * default tokens, not one account's preset, so the fetch is answered with an
+ * empty list. Observed request: `<supabase>/rest/v1/ui_themes?select=…&scope=eq.user&user_id=eq.…`.
+ */
+export async function stubSavedTheme(page: Page): Promise<void> {
+  await page.route(/\/rest\/v1\/ui_themes(\?|$)/, route =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }),
+  );
 }
 
 /**
@@ -36,7 +50,11 @@ export async function applyE2EStateInitScript(page: Page): Promise<void> {
   await page.addInitScript((key) => localStorage.setItem(key, 'true'), TOUR_SEEN_KEY);
 }
 
-/** Fails loudly if the app rendered the other mode (e.g. a server-side theme override). */
+/**
+ * Fails loudly if the app rendered the other mode (e.g. a server-side theme
+ * override). Specs call it twice: after the page booted, and again right before
+ * capture — a late flip must turn the cell into an error, never a pass.
+ */
 export async function expectMode(page: Page, mode: Mode): Promise<void> {
   await expect
     .poll(() => page.evaluate(() => document.documentElement.classList.contains('dark')), { timeout: 10_000 })

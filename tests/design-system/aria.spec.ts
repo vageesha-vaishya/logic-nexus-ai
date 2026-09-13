@@ -34,6 +34,7 @@ for (const def of PAGES) {
         await expectPageBooted(page, def.authenticated);
         await expectMode(page, 'light');
 
+        await expectMode(page, 'light'); // re-assert right before the snapshot (late theme flip = error cell)
         const snapshot = await page.locator('body').ariaSnapshot();
         const rel = ariaRelPath(def.key, engine);
         const abs = path.join(VERIFICATION_DIR, rel);

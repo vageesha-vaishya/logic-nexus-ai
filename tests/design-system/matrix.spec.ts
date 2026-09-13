@@ -57,6 +57,7 @@ for (const def of PAGES) {
               const abs = path.join(VERIFICATION_DIR, rel);
               fs.mkdirSync(path.dirname(abs), { recursive: true });
               result.scrollHeight = await page.evaluate(() => document.documentElement.scrollHeight);
+              await expectMode(page, mode); // re-assert: a late theme flip must not be captured as a pass
               result.screenshotMode = await screenshot(page, abs);
               result.screenshot = rel;
 

@@ -27,6 +27,7 @@ async function keyboardCell(page: Page, engine: string, def: PageDef, cellPage: 
     await settle(page);
     await expectPageBooted(page, def.authenticated);
     await expectMode(page, 'light');
+    await expectMode(page, 'light'); // re-assert right before the walk (late theme flip = error cell)
     result.keyboard = await walkTabOrder(page, 40);
   } catch (e) {
     result.error = e instanceof Error ? e.message : String(e);
