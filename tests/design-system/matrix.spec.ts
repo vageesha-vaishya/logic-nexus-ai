@@ -1,32 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { test, expect, request as pwRequest } from '@playwright/test';
-import {
-  AUTH_STATE, MODES, PAGES, VIEWPORTS, VERIFICATION_DIR,
-  resolveRoute, screenshotRelPath, type Mode, type PageDef, type ResolveContext,
-} from './pages';
+import { test, expect } from '@playwright/test';
+import { MODES, PAGES, VIEWPORTS, VERIFICATION_DIR, screenshotRelPath } from './pages';
 import { applyModeInitScript, expectMode } from './helpers/theme';
 import { checkLayout } from './helpers/layout';
 import { runAxe } from './helpers/axe';
 import { writeCellResult, type CellResult } from './helpers/results';
-import { readAccessToken, supabaseEnv } from './helpers/env';
-
-// Resolved once per worker; dynamic routes need the admin's access token.
-let resolved: Map<string, string> | undefined;
-async function routeFor(def: PageDef): Promise<string> {
-  if (!resolved) resolved = new Map();
-  const hit = resolved.get(def.key);
-  if (hit) return hit;
-  const ctx: ResolveContext = {
-    request: await pwRequest.newContext(),
-    ...supabaseEnv(),
-    accessToken: readAccessToken(AUTH_STATE),
-  };
-  const route = await resolveRoute(def, ctx);
-  await ctx.request.dispose();
-  resolved.set(def.key, route);
-  return route;
-}
+import { routeFor } from './helpers/route';
 
 async function settle(page: import('@playwright/test').Page) {
   await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => { /* SPAs poll; proceed */ });

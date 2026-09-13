@@ -1,25 +1,9 @@
-import { test, expect, request as pwRequest } from '@playwright/test';
-import { AUTH_STATE, DESKTOP, PAGES, resolveRoute, type PageDef, type ResolveContext } from './pages';
+import { test, expect } from '@playwright/test';
+import { DESKTOP, PAGES } from './pages';
 import { applyModeInitScript, expectMode } from './helpers/theme';
 import { walkTabOrder } from './helpers/focus';
 import { writeCellResult, type CellResult } from './helpers/results';
-import { readAccessToken, supabaseEnv } from './helpers/env';
-
-let resolved: Map<string, string> | undefined;
-async function routeFor(def: PageDef): Promise<string> {
-  if (!resolved) resolved = new Map();
-  const hit = resolved.get(def.key);
-  if (hit) return hit;
-  const ctx: ResolveContext = {
-    request: await pwRequest.newContext(),
-    ...supabaseEnv(),
-    accessToken: readAccessToken(AUTH_STATE),
-  };
-  const route = await resolveRoute(def, ctx);
-  await ctx.request.dispose();
-  resolved.set(def.key, route);
-  return route;
-}
+import { routeFor } from './helpers/route';
 
 test.use({ viewport: DESKTOP });
 // Same engine as chromium; nothing new to learn (spec §3.4).
