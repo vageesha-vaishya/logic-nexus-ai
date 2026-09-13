@@ -74,6 +74,8 @@ export default defineConfig({
     {
       name: 'msedge',
       dependencies: ['setup'],
+      // Same engine as chromium — the keyboard walk learns nothing new here (spec §3.4).
+      testIgnore: /keyboard\.spec\.ts/,
       use: { ...devices['Desktop Edge'], channel: 'msedge', storageState: AUTH_STATE },
     },
   ],

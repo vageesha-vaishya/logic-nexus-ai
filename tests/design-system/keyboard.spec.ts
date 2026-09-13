@@ -6,10 +6,6 @@ import { writeCellResult, type CellResult } from './helpers/results';
 import { routeFor } from './helpers/route';
 
 test.use({ viewport: DESKTOP });
-// Same engine as chromium; nothing new to learn (spec §3.4).
-test.beforeEach(async ({}, testInfo) => {
-  test.skip(testInfo.project.name === 'msedge', 'msedge shares chromium engine');
-});
 
 for (const def of PAGES) {
   test.describe(def.key, () => {
