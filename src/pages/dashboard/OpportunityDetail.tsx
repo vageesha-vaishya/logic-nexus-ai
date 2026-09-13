@@ -376,20 +376,13 @@ export default function OpportunityDetail() {
         >
         {isEditing ? (
           <>
-          <Card>
-            <CardHeader>
-              <CardTitle>Edit Opportunity</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <OpportunityForm
-                opportunity={opportunity}
-                onSubmit={handleUpdate}
-                onAutoSave={autoSave ? handleAutoSaveUpdate : undefined}
-                onCancel={() => setIsEditing(false)}
-                autoSave={autoSave}
-              />
-            </CardContent>
-          </Card>
+          <OpportunityForm
+            opportunity={opportunity}
+            onSubmit={handleUpdate}
+            onAutoSave={autoSave ? handleAutoSaveUpdate : undefined}
+            onCancel={() => setIsEditing(false)}
+            autoSave={autoSave}
+          />
 
           <Card>
             <CardHeader>

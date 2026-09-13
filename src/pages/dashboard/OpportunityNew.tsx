@@ -1,6 +1,5 @@
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { OpportunityForm } from '@/components/crm/OpportunityForm';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
@@ -65,14 +64,7 @@ export default function OpportunityNew() {
           <p className="text-muted-foreground">Create a new sales opportunity</p>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Opportunity Information</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <OpportunityForm onSubmit={handleSubmit} onCancel={handleCancel} />
-          </CardContent>
-        </Card>
+        <OpportunityForm onSubmit={handleSubmit} onCancel={handleCancel} />
       </div>
     </DashboardLayout>
   );

@@ -42,14 +42,12 @@ export function EntityCreatePageShell({ title, listLabel, listPath, entityType, 
         }
       >
         <EnterpriseSheet>
-          <div className="p-6">
-            <UnifiedPartnerForm
-              entityType={entityType}
-              mode="create"
-              onSubmit={onSubmit}
-              onCancel={() => navigate(listPath)}
-            />
-          </div>
+          <UnifiedPartnerForm
+            entityType={entityType}
+            mode="create"
+            onSubmit={onSubmit}
+            onCancel={() => navigate(listPath)}
+          />
         </EnterpriseSheet>
       </EnterpriseFormLayout>
     </div>

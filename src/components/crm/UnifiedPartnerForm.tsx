@@ -2,31 +2,30 @@ import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { 
-  Form, 
-  FormControl, 
-  FormField, 
-  FormItem, 
-  FormLabel, 
-  FormMessage 
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Loader2, Building2, User } from 'lucide-react';
-import { H5 } from '@/components/ui/Heading';
 import { useCRM } from '@/hooks/useCRM';
-import { cn } from '@/lib/utils';
 import { logger } from "@/lib/logger";
 import { useAutoSaveForm } from '@/hooks/useAutoSaveForm';
+import { FormSection, FormGrid, FormItem as LayoutItem } from '@/components/forms/FormLayout';
 
 // --- Zod Schemas ---
 
@@ -43,7 +42,7 @@ const partnerSchema = z.object({
   // Common / Meta
   type: z.enum(['company', 'individual']),
   tenant_id: z.string().optional(),
-  
+
   // Company Fields
   name: z.string().min(1, "Company name is required").optional().or(z.literal('')),
   account_type: z.string().optional(),
@@ -52,7 +51,7 @@ const partnerSchema = z.object({
   employee_count: z.string().optional(), // Input as string, convert to number
   vat_number: z.string().optional(),
   parent_account_id: z.string().optional(),
-  
+
   // Individual Fields
   first_name: z.string().min(1, "First name is required").optional().or(z.literal('')),
   last_name: z.string().min(1, "Last name is required").optional().or(z.literal('')),
@@ -61,15 +60,15 @@ const partnerSchema = z.object({
   department: z.string().optional(),
   mobile: z.string().optional(),
   lifecycle_stage: z.string().optional(),
-  
+
   // Shared Contact Info
   email: z.string().email("Invalid email").optional().or(z.literal('')),
   phone: z.string().optional(),
   website: z.string().url("Invalid URL").optional().or(z.literal('')), // Website or LinkedIn
-  
+
   // Address (Shared structure)
   address: addressSchema.optional(),
-  
+
   // Misc
   notes: z.string().optional(),
   tags: z.array(z.string()).optional(),
@@ -127,7 +126,7 @@ export function UnifiedPartnerForm({
 }: UnifiedPartnerFormProps) {
   // Determine initial type
   const defaultType = entityType === 'contact' ? 'individual' : 'company';
-  
+
   const form = useForm<PartnerFormData>({
     resolver: zodResolver(partnerSchema),
     defaultValues: {
@@ -182,7 +181,7 @@ export function UnifiedPartnerForm({
           .from('v_accounts')
           .select('id, name')
           .order('name');
-        
+
         if (error) throw error;
         setAccounts(data || []);
       } catch (err) {
@@ -199,505 +198,508 @@ export function UnifiedPartnerForm({
     delayMs: autoSaveDelayMs,
   });
 
-  // Enterprise Input Style Helper
-  const inputStyle = "border-0 border-b border-border rounded-none focus-visible:ring-0 focus-visible:border-primary px-0 h-9 placeholder:text-muted-foreground/50";
-  const labelStyle = "text-xs font-semibold text-muted-foreground mb-1";
+  const entityLabel = partnerType === 'company' ? 'Account' : 'Contact';
 
   return (
-    <div className="w-full max-w-5xl mx-auto p-6 bg-white shadow-sm border border-border/50 rounded-sm">
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-          {autoSave && autoSaveError ? (
-            <p className="text-xs text-destructive">{autoSaveError}</p>
-          ) : null}
+    <div className="p-6">
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        {autoSave && autoSaveError ? (
+          <p className="text-xs text-destructive">{autoSaveError}</p>
+        ) : null}
 
-          {/* Platform Admin: Tenant Selector */}
-          {mode === 'create' && context?.isPlatformAdmin && (
-            <div className="mb-6">
+        <FormSection
+          title={mode === 'create' ? `New ${entityLabel} Details` : `${entityLabel} Details`}
+          description="Core identity information"
+        >
+          <FormGrid columns={2} className="gap-x-4 gap-y-5">
+            {mode === 'create' && context?.isPlatformAdmin && (
+              <LayoutItem span={1}>
                 <FormField
-                    control={form.control}
-                    name="tenant_id"
-                    render={({ field }) => (
-                    <FormItem className="max-w-md">
-                        <FormLabel className={labelStyle}>Tenant</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  control={form.control}
+                  name="tenant_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tenant</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select Tenant" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {tenants.map((t) => (
+                            <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </LayoutItem>
+            )}
+
+            {mode === 'create' && !entityType && (
+              <LayoutItem span={2}>
+                <FormField
+                  control={form.control}
+                  name="type"
+                  render={({ field }) => (
+                    <FormItem className="space-y-2">
+                      <FormLabel>Type</FormLabel>
+                      <FormControl>
+                        <RadioGroup
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                          className="flex space-x-8"
+                        >
+                          <FormItem className="flex items-center space-x-2 space-y-0 cursor-pointer">
                             <FormControl>
-                                <SelectTrigger className={inputStyle}>
-                                    <SelectValue placeholder="Select Tenant" />
-                                </SelectTrigger>
+                              <RadioGroupItem value="company" id="r-company" />
                             </FormControl>
-                            <SelectContent>
-                                {tenants.map((t) => (
-                                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                                ))}
-                            </SelectContent>
+                            <FormLabel htmlFor="r-company" className="font-normal cursor-pointer flex items-center gap-2">
+                              <Building2 className="w-4 h-4 text-muted-foreground" />
+                              Company
+                            </FormLabel>
+                          </FormItem>
+                          <FormItem className="flex items-center space-x-2 space-y-0 cursor-pointer">
+                            <FormControl>
+                              <RadioGroupItem value="individual" id="r-individual" />
+                            </FormControl>
+                            <FormLabel htmlFor="r-individual" className="font-normal cursor-pointer flex items-center gap-2">
+                              <User className="w-4 h-4 text-muted-foreground" />
+                              Individual
+                            </FormLabel>
+                          </FormItem>
+                        </RadioGroup>
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </LayoutItem>
+            )}
+
+            {partnerType === 'company' ? (
+              <LayoutItem span={2}>
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Company Name *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. Lumber Inc" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </LayoutItem>
+            ) : (
+              <>
+                <LayoutItem span={1}>
+                  <FormField
+                    control={form.control}
+                    name="first_name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>First Name *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="First Name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </LayoutItem>
+                <LayoutItem span={1}>
+                  <FormField
+                    control={form.control}
+                    name="last_name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Last Name *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Last Name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </LayoutItem>
+                <LayoutItem span={1}>
+                  <FormField
+                    control={form.control}
+                    name="job_title"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Job Title</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Job Position" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </LayoutItem>
+                <LayoutItem span={1}>
+                  <FormField
+                    control={form.control}
+                    name="account_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Company</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select company" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {accounts.map((acc) => (
+                              <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
+                            ))}
+                          </SelectContent>
                         </Select>
                         <FormMessage />
-                    </FormItem>
+                      </FormItem>
                     )}
-                />
-            </div>
-          )}
+                  />
+                </LayoutItem>
+              </>
+            )}
+          </FormGrid>
+        </FormSection>
 
-          {/* Top Bar: Type Selector */}
-          {mode === 'create' && !entityType && (
-            <div className="flex items-center space-x-6 pb-6 border-b border-border/50">
+        <FormSection title="Address">
+          <FormGrid columns={2} className="gap-x-4 gap-y-5">
+            <LayoutItem span={2}>
               <FormField
                 control={form.control}
-                name="type"
+                name="address.street"
                 render={({ field }) => (
-                  <FormItem className="space-y-0">
+                  <FormItem>
+                    <FormLabel>Street</FormLabel>
                     <FormControl>
-                      <RadioGroup
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        className="flex space-x-8"
-                      >
-                        <FormItem className="flex items-center space-x-2 space-y-0 cursor-pointer">
-                          <FormControl>
-                            <RadioGroupItem value="company" id="r-company" className="text-primary border-border" />
-                          </FormControl>
-                          <FormLabel htmlFor="r-company" className="font-medium text-base cursor-pointer flex items-center gap-2 text-foreground">
-                            <Building2 className="w-4 h-4 text-muted-foreground" />
-                            Company
-                          </FormLabel>
-                        </FormItem>
-                        <FormItem className="flex items-center space-x-2 space-y-0 cursor-pointer">
-                          <FormControl>
-                            <RadioGroupItem value="individual" id="r-individual" className="text-primary border-border" />
-                          </FormControl>
-                          <FormLabel htmlFor="r-individual" className="font-medium text-base cursor-pointer flex items-center gap-2 text-foreground">
-                            <User className="w-4 h-4 text-muted-foreground" />
-                            Individual
-                          </FormLabel>
-                        </FormItem>
-                      </RadioGroup>
+                      <Input placeholder="Street..." {...field} />
                     </FormControl>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
-            </div>
-          )}
+            </LayoutItem>
+            <LayoutItem span={1}>
+              <FormField
+                control={form.control}
+                name="address.city"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>City</FormLabel>
+                    <FormControl>
+                      <Input placeholder="City" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </LayoutItem>
+            <LayoutItem span={1}>
+              <FormField
+                control={form.control}
+                name="address.state"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>State</FormLabel>
+                    <FormControl>
+                      <Input placeholder="State" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </LayoutItem>
+            <LayoutItem span={1}>
+              <FormField
+                control={form.control}
+                name="address.postal_code"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>ZIP</FormLabel>
+                    <FormControl>
+                      <Input placeholder="ZIP" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </LayoutItem>
+            <LayoutItem span={1}>
+              <FormField
+                control={form.control}
+                name="address.country"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Country</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Country" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </LayoutItem>
+          </FormGrid>
+        </FormSection>
 
-          {/* Main Form Content - Grid Layout */}
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
-            
-            {/* Left Column: Avatar & Main Identity */}
-            <div className="md:col-span-12 lg:col-span-8 space-y-8">
-              
-              {/* Name Section */}
-              <div className="flex gap-6 items-start">
-                 {/* Placeholder for Avatar */}
-                 <div className="w-24 h-24 bg-muted/30 border border-border rounded-sm flex items-center justify-center text-muted-foreground shrink-0 shadow-inner">
-                    {partnerType === 'company' ? <Building2 size={40} /> : <User size={40} />}
-                 </div>
-                 
-                 <div className="flex-1 space-y-4 pt-1">
-                    {partnerType === 'company' ? (
-                        <FormField
-                            control={form.control}
-                            name="name"
-                            render={({ field }) => (
-                            <FormItem>
-                                <FormLabel className={labelStyle}>Company Name *</FormLabel>
-                                <FormControl>
-                                <Input
-                                    placeholder="e.g. Lumber Inc"
-                                    className="text-3xl font-bold h-12 px-0 border-0 border-b border-border rounded-none focus-visible:ring-0 focus-visible:border-primary placeholder:text-muted-foreground/50"
-                                    {...field}
-                                />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                            )}
-                        />
-                    ) : (
-                        <div className="flex gap-4">
-                            <FormField
-                                control={form.control}
-                                name="first_name"
-                                render={({ field }) => (
-                                <FormItem className="flex-1">
-                                    <FormLabel className={labelStyle}>First Name *</FormLabel>
-                                    <FormControl>
-                                    <Input
-                                        placeholder="First Name"
-                                        className="text-3xl font-bold h-12 px-0 border-0 border-b border-border rounded-none focus-visible:ring-0 focus-visible:border-primary placeholder:text-muted-foreground/50"
-                                        {...field}
-                                    />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="last_name"
-                                render={({ field }) => (
-                                <FormItem className="flex-1">
-                                    <FormLabel className={labelStyle}>Last Name *</FormLabel>
-                                    <FormControl>
-                                    <Input
-                                        placeholder="Last Name"
-                                        className="text-3xl font-bold h-12 px-0 border-0 border-b border-border rounded-none focus-visible:ring-0 focus-visible:border-primary placeholder:text-muted-foreground/50"
-                                        {...field}
-                                    />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                                )}
-                            />
-                        </div>
-                    )}
+        <FormSection title="Communication">
+          <FormGrid columns={2} className="gap-x-4 gap-y-5">
+            <LayoutItem span={1}>
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone</FormLabel>
+                    <FormControl>
+                      <Input placeholder="+1..." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </LayoutItem>
+            {partnerType === 'individual' && (
+              <LayoutItem span={1}>
+                <FormField
+                  control={form.control}
+                  name="mobile"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Mobile</FormLabel>
+                      <FormControl>
+                        <Input placeholder="+1..." {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </LayoutItem>
+            )}
+            <LayoutItem span={1}>
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input placeholder="name@example.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </LayoutItem>
+            <LayoutItem span={1}>
+              <FormField
+                control={form.control}
+                name="website"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Website / LinkedIn</FormLabel>
+                    <FormControl>
+                      <Input placeholder="https://..." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </LayoutItem>
+          </FormGrid>
+        </FormSection>
 
-                    {/* Sub-fields under name */}
-                    {partnerType === 'individual' && (
-                        <div className="flex gap-4 items-center max-w-lg">
-                            <FormField
-                                control={form.control}
-                                name="job_title"
-                                render={({ field }) => (
-                                <FormItem className="flex-1">
-                                    <FormControl>
-                                    <Input placeholder="Job Position" className={inputStyle} {...field} />
-                                    </FormControl>
-                                </FormItem>
-                                )}
-                            />
-                            <span className="text-muted-foreground text-sm">at</span>
-                            <FormField
-                                control={form.control}
-                                name="account_id"
-                                render={({ field }) => (
-                                <FormItem className="flex-1">
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl>
-                                        <SelectTrigger className={cn(inputStyle, "flex w-full items-center justify-between bg-transparent text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed disabled:opacity-50")}>
-                                            <SelectValue placeholder="Company" />
-                                        </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                        <SelectItem value="none">None</SelectItem>
-                                        {accounts.map((acc) => (
-                                            <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                    </Select>
-                                </FormItem>
-                                )}
-                            />
-                        </div>
-                    )}
-                 </div>
-              </div>
+        {partnerType === 'company' ? (
+          <FormSection title="Company Details">
+            <FormGrid columns={2} className="gap-x-4 gap-y-5">
+              <LayoutItem span={1}>
+                <FormField
+                  control={form.control}
+                  name="account_type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Account Type</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select Type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="prospect">Prospect</SelectItem>
+                          <SelectItem value="customer">Customer</SelectItem>
+                          <SelectItem value="partner">Partner</SelectItem>
+                          <SelectItem value="vendor">Vendor</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </LayoutItem>
+              <LayoutItem span={1}>
+                <FormField
+                  control={form.control}
+                  name="industry"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Industry</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. Manufacturing" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </LayoutItem>
+              <LayoutItem span={1}>
+                <FormField
+                  control={form.control}
+                  name="annual_revenue"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Annual Revenue</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="0.00" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </LayoutItem>
+              <LayoutItem span={1}>
+                <FormField
+                  control={form.control}
+                  name="employee_count"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Employees</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="0" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </LayoutItem>
+              <LayoutItem span={1}>
+                <FormField
+                  control={form.control}
+                  name="vat_number"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tax ID / VAT</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. US123456789" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </LayoutItem>
+            </FormGrid>
+          </FormSection>
+        ) : (
+          <FormSection title="Contact Details">
+            <FormGrid columns={2} className="gap-x-4 gap-y-5">
+              <LayoutItem span={1}>
+                <FormField
+                  control={form.control}
+                  name="lifecycle_stage"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Lifecycle Stage</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select Stage" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="subscriber">Subscriber</SelectItem>
+                          <SelectItem value="lead">Lead</SelectItem>
+                          <SelectItem value="mql">MQL</SelectItem>
+                          <SelectItem value="sql">SQL</SelectItem>
+                          <SelectItem value="customer">Customer</SelectItem>
+                          <SelectItem value="evangelist">Evangelist</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </LayoutItem>
+            </FormGrid>
+          </FormSection>
+        )}
 
-              {/* Address & Contact Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-16 gap-y-6 pt-2">
-                  {/* Left Column: Address */}
-                  <div className="space-y-4">
-                    <H5 className="mb-4">Address</H5>
-                    
-                    <div className="space-y-2">
-                        <FormField
-                            control={form.control}
-                            name="address.street"
-                            render={({ field }) => (
-                            <FormItem>
-                                <FormLabel className={labelStyle}>Street</FormLabel>
-                                <FormControl>
-                                <Input placeholder="Street..." className={inputStyle} {...field} />
-                                </FormControl>
-                            </FormItem>
-                            )}
-                        />
-                        <div className="flex gap-2">
-                            <FormField
-                                control={form.control}
-                                name="address.city"
-                                render={({ field }) => (
-                                <FormItem className="flex-1">
-                                    <FormLabel className={labelStyle}>City</FormLabel>
-                                    <FormControl>
-                                    <Input placeholder="City" className={inputStyle} {...field} />
-                                    </FormControl>
-                                </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="address.state"
-                                render={({ field }) => (
-                                <FormItem className="w-24">
-                                    <FormLabel className={labelStyle}>State</FormLabel>
-                                    <FormControl>
-                                    <Input placeholder="State" className={inputStyle} {...field} />
-                                    </FormControl>
-                                </FormItem>
-                                )}
-                            />
-                        </div>
-                        <div className="flex gap-2">
-                            <FormField
-                                control={form.control}
-                                name="address.postal_code"
-                                render={({ field }) => (
-                                <FormItem className="w-32">
-                                    <FormLabel className={labelStyle}>ZIP</FormLabel>
-                                    <FormControl>
-                                    <Input placeholder="ZIP" className={inputStyle} {...field} />
-                                    </FormControl>
-                                </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="address.country"
-                                render={({ field }) => (
-                                <FormItem className="flex-1">
-                                    <FormLabel className={labelStyle}>Country</FormLabel>
-                                    <FormControl>
-                                    <Input placeholder="Country" className={inputStyle} {...field} />
-                                    </FormControl>
-                                </FormItem>
-                                )}
-                            />
-                        </div>
-                    </div>
-                    
-                    {partnerType === 'company' && (
-                         <div className="pt-6 space-y-4">
-                             <H5 className="mb-2">Tax ID</H5>
-                            <FormField
-                                control={form.control}
-                                name="vat_number"
-                                render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel className={labelStyle}>Tax ID / VAT</FormLabel>
-                                    <FormControl>
-                                    <Input placeholder="e.g. US123456789" className={inputStyle} {...field} />
-                                    </FormControl>
-                                </FormItem>
-                                )}
-                            />
-                         </div>
-                    )}
-                  </div>
+        <FormSection title="Notes">
+          <FormGrid columns={2} className="gap-x-4 gap-y-5">
+            <LayoutItem span={2}>
+              <FormField
+                control={form.control}
+                name="tags"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tags</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="e.g. Prospect, Vendor"
+                        {...field}
+                        value={Array.isArray(field.value) ? field.value.join(', ') : field.value || ''}
+                        onChange={(e) => field.onChange(e.target.value.split(',').map(s => s.trim()))}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </LayoutItem>
+            <LayoutItem span={2}>
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Internal Notes</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Add internal notes..."
+                        className="min-h-[100px]"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </LayoutItem>
+          </FormGrid>
+        </FormSection>
 
-                  {/* Right Column: Communication */}
-                  <div className="space-y-4">
-                    <H5 className="mb-4">Communication</H5>
-                    
-                    <FormField
-                        control={form.control}
-                        name="phone"
-                        render={({ field }) => (
-                        <FormItem>
-                            <FormLabel className={labelStyle}>Phone</FormLabel>
-                            <FormControl>
-                            <Input placeholder="+1..." className={inputStyle} {...field} />
-                            </FormControl>
-                        </FormItem>
-                        )}
-                    />
-                    
-                    {partnerType === 'individual' && (
-                        <FormField
-                            control={form.control}
-                            name="mobile"
-                            render={({ field }) => (
-                            <FormItem>
-                                <FormLabel className={labelStyle}>Mobile</FormLabel>
-                                <FormControl>
-                                <Input placeholder="+1..." className={inputStyle} {...field} />
-                                </FormControl>
-                            </FormItem>
-                            )}
-                        />
-                    )}
-
-                    <FormField
-                        control={form.control}
-                        name="email"
-                        render={({ field }) => (
-                        <FormItem>
-                            <FormLabel className={labelStyle}>Email</FormLabel>
-                            <FormControl>
-                            <Input placeholder="name@example.com" className={inputStyle} {...field} />
-                            </FormControl>
-                        </FormItem>
-                        )}
-                    />
-
-                    <FormField
-                        control={form.control}
-                        name="website"
-                        render={({ field }) => (
-                        <FormItem>
-                            <FormLabel className={labelStyle}>Website / LinkedIn</FormLabel>
-                            <FormControl>
-                            <Input placeholder="https://..." className={inputStyle} {...field} />
-                            </FormControl>
-                        </FormItem>
-                        )}
-                    />
-
-                    {/* Company Specific Details */}
-                    {partnerType === 'company' && (
-                        <>
-                            <div className="pt-4 border-t border-border/50 mt-4 mb-2">
-                                <H5>Company Details</H5>
-                            </div>
-                            <FormField
-                                control={form.control}
-                                name="account_type"
-                                render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel className={labelStyle}>Account Type</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                        <FormControl>
-                                            <SelectTrigger className={cn(inputStyle, "flex w-full items-center justify-between bg-transparent text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed disabled:opacity-50")}>
-                                                <SelectValue placeholder="Select Type" />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            <SelectItem value="prospect">Prospect</SelectItem>
-                                            <SelectItem value="customer">Customer</SelectItem>
-                                            <SelectItem value="partner">Partner</SelectItem>
-                                            <SelectItem value="vendor">Vendor</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="industry"
-                                render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel className={labelStyle}>Industry</FormLabel>
-                                    <FormControl>
-                                    <Input placeholder="e.g. Manufacturing" className={inputStyle} {...field} />
-                                    </FormControl>
-                                </FormItem>
-                                )}
-                            />
-                            <div className="flex gap-4">
-                                <FormField
-                                    control={form.control}
-                                    name="annual_revenue"
-                                    render={({ field }) => (
-                                    <FormItem className="flex-1">
-                                        <FormLabel className={labelStyle}>Annual Revenue</FormLabel>
-                                        <FormControl>
-                                        <Input type="number" placeholder="0.00" className={inputStyle} {...field} />
-                                        </FormControl>
-                                    </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={form.control}
-                                    name="employee_count"
-                                    render={({ field }) => (
-                                    <FormItem className="flex-1">
-                                        <FormLabel className={labelStyle}>Employees</FormLabel>
-                                        <FormControl>
-                                        <Input type="number" placeholder="0" className={inputStyle} {...field} />
-                                        </FormControl>
-                                    </FormItem>
-                                    )}
-                                />
-                            </div>
-                        </>
-                    )}
-
-                    {/* Contact Specific Details */}
-                    {partnerType === 'individual' && (
-                        <FormField
-                            control={form.control}
-                            name="lifecycle_stage"
-                            render={({ field }) => (
-                            <FormItem>
-                                <FormLabel className={labelStyle}>Lifecycle Stage</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl>
-                                        <SelectTrigger className={cn(inputStyle, "flex w-full items-center justify-between bg-transparent text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed disabled:opacity-50")}>
-                                            <SelectValue placeholder="Select Stage" />
-                                        </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                        <SelectItem value="subscriber">Subscriber</SelectItem>
-                                        <SelectItem value="lead">Lead</SelectItem>
-                                        <SelectItem value="mql">MQL</SelectItem>
-                                        <SelectItem value="sql">SQL</SelectItem>
-                                        <SelectItem value="customer">Customer</SelectItem>
-                                        <SelectItem value="evangelist">Evangelist</SelectItem>
-                                        <SelectItem value="other">Other</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </FormItem>
-                            )}
-                        />
-                    )}
-
-                    <FormField
-                        control={form.control}
-                        name="tags"
-                        render={({ field }) => (
-                        <FormItem>
-                            <FormLabel className={labelStyle}>Tags</FormLabel>
-                            <FormControl>
-                             <Input 
-                                placeholder="e.g. Prospect, Vendor" 
-                                className={inputStyle} 
-                                {...field} 
-                                value={Array.isArray(field.value) ? field.value.join(', ') : field.value || ''}
-                                onChange={(e) => field.onChange(e.target.value.split(',').map(s => s.trim()))}
-                             />
-                            </FormControl>
-                        </FormItem>
-                        )}
-                    />
-                  </div>
-              </div>
-            </div>
-
-            {/* Right Sidebar / Tabbed Area for Extra Info */}
-            <div className="md:col-span-12 lg:col-span-12 pt-6">
-                <div className="border-t border-border/50 pt-6">
-                     <FormField
-                        control={form.control}
-                        name="notes"
-                        render={({ field }) => (
-                        <FormItem>
-                            <FormLabel className="text-sm font-semibold text-foreground">Internal Notes</FormLabel>
-                            <FormControl>
-                            <Textarea
-                                placeholder="Add internal notes..."
-                                className="min-h-[100px] border-border resize-none bg-yellow-50/20 focus-visible:ring-primary"
-                                {...field}
-                            />
-                            </FormControl>
-                        </FormItem>
-                        )}
-                    />
-                </div>
-            </div>
-
-          </div>
-
-          {/* Actions */}
-          <div className="flex justify-end gap-3 pt-6 border-t border-border/50">
-            <Button type="button" variant="outline" onClick={onCancel} className="border-border">
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {mode === 'create' ? `Create ${partnerType === 'company' ? 'Account' : 'Contact'}` : 'Save Changes'}
-            </Button>
-          </div>
-
-        </form>
-      </Form>
+        <div className="flex justify-end gap-3">
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={isLoading}>
+            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {mode === 'create' ? `Create ${entityLabel}` : 'Save Changes'}
+          </Button>
+        </div>
+      </form>
+    </Form>
     </div>
   );
 }

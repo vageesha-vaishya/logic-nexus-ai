@@ -12,6 +12,7 @@ import { useCRM } from '@/hooks/useCRM';
 import { stageProbabilityMap, OpportunityStage } from '@/pages/dashboard/opportunities-data';
 import { leadSources } from '@/pages/dashboard/leads-data';
 import { useAutoSaveForm } from '@/hooks/useAutoSaveForm';
+import { FormSection, FormGrid, FormItem as LayoutItem } from '@/components/forms/FormLayout';
 
 const opportunitySchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -170,329 +171,366 @@ export function OpportunityForm({ opportunity, onSubmit, onAutoSave, onCancel, a
           <p className="text-xs text-destructive">{autoSaveError}</p>
         ) : null}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="name"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Opportunity Name *</FormLabel>
-                <FormControl>
-                  <Input placeholder="Enter opportunity name" {...field} data-testid="opportunity-name-input" />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="stage"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Stage</FormLabel>
-                <Select 
-                  onValueChange={(val) => {
-                    field.onChange(val);
-                    if (stageProbabilityMap[val as OpportunityStage] !== undefined) {
-                       form.setValue('probability', stageProbabilityMap[val as OpportunityStage].toString());
-                    }
-                  }} 
-                  defaultValue={field.value}
-                >
-                  <FormControl>
-                    <SelectTrigger data-testid="stage-select-trigger">
-                      <SelectValue placeholder="Select stage" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {Object.entries(stageLabels).map(([value, label]) => (
-                      <SelectItem key={value} value={value}>
-                        {label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="amount"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Amount</FormLabel>
-                <FormControl>
-                  <Input type="number" step="0.01" placeholder="0.00" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="probability"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Probability (%)</FormLabel>
-                <FormControl>
-                  <Input type="number" min="0" max="100" placeholder="0-100" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="close_date"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Expected Close Date</FormLabel>
-                <FormControl>
-                  <Input type="date" {...field} data-testid="close-date-input" />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="account_id"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Account</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select account" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {accounts.map((account) => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {account.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="contact_id"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Primary Contact</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select contact" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {filteredContacts.map((contact) => (
-                      <SelectItem key={contact.id} value={contact.id}>
-                        {contact.first_name} {contact.last_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="lead_id"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Related Lead</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select lead" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {leads.map((lead) => (
-                      <SelectItem key={lead.id} value={lead.id}>
-                        {lead.first_name} {lead.last_name} {lead.company ? `- ${lead.company}` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="lead_source"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Lead Source</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select lead source" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="website">Website</SelectItem>
-                    <SelectItem value="phone">Phone</SelectItem>
-                    <SelectItem value="email">Email</SelectItem>
-                    <SelectItem value="referral">Referral</SelectItem>
-                    <SelectItem value="social">Social</SelectItem>
-                    <SelectItem value="event">Event</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="type"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Type</FormLabel>
-                <FormControl>
-                  <Input placeholder="New Business, Upsell, Renewal, etc." {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="forecast_category"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Forecast Category</FormLabel>
-                <FormControl>
-                  <Input placeholder="Pipeline, Best Case, Commit, etc." {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {context.isPlatformAdmin && (
-            <FormField
-              control={form.control}
-              name="tenant_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Tenant *</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+        <FormSection
+          title={opportunity ? 'Opportunity Details' : 'New Opportunity Details'}
+          description="Core opportunity information, pipeline stage, and related records"
+        >
+          <FormGrid columns={2} className="gap-x-4 gap-y-5">
+            <LayoutItem span={1}>
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Opportunity Name *</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select tenant" />
-                      </SelectTrigger>
+                      <Input placeholder="Enter opportunity name" {...field} data-testid="opportunity-name-input" />
                     </FormControl>
-                    <SelectContent>
-                      {tenants.map((tenant) => (
-                        <SelectItem key={tenant.id} value={tenant.id}>
-                          {tenant.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </LayoutItem>
 
-          {(context.isPlatformAdmin || context.isTenantAdmin) && (
-            <FormField
-              control={form.control}
-              name="franchise_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Franchise</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+            <LayoutItem span={1}>
+              <FormField
+                control={form.control}
+                name="stage"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Stage</FormLabel>
+                    <Select
+                      onValueChange={(val) => {
+                        field.onChange(val);
+                        if (stageProbabilityMap[val as OpportunityStage] !== undefined) {
+                           form.setValue('probability', stageProbabilityMap[val as OpportunityStage].toString());
+                        }
+                      }}
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="stage-select-trigger">
+                          <SelectValue placeholder="Select stage" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {Object.entries(stageLabels).map(([value, label]) => (
+                          <SelectItem key={value} value={value}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </LayoutItem>
+
+            <LayoutItem span={1}>
+              <FormField
+                control={form.control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Amount</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select franchise" />
-                      </SelectTrigger>
+                      <Input type="number" step="0.01" placeholder="0.00" {...field} />
                     </FormControl>
-                    <SelectContent>
-                      {franchises.map((franchise) => (
-                        <SelectItem key={franchise.id} value={franchise.id}>
-                          {franchise.code} - {franchise.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          )}
-        </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </LayoutItem>
 
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Description</FormLabel>
-              <FormControl>
-                <Textarea
-                  placeholder="Enter opportunity description"
-                  className="min-h-[100px]"
-                  {...field}
+            <LayoutItem span={1}>
+              <FormField
+                control={form.control}
+                name="probability"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Probability (%)</FormLabel>
+                    <FormControl>
+                      <Input type="number" min="0" max="100" placeholder="0-100" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </LayoutItem>
+
+            <LayoutItem span={1}>
+              <FormField
+                control={form.control}
+                name="close_date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Expected Close Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} data-testid="close-date-input" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </LayoutItem>
+
+            <LayoutItem span={1}>
+              <FormField
+                control={form.control}
+                name="account_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Account</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select account" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {accounts.map((account) => (
+                          <SelectItem key={account.id} value={account.id}>
+                            {account.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </LayoutItem>
+
+            <LayoutItem span={1}>
+              <FormField
+                control={form.control}
+                name="contact_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Primary Contact</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select contact" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {filteredContacts.map((contact) => (
+                          <SelectItem key={contact.id} value={contact.id}>
+                            {contact.first_name} {contact.last_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </LayoutItem>
+
+            <LayoutItem span={1}>
+              <FormField
+                control={form.control}
+                name="lead_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Related Lead</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select lead" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {leads.map((lead) => (
+                          <SelectItem key={lead.id} value={lead.id}>
+                            {lead.first_name} {lead.last_name} {lead.company ? `- ${lead.company}` : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </LayoutItem>
+
+            <LayoutItem span={1}>
+              <FormField
+                control={form.control}
+                name="lead_source"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Lead Source</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select lead source" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="website">Website</SelectItem>
+                        <SelectItem value="phone">Phone</SelectItem>
+                        <SelectItem value="email">Email</SelectItem>
+                        <SelectItem value="referral">Referral</SelectItem>
+                        <SelectItem value="social">Social</SelectItem>
+                        <SelectItem value="event">Event</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </LayoutItem>
+
+            <LayoutItem span={1}>
+              <FormField
+                control={form.control}
+                name="type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Type</FormLabel>
+                    <FormControl>
+                      <Input placeholder="New Business, Upsell, Renewal, etc." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </LayoutItem>
+
+            <LayoutItem span={1}>
+              <FormField
+                control={form.control}
+                name="forecast_category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Forecast Category</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Pipeline, Best Case, Commit, etc." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </LayoutItem>
+
+            {context.isPlatformAdmin && (
+              <LayoutItem span={1}>
+                <FormField
+                  control={form.control}
+                  name="tenant_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tenant *</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select tenant" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {tenants.map((tenant) => (
+                            <SelectItem key={tenant.id} value={tenant.id}>
+                              {tenant.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+              </LayoutItem>
+            )}
 
-        <FormField
-          control={form.control}
-          name="next_step"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Next Step</FormLabel>
-              <FormControl>
-                <Input placeholder="What's the next action?" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="competitors"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Competitors</FormLabel>
-              <FormControl>
-                <Textarea
-                  placeholder="List competing companies or solutions"
-                  {...field}
+            {(context.isPlatformAdmin || context.isTenantAdmin) && (
+              <LayoutItem span={1}>
+                <FormField
+                  control={form.control}
+                  name="franchise_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Franchise</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select franchise" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {franchises.map((franchise) => (
+                            <SelectItem key={franchise.id} value={franchise.id}>
+                              {franchise.code} - {franchise.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+              </LayoutItem>
+            )}
+
+            <LayoutItem span={2}>
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Enter opportunity description"
+                        className="min-h-[100px]"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </LayoutItem>
+
+            <LayoutItem span={1}>
+              <FormField
+                control={form.control}
+                name="next_step"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Next Step</FormLabel>
+                    <FormControl>
+                      <Input placeholder="What's the next action?" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </LayoutItem>
+
+            <LayoutItem span={1}>
+              <FormField
+                control={form.control}
+                name="competitors"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Competitors</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="List competing companies or solutions"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </LayoutItem>
+          </FormGrid>
+        </FormSection>
 
         <div className="flex justify-end gap-4">
           <Button type="button" variant="outline" onClick={onCancel}>
