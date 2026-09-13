@@ -1,5 +1,4 @@
 import { AppSidebar } from './AppSidebar';
-import { ObjectMenu } from './ObjectMenu';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +9,6 @@ import { useStickyActions } from '@/components/layout/StickyActionsContext';
 import { StickyActionsBar } from '@/components/ui/StickyActionsBar';
 import { AdminScopeSwitcher } from './AdminScopeSwitcher';
 import { DomainSwitcher } from '@/components/navigation/DomainSwitcher';
-import { MembershipSwitcher } from './MembershipSwitcher';
 import { DomainAccentStrip } from '@/components/branding';
 import { useDomainAccent } from '@/hooks/useDomainAccent';
 import { usePipeline } from '@/components/debug/pipeline/PipelineContext';
@@ -752,10 +750,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   <TooltipContent side="bottom">Open Pipeline Debugger</TooltipContent>
                 </Tooltip>
               )}
-              <MembershipSwitcher />
               <DomainSwitcher />
               <AdminScopeSwitcher />
-              <ObjectMenu />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="h-9 px-2 gap-2" aria-label={userDisplayName}>
