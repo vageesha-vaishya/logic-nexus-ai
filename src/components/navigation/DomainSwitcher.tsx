@@ -33,7 +33,7 @@ export function DomainSwitcher() {
         value={currentDomain?.code}
         onValueChange={(value) => setDomain(value)}
       >
-        <SelectTrigger className="w-[200px] h-9 bg-background border-input">
+        <SelectTrigger aria-label="Domain" className="w-[200px] h-9 bg-background border-input">
           <div className="flex items-center gap-2 truncate">
             <Layers className="h-4 w-4 text-muted-foreground shrink-0" />
             <SelectValue placeholder="Select Domain" />
@@ -45,7 +45,7 @@ export function DomainSwitcher() {
               <div className="flex flex-col items-start text-left">
                 <span className="font-medium leading-none mb-0.5">{domain.name}</span>
                 {domain.description && (
-                  <span className="text-xs text-muted-foreground line-clamp-1 opacity-70">
+                  <span className="text-xs text-muted-foreground line-clamp-1">
                     {domain.description}
                   </span>
                 )}

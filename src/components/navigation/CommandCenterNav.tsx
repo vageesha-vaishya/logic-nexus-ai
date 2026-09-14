@@ -529,6 +529,8 @@ export function CommandCenterNav() {
                       )}
                       aria-label={`Toggle ${group.label} menu`}
                       aria-expanded={isOpen}
+                      tabIndex={collapsed ? -1 : 0}
+                      aria-hidden={collapsed ? true : undefined}
                     >
                       {!collapsed && (
                         <>

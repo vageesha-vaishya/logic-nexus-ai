@@ -296,4 +296,16 @@ describe('CommandCenterNav', () => {
 
     expect(screen.getByRole('link', { name: 'Overview' })).toBeInTheDocument();
   });
+
+  it('removes collapsed group toggles from the tab order', () => {
+    mockUseSidebar.mockReturnValue({ state: 'collapsed' });
+    // aria-hidden="true" removes the element's computed accessible name (by
+    // design — that is the point of the fix), so getByRole(... { name }) can
+    // no longer find it; look it up by its aria-label attribute instead.
+    const { container } = renderNav('/dashboard');
+    const toggle = container.querySelector('button[aria-label="Toggle CRM menu"]');
+    expect(toggle).not.toBeNull();
+    expect(toggle).toHaveAttribute('tabindex', '-1');
+    expect(toggle).toHaveAttribute('aria-hidden', 'true');
+  });
 });

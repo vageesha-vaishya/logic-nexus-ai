@@ -78,7 +78,7 @@ export function EnterpriseDashboardShell({
                   </div>
                   <Badge variant={lane.badgeTone}>{lane.badge}</Badge>
                 </div>
-                <Progress value={lane.progress} className="h-2" />
+                <Progress value={lane.progress} className="h-2" aria-label={`${lane.name} progress`} />
               </div>
             ))}
           </CardContent>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import Joyride, { Step, CallBackProps, STATUS } from 'react-joyride';
 import { useTheme } from '@/hooks/useTheme';
 
@@ -16,6 +16,31 @@ export function OnboardingTour({ enabled = true }: OnboardingTourProps) {
       setRun(true);
     }
   }, [enabled]);
+
+  const dismissTour = useCallback(() => {
+    setRun(false);
+    localStorage.setItem('has_seen_onboarding_tour', 'true');
+  }, []);
+
+  // react-joyride's own Escape handling (disableCloseOnEsc={false}, its
+  // default) only closes the *current* step and advances to the next one —
+  // it does not end the tour the way Skip does. The tooltip is a modal
+  // dialog (role="alertdialog"/aria-modal, applied by the library's default
+  // Tooltip) that cycles focus between Skip/Next, which is only acceptable
+  // per WCAG 2.4.3/2.4.7 if the trap has a single, predictable way out.
+  // Make Escape fully end the tour, exactly like Skip.
+  useEffect(() => {
+    if (!run) {
+      return;
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        dismissTour();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [run, dismissTour]);
 
   const steps: Step[] = [
     {
@@ -44,8 +69,7 @@ export function OnboardingTour({ enabled = true }: OnboardingTourProps) {
   const handleJoyrideCallback = (data: CallBackProps) => {
     const { status } = data;
     if (([STATUS.FINISHED, STATUS.SKIPPED] as string[]).includes(status)) {
-      setRun(false);
-      localStorage.setItem('has_seen_onboarding_tour', 'true');
+      dismissTour();
     }
   };
 
@@ -59,6 +83,7 @@ export function OnboardingTour({ enabled = true }: OnboardingTourProps) {
       showProgress
       showSkipButton
       steps={steps}
+      disableCloseOnEsc={false}
       styles={{
         options: {
           zIndex: 10000,
