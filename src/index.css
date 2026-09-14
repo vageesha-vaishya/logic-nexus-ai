@@ -352,9 +352,12 @@ All colors MUST be HSL.
     --warning-foreground: 222 47% 11%;
 
     /* Markets / financial up-down semantics — dark theme (ADR-026 §5).
-       Foregrounds are ink, not white: on a 9%-lightness page the solid must stay
-       bright enough to clear 4.5:1 against the background, which caps white-on-solid
-       at ~2.1:1. Same resolution as --success-foreground / --warning-foreground. */
+       Foregrounds are ink, not white. The two requirements are mutually exclusive
+       here: clearing 4.5:1 against the --background (222 47% 9%, L=0.0065) needs the
+       solid at L>=0.2041, while white-on-solid at 4.5:1 needs L<=0.1833. Holding
+       up-on-background at exactly 4.5 caps white-on-solid at ~4.13:1 (~4.31:1 if you
+       balance the two), so no lightness satisfies both and white is out regardless of
+       tuning. Same resolution as --success-foreground / --warning-foreground. */
     --up: 142 58% 50%;
     --up-foreground: 222 47% 11%;
     --up-soft: 142 50% 14%;

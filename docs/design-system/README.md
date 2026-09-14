@@ -138,9 +138,12 @@ were not touched.
 
 Light `--up` was `38%` (3.30:1 on `--up-soft`) and `--down` was `50%` (4.37:1); both
 were darkened until the tinted pill cleared 4.5:1. In **dark** mode the foregrounds had
-to stop being white: on a 9%-lightness page the solid must stay bright enough to clear
-4.5:1 against the background, which caps white-on-solid at ~2.1:1 — the same conflict
-`--success-foreground` and `--warning-foreground` resolve with dark ink.
+to stop being white, and no amount of tuning could have saved them: against the dark
+`--background` (`222 47% 9%`, luminance 0.0065) a solid needs luminance ≥ 0.2041 to clear
+4.5:1, while white-on-solid at 4.5:1 requires ≤ 0.1833. The ranges do not overlap — hold
+`up on background` at exactly 4.5 and white-on-solid tops out at **~4.13:1** (~4.31:1 if
+the two are balanced against each other). Dark ink is the only pairing that works, the
+same conflict `--success-foreground` and `--warning-foreground` resolve the same way.
 
 The brand blue (`217 91% 53%`) is *only* for actions, links, selection, and focus. Record state uses the `--status-*` tones above (via `<Badge tone>`), the `--menu-strip-*` module hues, and the `--up`/`--down`/`--neutral` financial semantics, never `--primary`.
 
@@ -372,6 +375,11 @@ Requires `E2E_ADMIN_EMAIL` / `E2E_ADMIN_PASSWORD` in the gitignored repo-root `e
 - `LeadDetail` / `QuoteDetail` keep their own richer navigation; not migrated to the sticky-bar pattern (business-critical workspace pages, deliberately left alone).
 - Lead/Activity/Opportunity/Quote "New" pages keep their own shells; `EntityCreatePageShell` is coupled to `UnifiedPartnerForm` and would need generalising first.
 - **Server-side pagination for Accounts.** Plan 2 shipped client-side paging ("Load more", 100 rows a page) so the list no longer renders every row at once, but the full result set is still fetched. The real fix is a ranged query.
+- **~74 gated axe/ARIA/layout cells still fail** after Plan 2 (down from 717 rule×cell instances; gated rules 8 → 2). See [`verification/REPORT.md`](verification/REPORT.md) for the authoritative list — the summary here names only the clusters.
+  - **Largest cluster by far: the Themes page (~60 cells), all in `src/pages/dashboard/ThemeManagement.tsx`.** `label` (critical, 32 cells): the Theme Name input and the Gradient Angle range/number inputs have no `htmlFor`-associated label — their adjacent text is not programmatically attached, and a placeholder is not a label. `color-contrast` (serious, 16 cells, dark only): the two bare `<select>`s at `:546` and `:564` carry no colour tokens, so dark mode inherits an unreadable pairing. Layout (8 cells): a button at `:386` overflows 360px viewports (`right=388 > 360`). Plus 4 ARIA cells for the same unnamed Theme Name input.
+  - **Palette classes that escaped the Plan 2 sweep (~17 cells).** `leads-kanban` dark: `LeadsPipelineComponents.tsx` uses `bg-sky-500/10 text-sky-700`-style pills. Dashboard widgets: `RevenueYTD.tsx` and `SalesForecast.tsx` use standalone `text-green-600` / `text-cyan-600`.
+  - **The lint ban has two blind spots that let those through**, so it reads as stronger than it is. `STATUS_PALETTE_BANS` matches `bg-<hue>-<n>` and `text-<hue>-<n>` only when *whitespace-adjacent*, so an **opacity modifier** (`bg-sky-500/10 text-sky-700`) slips past; and it only matches **pairs**, so a text-only class with no `bg-` partner was never in scope. `sky` is also missing from `STATUS_PALETTE_HUES`. Widening the selector on both axes would catch these at lint time rather than at harness time.
+  - **These are pre-existing findings, not regressions introduced by Plan 2.** They survived because the per-task briefs were written from `REPORT.md`'s **truncated 3-item "Sample targets" line**, which cannot reveal every violating node: on this same page `select-name` went 32 → 0 (all its nodes fit the sample) while `label` stayed 32 → 32 (its did not). Brief a follow-up from the full node list, not the sample.
 
 ## Appendix C — Research sources
 
