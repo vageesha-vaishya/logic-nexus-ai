@@ -26,6 +26,15 @@ export async function checkLayout(page: Page): Promise<{ passed: boolean; offend
       }
       return false;
     };
+    const source = (el: Element): string => {
+      let cur: Element | null = el;
+      for (let depth = 0; cur && depth < 5; depth++, cur = cur.parentElement) {
+        const p = cur.getAttribute('data-component-path');
+        const l = cur.getAttribute('data-component-line');
+        if (p) return `${p.replace(/\\/g, '/')}:${l ?? '?'} `;
+      }
+      return '';
+    };
     const describe = (el: Element): string => {
       const id = el.id ? `#${el.id}` : '';
       const cls = typeof el.className === 'string' && el.className
@@ -42,7 +51,7 @@ export async function checkLayout(page: Page): Promise<{ passed: boolean; offend
       if (r.width === 0 || r.height === 0) continue;
       // +1 tolerates sub-pixel rounding.
       if (r.right > vw + 1 && !hasScrollingAncestor(el) && getComputedStyle(el).position !== 'fixed') {
-        offenders.push(`${describe(el)} right=${Math.round(r.right)} > ${vw}`);
+        offenders.push(`${source(el)}${describe(el)} right=${Math.round(r.right)} > ${vw}`);
         reported++;
       }
     }

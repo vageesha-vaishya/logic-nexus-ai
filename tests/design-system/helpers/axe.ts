@@ -12,7 +12,7 @@ interface RawViolation {
   impact: AxeViolationSummary['impact'] | null;
   help: string;
   helpUrl: string;
-  nodes: { target: string[] }[];
+  nodes: { target: string[]; source: string }[];
 }
 
 export async function runAxe(
@@ -26,7 +26,14 @@ export async function runAxe(
       for (const id of disabled) rules[id] = { enabled: false };
       // @ts-expect-error axe is injected globally by addScriptTag
       const res = await window.axe.run(document, { runOnly: { type: 'tag', values: tags }, rules });
-      return res.violations as RawViolation[];
+      return res.violations.map((v: RawViolation) => ({
+        ...v,
+        nodes: v.nodes.map(n => {
+          const path = /data-component-path="([^"]+)"/.exec(n.html)?.[1]?.replace(/\\/g, '/');
+          const line = /data-component-line="(\d+)"/.exec(n.html)?.[1];
+          return { target: n.target, source: path ? `${path}:${line ?? '?'} ` : '' };
+        }),
+      }));
     },
     [AXE_TAGS, disabledRules.map(r => r.id)] as const,
   );
@@ -37,7 +44,7 @@ export async function runAxe(
     help: v.help,
     helpUrl: v.helpUrl,
     nodes: v.nodes.length,
-    sampleTargets: v.nodes.slice(0, 3).map(n => n.target.join(' ')),
+    sampleTargets: v.nodes.slice(0, 3).map(n => `${n.source}${n.target.join(' ')}`),
   }));
 
   return {
