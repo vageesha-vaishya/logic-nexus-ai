@@ -3,7 +3,6 @@
   - /url: "#main-content"
 - button "Toggle Sidebar":
   - img "SOS Services Logo"
-- button "Toggle CRM menu" [expanded]
 - list:
   - listitem:
     - link "Leads":
@@ -25,13 +24,6 @@
     - link "Contacts":
       - /url: /dashboard/contacts/pipeline
       - img
-- button "Toggle Sales menu"
-- button "Toggle Markets menu"
-- button "Toggle Financials menu"
-- button "Toggle Logistics menu"
-- button "Toggle UIM menu"
-- button "Toggle AMRO menu"
-- button "Toggle Administration menu"
 - button "Sign Out":
   - img
 - banner:
@@ -44,7 +36,7 @@
           - /url: /dashboard
       - listitem:
         - link "Leads" [disabled]
-  - combobox:
+  - combobox "Domain":
     - img
     - text: Logistics & Supply Chain Transportation, Warehousing, and Freight Management
   - button "Scoped View":
@@ -87,7 +79,7 @@
     - button "Leads Analytics view":
       - img
       - text: Analytics
-  - heading "Leads Workspace" [level=1]
+  - heading "Leads Workspace" [level=2]
   - paragraph: Focus on pipeline and active contacts
   - text: "Tenant: bb451198-2877-4345-a578-d404c5720f1a"
   - button "Refreshing..." [disabled]
@@ -96,20 +88,20 @@
   - heading "Lead Search and Filter" [level=3]
   - img
   - textbox "Search leads..."
-  - combobox:
+  - combobox "Filter by status":
     - img
     - text: All Status
-  - combobox:
+  - combobox "Filter by owner":
     - img
     - text: Any Owner
-  - combobox:
+  - combobox "Filter by score":
     - img
     - text: All Scores
   - combobox "Group By": No Grouping
   - spinbutton
   - text: "-"
   - spinbutton
-  - combobox: Contains
+  - combobox "Name match type": Contains
   - textbox "Lead Name"
   - button "Fields":
     - img

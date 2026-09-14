@@ -3,7 +3,6 @@
   - /url: "#main-content"
 - button "Toggle Sidebar":
   - img "SOS Services Logo"
-- button "Toggle CRM menu" [expanded]
 - list:
   - listitem:
     - link "Leads":
@@ -25,13 +24,6 @@
     - link "Contacts":
       - /url: /dashboard/contacts/pipeline
       - img
-- button "Toggle Sales menu"
-- button "Toggle Markets menu"
-- button "Toggle Financials menu"
-- button "Toggle Logistics menu"
-- button "Toggle UIM menu"
-- button "Toggle AMRO menu"
-- button "Toggle Administration menu"
 - button "Sign Out":
   - img
 - banner:
@@ -44,7 +36,7 @@
           - /url: /dashboard
       - listitem:
         - link "Contacts" [disabled]
-  - combobox:
+  - combobox "Domain":
     - img
     - text: Logistics & Supply Chain Transportation, Warehousing, and Freight Management
   - button "SOS Services":

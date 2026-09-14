@@ -3,7 +3,6 @@
   - /url: "#main-content"
 - button "Toggle Sidebar":
   - img "SOS Services Logo"
-- button "Toggle CRM menu" [expanded]
 - list:
   - listitem:
     - link "Leads":
@@ -25,13 +24,6 @@
     - link "Contacts":
       - /url: /dashboard/contacts/pipeline
       - img
-- button "Toggle Sales menu"
-- button "Toggle Markets menu"
-- button "Toggle Financials menu"
-- button "Toggle Logistics menu"
-- button "Toggle UIM menu"
-- button "Toggle AMRO menu"
-- button "Toggle Administration menu"
 - button "Sign Out":
   - img
 - banner:
@@ -44,7 +36,7 @@
           - /url: /dashboard
       - listitem:
         - link "Theme Management" [disabled]
-  - combobox:
+  - combobox "Domain":
     - img
     - text: Logistics & Supply Chain Transportation, Warehousing, and Freight Management
   - button "SOS Services":
@@ -71,243 +63,281 @@
   - button "Platform"
   - heading "Main Menu Group Strip Colors" [level=3]
   - text: Configure individual color strips for CRM, Sales, Financials, Logistics, AMRO, Administration, and Other Modules. CRM Strip (HSL) Pick
-  - textbox: "#932bee"
+  - textbox "Pick": "#932bee"
   - text: Hue
-  - slider: "272"
-  - spinbutton: "272"
+  - slider "Hue": "272"
+  - spinbutton "CRM Strip Hue (number)": "272"
   - text: Sat
-  - slider: "85"
-  - spinbutton: "85"
+  - slider "Sat": "85"
+  - spinbutton "CRM Strip Sat (number)": "85"
   - text: Light
-  - slider: "55"
-  - spinbutton: "55"
-  - textbox "e.g., 217 91% 60%": 272 85% 55%
+  - slider "Light": "55"
+  - spinbutton "CRM Strip Light (number)": "55"
+  - textbox "CRM Strip HSL value":
+    - /placeholder: e.g., 217 91% 60%
+    - text: 272 85% 55%
   - text: Sales Strip (HSL) Pick
-  - textbox: "#3c83f6"
+  - textbox "Pick": "#3c83f6"
   - text: Hue
-  - slider: "217"
-  - spinbutton: "217"
+  - slider "Hue": "217"
+  - spinbutton "Sales Strip Hue (number)": "217"
   - text: Sat
-  - slider: "91"
-  - spinbutton: "91"
+  - slider "Sat": "91"
+  - spinbutton "Sales Strip Sat (number)": "91"
   - text: Light
-  - slider: "60"
-  - spinbutton: "60"
-  - textbox "e.g., 217 91% 60%": 217 91% 60%
+  - slider "Light": "60"
+  - spinbutton "Sales Strip Light (number)": "60"
+  - textbox "Sales Strip HSL value":
+    - /placeholder: e.g., 217 91% 60%
+    - text: 217 91% 60%
   - text: Financials Strip (HSL) Pick
-  - textbox: "#11bb66"
+  - textbox "Pick": "#11bb66"
   - text: Hue
-  - slider: "150"
-  - spinbutton: "150"
+  - slider "Hue": "150"
+  - spinbutton "Financials Strip Hue (number)": "150"
   - text: Sat
-  - slider: "83"
-  - spinbutton: "83"
+  - slider "Sat": "83"
+  - spinbutton "Financials Strip Sat (number)": "83"
   - text: Light
-  - slider: "40"
-  - spinbutton: "40"
-  - textbox "e.g., 217 91% 60%": 150 83% 40%
+  - slider "Light": "40"
+  - spinbutton "Financials Strip Light (number)": "40"
+  - textbox "Financials Strip HSL value":
+    - /placeholder: e.g., 217 91% 60%
+    - text: 150 83% 40%
   - text: Logistics Strip (HSL) Pick
-  - textbox: "#f59f0a"
+  - textbox "Pick": "#f59f0a"
   - text: Hue
-  - slider: "38"
-  - spinbutton: "38"
+  - slider "Hue": "38"
+  - spinbutton "Logistics Strip Hue (number)": "38"
   - text: Sat
-  - slider: "92"
-  - spinbutton: "92"
+  - slider "Sat": "92"
+  - spinbutton "Logistics Strip Sat (number)": "92"
   - text: Light
-  - slider: "50"
-  - spinbutton: "50"
-  - textbox "e.g., 217 91% 60%": 38 92% 50%
+  - slider "Light": "50"
+  - spinbutton "Logistics Strip Light (number)": "50"
+  - textbox "Logistics Strip HSL value":
+    - /placeholder: e.g., 217 91% 60%
+    - text: 38 92% 50%
   - text: AMRO Strip (HSL) Pick
-  - textbox: "#05afd1"
+  - textbox "Pick": "#05afd1"
   - text: Hue
-  - slider: "190"
-  - spinbutton: "190"
+  - slider "Hue": "190"
+  - spinbutton "AMRO Strip Hue (number)": "190"
   - text: Sat
-  - slider: "95"
-  - spinbutton: "95"
+  - slider "Sat": "95"
+  - spinbutton "AMRO Strip Sat (number)": "95"
   - text: Light
-  - slider: "42"
-  - spinbutton: "42"
-  - textbox "e.g., 217 91% 60%": 190 95% 42%
+  - slider "Light": "42"
+  - spinbutton "AMRO Strip Light (number)": "42"
+  - textbox "AMRO Strip HSL value":
+    - /placeholder: e.g., 217 91% 60%
+    - text: 190 95% 42%
   - text: Administration Strip (HSL) Pick
-  - textbox: "#e633c8"
+  - textbox "Pick": "#e633c8"
   - text: Hue
-  - slider: "310"
-  - spinbutton: "310"
+  - slider "Hue": "310"
+  - spinbutton "Administration Strip Hue (number)": "310"
   - text: Sat
-  - slider: "78"
-  - spinbutton: "78"
+  - slider "Sat": "78"
+  - spinbutton "Administration Strip Sat (number)": "78"
   - text: Light
-  - slider: "55"
-  - spinbutton: "55"
-  - textbox "e.g., 217 91% 60%": 310 78% 55%
+  - slider "Light": "55"
+  - spinbutton "Administration Strip Light (number)": "55"
+  - textbox "Administration Strip HSL value":
+    - /placeholder: e.g., 217 91% 60%
+    - text: 310 78% 55%
   - text: Other Modules Strip (HSL) Pick
-  - textbox: "#8a94a8"
+  - textbox "Pick": "#8a94a8"
   - text: Hue
-  - slider: "220"
-  - spinbutton: "220"
+  - slider "Hue": "220"
+  - spinbutton "Other Modules Strip Hue (number)": "220"
   - text: Sat
-  - slider: "15"
-  - spinbutton: "15"
+  - slider "Sat": "15"
+  - spinbutton "Other Modules Strip Sat (number)": "15"
   - text: Light
-  - slider: "60"
-  - spinbutton: "60"
-  - textbox "e.g., 217 91% 60%": 220 15% 60%
+  - slider "Light": "60"
+  - spinbutton "Other Modules Strip Light (number)": "60"
+  - textbox "Other Modules Strip HSL value":
+    - /placeholder: e.g., 217 91% 60%
+    - text: 220 15% 60%
   - text: CRM Sales Financials Logistics AMRO Administration Other Modules
   - heading "Create / Preview" [level=3]
   - text: Theme Name
   - textbox: Custom Theme
   - text: Gradient Start (HSL) Pick
-  - textbox: "#3c83f6"
+  - textbox "Pick": "#3c83f6"
   - text: Hue
-  - slider: "217"
-  - spinbutton: "217"
+  - slider "Hue": "217"
+  - spinbutton "Gradient Start Hue (number)": "217"
   - text: Sat
-  - slider: "91"
-  - spinbutton: "91"
+  - slider "Sat": "91"
+  - spinbutton "Gradient Start Sat (number)": "91"
   - text: Light
-  - slider: "60"
-  - spinbutton: "60"
-  - textbox "e.g., 217 91% 60%": 217 91% 60%
+  - slider "Light": "60"
+  - spinbutton "Gradient Start Light (number)": "60"
+  - textbox "Gradient Start HSL value":
+    - /placeholder: e.g., 217 91% 60%
+    - text: 217 91% 60%
   - text: Gradient End (HSL) Pick
-  - textbox: "#2eaadc"
+  - textbox "Pick": "#2eaadc"
   - text: Hue
-  - slider: "197"
-  - spinbutton: "197"
+  - slider "Hue": "197"
+  - spinbutton "Gradient End Hue (number)": "197"
   - text: Sat
-  - slider: "71"
-  - spinbutton: "71"
+  - slider "Sat": "71"
+  - spinbutton "Gradient End Sat (number)": "71"
   - text: Light
-  - slider: "52"
-  - spinbutton: "52"
-  - textbox "e.g., 217 91% 60%": 197 71% 52%
+  - slider "Light": "52"
+  - spinbutton "Gradient End Light (number)": "52"
+  - textbox "Gradient End HSL value":
+    - /placeholder: e.g., 217 91% 60%
+    - text: 197 71% 52%
   - text: Primary (HSL) Pick
-  - textbox: "#3c83f6"
+  - textbox "Pick": "#3c83f6"
   - text: Hue
-  - slider: "217"
-  - spinbutton: "217"
+  - slider "Hue": "217"
+  - spinbutton "Primary Hue (number)": "217"
   - text: Sat
-  - slider: "91"
-  - spinbutton: "91"
+  - slider "Sat": "91"
+  - spinbutton "Primary Sat (number)": "91"
   - text: Light
-  - slider: "60"
-  - spinbutton: "60"
-  - textbox "e.g., 217 91% 60%": 217 91% 60%
+  - slider "Light": "60"
+  - spinbutton "Primary Light (number)": "60"
+  - textbox "Primary HSL value":
+    - /placeholder: e.g., 217 91% 60%
+    - text: 217 91% 60%
   - text: Accent (HSL) Pick
-  - textbox: "#2eaadc"
+  - textbox "Pick": "#2eaadc"
   - text: Hue
-  - slider: "197"
-  - spinbutton: "197"
+  - slider "Hue": "197"
+  - spinbutton "Accent Hue (number)": "197"
   - text: Sat
-  - slider: "71"
-  - spinbutton: "71"
+  - slider "Sat": "71"
+  - spinbutton "Accent Sat (number)": "71"
   - text: Light
-  - slider: "52"
-  - spinbutton: "52"
-  - textbox "e.g., 217 91% 60%": 197 71% 52%
+  - slider "Light": "52"
+  - spinbutton "Accent Light (number)": "52"
+  - textbox "Accent HSL value":
+    - /placeholder: e.g., 217 91% 60%
+    - text: 197 71% 52%
   - text: List Title Strip (HSL) Pick
-  - textbox: "#2eaadc"
+  - textbox "Pick": "#2eaadc"
   - text: Hue
-  - slider: "197"
-  - spinbutton: "197"
+  - slider "Hue": "197"
+  - spinbutton "List Title Strip Hue (number)": "197"
   - text: Sat
-  - slider: "71"
-  - spinbutton: "71"
+  - slider "Sat": "71"
+  - spinbutton "List Title Strip Sat (number)": "71"
   - text: Light
-  - slider: "52"
-  - spinbutton: "52"
-  - textbox "e.g., 217 91% 60%": 197 71% 52%
+  - slider "Light": "52"
+  - spinbutton "List Title Strip Light (number)": "52"
+  - textbox "List Title Strip HSL value":
+    - /placeholder: e.g., 217 91% 60%
+    - text: 197 71% 52%
   - text: Table Header Text (HSL) Pick
-  - textbox: "#ffffff"
+  - textbox "Pick": "#ffffff"
   - text: Hue
-  - slider: "0"
-  - spinbutton: "0"
+  - slider "Hue": "0"
+  - spinbutton "Table Header Text Hue (number)": "0"
   - text: Sat
-  - slider: "0"
-  - spinbutton: "0"
+  - slider "Sat": "0"
+  - spinbutton "Table Header Text Sat (number)": "0"
   - text: Light
-  - slider: "100"
-  - spinbutton: "100"
-  - textbox "e.g., 217 91% 60%": 0 0% 100%
+  - slider "Light": "100"
+  - spinbutton "Table Header Text Light (number)": "100"
+  - textbox "Table Header Text HSL value":
+    - /placeholder: e.g., 217 91% 60%
+    - text: 0 0% 100%
   - text: Table Header Separator (HSL) Pick
-  - textbox: "#000000"
+  - textbox "Pick": "#000000"
   - text: Hue
-  - slider: "0"
-  - spinbutton: "0"
+  - slider "Hue": "0"
+  - spinbutton "Table Header Separator Hue (number)": "0"
   - text: Sat
-  - slider: "0"
-  - spinbutton: "0"
+  - slider "Sat": "0"
+  - spinbutton "Table Header Separator Sat (number)": "0"
   - text: Light
-  - slider: "0"
-  - spinbutton: "0"
-  - textbox "e.g., 217 91% 60%": 0 0% 0% / 0.2
+  - slider "Light": "0"
+  - spinbutton "Table Header Separator Light (number)": "0"
+  - textbox "Table Header Separator HSL value":
+    - /placeholder: e.g., 217 91% 60%
+    - text: 0 0% 0% / 0.2
   - text: Table Header Background (HSL) Pick
-  - textbox: "#2eaadc"
+  - textbox "Pick": "#2eaadc"
   - text: Hue
-  - slider: "197"
-  - spinbutton: "197"
+  - slider "Hue": "197"
+  - spinbutton "Table Header Background Hue (number)": "197"
   - text: Sat
-  - slider: "71"
-  - spinbutton: "71"
+  - slider "Sat": "71"
+  - spinbutton "Table Header Background Sat (number)": "71"
   - text: Light
-  - slider: "52"
-  - spinbutton: "52"
-  - textbox "e.g., 217 91% 60%": 197 71% 52%
+  - slider "Light": "52"
+  - spinbutton "Table Header Background Light (number)": "52"
+  - textbox "Table Header Background HSL value":
+    - /placeholder: e.g., 217 91% 60%
+    - text: 197 71% 52%
   - text: Table Background (HSL) Pick
-  - textbox: "#ffffff"
+  - textbox "Pick": "#ffffff"
   - text: Hue
-  - slider: "0"
-  - spinbutton: "0"
+  - slider "Hue": "0"
+  - spinbutton "Table Background Hue (number)": "0"
   - text: Sat
-  - slider: "0"
-  - spinbutton: "0"
+  - slider "Sat": "0"
+  - spinbutton "Table Background Sat (number)": "0"
   - text: Light
-  - slider: "100"
-  - spinbutton: "100"
-  - textbox "e.g., 217 91% 60%": 0 0% 100%
+  - slider "Light": "100"
+  - spinbutton "Table Background Light (number)": "100"
+  - textbox "Table Background HSL value":
+    - /placeholder: e.g., 217 91% 60%
+    - text: 0 0% 100%
   - text: Table Text (HSL) Pick
-  - textbox: "#020817"
+  - textbox "Pick": "#020817"
   - text: Hue
-  - slider: "222"
-  - spinbutton: "222.2"
+  - slider "Hue": "222"
+  - spinbutton "Table Text Hue (number)": "222.2"
   - text: Sat
-  - slider: "84"
-  - spinbutton: "84"
+  - slider "Sat": "84"
+  - spinbutton "Table Text Sat (number)": "84"
   - text: Light
-  - slider: "5"
-  - spinbutton: "4.9"
-  - textbox "e.g., 217 91% 60%": 222.2 84% 4.9%
+  - slider "Light": "5"
+  - spinbutton "Table Text Light (number)": "4.9"
+  - textbox "Table Text HSL value":
+    - /placeholder: e.g., 217 91% 60%
+    - text: 222.2 84% 4.9%
   - button "Reset Table Defaults"
   - text: Header Banner
-  - switch
+  - switch "Show header banner"
   - text: Visible Banner Content
   - textbox "Type banner content"
   - paragraph: Displays existing header labels and text fields exactly with the banner background.
   - text: Banner Background (HSL) Pick
-  - textbox: "#3c83f6"
+  - textbox "Pick": "#3c83f6"
   - text: Hue
-  - slider: "217"
-  - spinbutton: "217"
+  - slider "Hue": "217"
+  - spinbutton "Banner Background Hue (number)": "217"
   - text: Sat
-  - slider: "91"
-  - spinbutton: "91"
+  - slider "Sat": "91"
+  - spinbutton "Banner Background Sat (number)": "91"
   - text: Light
-  - slider: "60"
-  - spinbutton: "60"
-  - textbox "e.g., 217 91% 60%": 217 91% 60%
+  - slider "Light": "60"
+  - spinbutton "Banner Background Light (number)": "60"
+  - textbox "Banner Background HSL value":
+    - /placeholder: e.g., 217 91% 60%
+    - text: 217 91% 60%
   - text: Banner Text (HSL) Pick
-  - textbox: "#ffffff"
+  - textbox "Pick": "#ffffff"
   - text: Hue
-  - slider: "0"
-  - spinbutton: "0"
+  - slider "Hue": "0"
+  - spinbutton "Banner Text Hue (number)": "0"
   - text: Sat
-  - slider: "0"
-  - spinbutton: "0"
+  - slider "Sat": "0"
+  - spinbutton "Banner Text Sat (number)": "0"
   - text: Light
-  - slider: "100"
-  - spinbutton: "100"
-  - textbox "e.g., 217 91% 60%": 0 0% 100%
+  - slider "Light": "100"
+  - spinbutton "Banner Text Light (number)": "100"
+  - textbox "Banner Text HSL value":
+    - /placeholder: e.g., 217 91% 60%
+    - text: 0 0% 100%
   - text: Banner Height
   - textbox "e.g., 48px": 48px
   - text: Table Preview
@@ -330,34 +360,38 @@
   - slider: "135"
   - spinbutton: "135"
   - text: Main Background Gradient BG Start (HSL) Pick
-  - textbox: "#3c83f6"
+  - textbox "Pick": "#3c83f6"
   - text: Hue
-  - slider: "217"
-  - spinbutton: "217"
+  - slider "Hue": "217"
+  - spinbutton "BG Start Hue (number)": "217"
   - text: Sat
-  - slider: "91"
-  - spinbutton: "91"
+  - slider "Sat": "91"
+  - spinbutton "BG Start Sat (number)": "91"
   - text: Light
-  - slider: "60"
-  - spinbutton: "60"
-  - textbox "e.g., 217 91% 60%": 217 91% 60%
+  - slider "Light": "60"
+  - spinbutton "BG Start Light (number)": "60"
+  - textbox "BG Start HSL value":
+    - /placeholder: e.g., 217 91% 60%
+    - text: 217 91% 60%
   - text: BG End (HSL) Pick
-  - textbox: "#2eaadc"
+  - textbox "Pick": "#2eaadc"
   - text: Hue
-  - slider: "197"
-  - spinbutton: "197"
+  - slider "Hue": "197"
+  - spinbutton "BG End Hue (number)": "197"
   - text: Sat
-  - slider: "71"
-  - spinbutton: "71"
+  - slider "Sat": "71"
+  - spinbutton "BG End Sat (number)": "71"
   - text: Light
-  - slider: "52"
-  - spinbutton: "52"
-  - textbox "e.g., 217 91% 60%": 197 71% 52%
+  - slider "Light": "52"
+  - spinbutton "BG End Light (number)": "52"
+  - textbox "BG End HSL value":
+    - /placeholder: e.g., 217 91% 60%
+    - text: 197 71% 52%
   - text: BG Angle
   - slider: "135"
   - spinbutton: "135"
   - text: Border Radius
-  - combobox:
+  - combobox "Card radius":
     - option "0"
     - option "0.25rem"
     - option "0.5rem"
@@ -367,50 +401,55 @@
     - option "2rem"
   - textbox "e.g., 0.75rem": 0.75rem
   - text: Sidebar Background (HSL) Pick
-  - textbox: "#0f1729"
+  - textbox "Pick": "#0f1729"
   - text: Hue
-  - slider: "222"
-  - spinbutton: "222"
+  - slider "Hue": "222"
+  - spinbutton "Sidebar Background Hue (number)": "222"
   - text: Sat
-  - slider: "47"
-  - spinbutton: "47"
+  - slider "Sat": "47"
+  - spinbutton "Sidebar Background Sat (number)": "47"
   - text: Light
-  - slider: "11"
-  - spinbutton: "11"
-  - textbox "e.g., 217 91% 60%": 222 47% 11%
+  - slider "Light": "11"
+  - spinbutton "Sidebar Background Light (number)": "11"
+  - textbox "Sidebar Background HSL value":
+    - /placeholder: e.g., 217 91% 60%
+    - text: 222 47% 11%
   - text: Sidebar Accent (HSL) Pick
-  - textbox: "#1d2839"
+  - textbox "Pick": "#1d2839"
   - text: Hue
-  - slider: "217"
-  - spinbutton: "217"
+  - slider "Hue": "217"
+  - spinbutton "Sidebar Accent Hue (number)": "217"
   - text: Sat
-  - slider: "32"
-  - spinbutton: "32"
+  - slider "Sat": "32"
+  - spinbutton "Sidebar Accent Sat (number)": "32"
   - text: Light
-  - slider: "17"
-  - spinbutton: "17"
-  - textbox "e.g., 217 91% 60%": 217 32% 17%
+  - slider "Light": "17"
+  - spinbutton "Sidebar Accent Light (number)": "17"
+  - textbox "Sidebar Accent HSL value":
+    - /placeholder: e.g., 217 91% 60%
+    - text: 217 32% 17%
   - text: Kanban Card Background (HSL) Pick
-  - textbox: "#000000"
+  - textbox "Pick": "#000000"
   - text: Hue
-  - slider: "0"
-  - spinbutton: "0"
+  - slider "Hue": "0"
+  - spinbutton "Kanban Card Background Hue (number)": "0"
   - text: Sat
-  - slider: "0"
-  - spinbutton: "0"
+  - slider "Sat": "0"
+  - spinbutton "Kanban Card Background Sat (number)": "0"
   - text: Light
-  - slider: "0"
-  - spinbutton: "0"
-  - textbox "e.g., 217 91% 60%"
+  - slider "Light": "0"
+  - spinbutton "Kanban Card Background Light (number)": "0"
+  - textbox "Kanban Card Background HSL value":
+    - /placeholder: e.g., 217 91% 60%
   - text: Kanban Card Radius
-  - combobox:
+  - combobox "Kanban card radius":
     - option "0"
     - option "0.25rem"
     - option "0.5rem" [selected]
     - option "0.75rem"
     - option "1rem"
   - textbox "e.g., 0.5rem": 0.5rem
-  - switch
+  - switch "Dark mode"
   - text: Dark Mode
   - button "Preview"
   - button "Save As"

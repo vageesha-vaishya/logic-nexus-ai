@@ -3,7 +3,6 @@
   - /url: "#main-content"
 - button "Toggle Sidebar":
   - img "SOS Services Logo"
-- button "Toggle CRM menu" [expanded]
 - list:
   - listitem:
     - link "Leads":
@@ -25,13 +24,6 @@
     - link "Contacts":
       - /url: /dashboard/contacts/pipeline
       - img
-- button "Toggle Sales menu"
-- button "Toggle Markets menu"
-- button "Toggle Financials menu"
-- button "Toggle Logistics menu"
-- button "Toggle UIM menu"
-- button "Toggle AMRO menu"
-- button "Toggle Administration menu"
 - button "Sign Out":
   - img
 - banner:
@@ -44,7 +36,7 @@
           - /url: /dashboard
       - listitem:
         - link "Leads" [disabled]
-  - combobox:
+  - combobox "Domain":
     - img
     - text: Logistics & Supply Chain Transportation, Warehousing, and Freight Management
   - button "SOS Services":
@@ -102,327 +94,368 @@
     - button "Custom Fields":
       - img
       - text: Custom Fields
-    - button "New Lead 1":
-      - heading "New Lead" [level=3]
-      - text: "1"
-      - button:
-        - img
-      - button:
-        - img
+    - button "Drag New Lead to reorder":
+      - img
+    - heading "New Lead" [level=3]
+    - text: "1"
+    - button "Add card to New Lead":
+      - img
+    - button "Column options for New Lead":
+      - img
     - text: Total Value $12,000
-    - button "medium Jan 20 Sarvesh Gupta €12,000":
-      - text: medium Jan 20 Sarvesh Gupta
-      - button:
-        - img
-      - button:
-        - img
-      - text: €12,000
-    - button "Contacted 1":
-      - heading "Contacted" [level=3]
-      - text: "1"
-      - button:
-        - img
-      - button:
-        - img
-    - button "low Feb 7 Lead1770463359225 TestUser Company 1770463359225 €0":
-      - text: low Feb 7 Lead1770463359225 TestUser
-      - button:
-        - img
-      - button:
-        - img
-      - paragraph: Company 1770463359225
-      - text: €0
-    - button "Qualified 5":
-      - heading "Qualified" [level=3]
-      - text: "5"
-      - button:
-        - img
-      - button:
-        - img
-    - button "low Feb 7 Lead1770467513624 TestUser Company 1770467513624 €0":
-      - text: low Feb 7 Lead1770467513624 TestUser
-      - button:
-        - img
-      - button:
-        - img
-      - paragraph: Company 1770467513624
-      - text: €0
-    - button "medium Feb 7 Lead1770466337512 TestUser Company 1770466337512 €0":
-      - text: medium Feb 7 Lead1770466337512 TestUser
-      - button:
-        - img
-      - button:
-        - img
-      - paragraph: Company 1770466337512
-      - text: €0
-    - button "low Feb 7 Lead1770464111669 TestUser Company 1770464111669 €0":
-      - text: low Feb 7 Lead1770464111669 TestUser
-      - button:
-        - img
-      - button:
-        - img
-      - paragraph: Company 1770464111669
-      - text: €0
-    - button "medium Feb 7 Lead1770463893645 TestUser Company 1770463893645 €0":
-      - text: medium Feb 7 Lead1770463893645 TestUser
-      - button:
-        - img
-      - button:
-        - img
-      - paragraph: Company 1770463893645
-      - text: €0
-    - button "low Feb 7 Lead1770463599674 TestUser Company 1770463599674 €0":
-      - text: low Feb 7 Lead1770463599674 TestUser
-      - button:
-        - img
-      - button:
-        - img
-      - paragraph: Company 1770463599674
-      - text: €0
-    - button "Proposal Sent 3":
-      - heading "Proposal Sent" [level=3]
-      - text: "3"
-      - button:
-        - img
-      - button:
-        - img
-    - button "low Feb 7 Lead1770468476163 TestUser Company 1770468476163 €0":
-      - text: low Feb 7 Lead1770468476163 TestUser
-      - button:
-        - img
-      - button:
-        - img
-      - paragraph: Company 1770468476163
-      - text: €0
-    - button "medium Feb 7 Lead1770466576552 TestUser Company 1770466576552 €0":
-      - text: medium Feb 7 Lead1770466576552 TestUser
-      - button:
-        - img
-      - button:
-        - img
-      - paragraph: Company 1770466576552
-      - text: €0
-    - button "medium Feb 7 Lead1770465183151 TestUser Company 1770465183151 €0":
-      - text: medium Feb 7 Lead1770465183151 TestUser
-      - button:
-        - img
-      - button:
-        - img
-      - paragraph: Company 1770465183151
-      - text: €0
-    - button "Negotiation 2":
-      - heading "Negotiation" [level=3]
-      - text: "2"
-      - button:
-        - img
-      - button:
-        - img
-    - button "low Feb 7 Lead1770463056343 TestUser Company 1770463056343 €0":
-      - text: low Feb 7 Lead1770463056343 TestUser
-      - button:
-        - img
-      - button:
-        - img
-      - paragraph: Company 1770463056343
-      - text: €0
-    - button "low Feb 7 Lead1770463002751 TestUser Company 1770463002751 €0":
-      - text: low Feb 7 Lead1770463002751 TestUser
-      - button:
-        - img
-      - button:
-        - img
-      - paragraph: Company 1770463002751
-      - text: €0
-    - button "Won 2":
-      - heading "Won" [level=3]
-      - text: "2"
-      - button:
-        - img
-      - button:
-        - img
+    - button "Drag Sarvesh Gupta to another column":
+      - img
+    - text: medium Jan 20 Sarvesh Gupta
+    - button "View Sarvesh Gupta":
+      - img
+    - button "Actions for Sarvesh Gupta":
+      - img
+    - text: €12,000
+    - button "Drag Contacted to reorder":
+      - img
+    - heading "Contacted" [level=3]
+    - text: "1"
+    - button "Add card to Contacted":
+      - img
+    - button "Column options for Contacted":
+      - img
+    - button "Drag Lead1770463359225 TestUser to another column":
+      - img
+    - text: low Feb 7 Lead1770463359225 TestUser
+    - button "View Lead1770463359225 TestUser":
+      - img
+    - button "Actions for Lead1770463359225 TestUser":
+      - img
+    - paragraph: Company 1770463359225
+    - text: €0
+    - button "Drag Qualified to reorder":
+      - img
+    - heading "Qualified" [level=3]
+    - text: "5"
+    - button "Add card to Qualified":
+      - img
+    - button "Column options for Qualified":
+      - img
+    - button "Drag Lead1770467513624 TestUser to another column":
+      - img
+    - text: low Feb 7 Lead1770467513624 TestUser
+    - button "View Lead1770467513624 TestUser":
+      - img
+    - button "Actions for Lead1770467513624 TestUser":
+      - img
+    - paragraph: Company 1770467513624
+    - text: €0
+    - button "Drag Lead1770466337512 TestUser to another column":
+      - img
+    - text: medium Feb 7 Lead1770466337512 TestUser
+    - button "View Lead1770466337512 TestUser":
+      - img
+    - button "Actions for Lead1770466337512 TestUser":
+      - img
+    - paragraph: Company 1770466337512
+    - text: €0
+    - button "Drag Lead1770464111669 TestUser to another column":
+      - img
+    - text: low Feb 7 Lead1770464111669 TestUser
+    - button "View Lead1770464111669 TestUser":
+      - img
+    - button "Actions for Lead1770464111669 TestUser":
+      - img
+    - paragraph: Company 1770464111669
+    - text: €0
+    - button "Drag Lead1770463893645 TestUser to another column":
+      - img
+    - text: medium Feb 7 Lead1770463893645 TestUser
+    - button "View Lead1770463893645 TestUser":
+      - img
+    - button "Actions for Lead1770463893645 TestUser":
+      - img
+    - paragraph: Company 1770463893645
+    - text: €0
+    - button "Drag Lead1770463599674 TestUser to another column":
+      - img
+    - text: low Feb 7 Lead1770463599674 TestUser
+    - button "View Lead1770463599674 TestUser":
+      - img
+    - button "Actions for Lead1770463599674 TestUser":
+      - img
+    - paragraph: Company 1770463599674
+    - text: €0
+    - button "Drag Proposal Sent to reorder":
+      - img
+    - heading "Proposal Sent" [level=3]
+    - text: "3"
+    - button "Add card to Proposal Sent":
+      - img
+    - button "Column options for Proposal Sent":
+      - img
+    - button "Drag Lead1770468476163 TestUser to another column":
+      - img
+    - text: low Feb 7 Lead1770468476163 TestUser
+    - button "View Lead1770468476163 TestUser":
+      - img
+    - button "Actions for Lead1770468476163 TestUser":
+      - img
+    - paragraph: Company 1770468476163
+    - text: €0
+    - button "Drag Lead1770466576552 TestUser to another column":
+      - img
+    - text: medium Feb 7 Lead1770466576552 TestUser
+    - button "View Lead1770466576552 TestUser":
+      - img
+    - button "Actions for Lead1770466576552 TestUser":
+      - img
+    - paragraph: Company 1770466576552
+    - text: €0
+    - button "Drag Lead1770465183151 TestUser to another column":
+      - img
+    - text: medium Feb 7 Lead1770465183151 TestUser
+    - button "View Lead1770465183151 TestUser":
+      - img
+    - button "Actions for Lead1770465183151 TestUser":
+      - img
+    - paragraph: Company 1770465183151
+    - text: €0
+    - button "Drag Negotiation to reorder":
+      - img
+    - heading "Negotiation" [level=3]
+    - text: "2"
+    - button "Add card to Negotiation":
+      - img
+    - button "Column options for Negotiation":
+      - img
+    - button "Drag Lead1770463056343 TestUser to another column":
+      - img
+    - text: low Feb 7 Lead1770463056343 TestUser
+    - button "View Lead1770463056343 TestUser":
+      - img
+    - button "Actions for Lead1770463056343 TestUser":
+      - img
+    - paragraph: Company 1770463056343
+    - text: €0
+    - button "Drag Lead1770463002751 TestUser to another column":
+      - img
+    - text: low Feb 7 Lead1770463002751 TestUser
+    - button "View Lead1770463002751 TestUser":
+      - img
+    - button "Actions for Lead1770463002751 TestUser":
+      - img
+    - paragraph: Company 1770463002751
+    - text: €0
+    - button "Drag Won to reorder":
+      - img
+    - heading "Won" [level=3]
+    - text: "2"
+    - button "Add card to Won":
+      - img
+    - button "Column options for Won":
+      - img
     - text: Total Value $19,999
-    - button "low Feb 7 Lead1770467426655 TestUser Company 1770467426655 €0":
-      - text: low Feb 7 Lead1770467426655 TestUser
-      - button:
-        - img
-      - button:
-        - img
-      - paragraph: Company 1770467426655
-      - text: €0
-    - button "medium Jan 20 Vimal Bahuguna BuildRight Equipment €19,999":
-      - text: medium Jan 20 Vimal Bahuguna
-      - button:
-        - img
-      - button:
-        - img
-      - paragraph: BuildRight Equipment
-      - text: €19,999
-    - button "Lost 2":
-      - heading "Lost" [level=3]
-      - text: "2"
-      - button:
-        - img
-      - button:
-        - img
-    - button "low Feb 7 Lead1770468374368 TestUser Company 1770468374368 €0":
-      - text: low Feb 7 Lead1770468374368 TestUser
-      - button:
-        - img
-      - button:
-        - img
-      - paragraph: Company 1770468374368
-      - text: €0
-    - button "low Feb 7 Lead1770467571856 TestUser Company 1770467571856 €0":
-      - text: low Feb 7 Lead1770467571856 TestUser
-      - button:
-        - img
-      - button:
-        - img
-      - paragraph: Company 1770467571856
-      - text: €0
-    - button "Converted 17":
-      - heading "Converted" [level=3]
-      - text: "17"
-      - button:
-        - img
-      - button:
-        - img
-    - button "low Feb 10 Lead1770725185010 TestUser Company 1770725185010 €0":
-      - text: low Feb 10 Lead1770725185010 TestUser
-      - button:
-        - img
-      - button:
-        - img
-      - paragraph: Company 1770725185010
-      - text: €0
-    - button "low Feb 10 Lead1770725149462 TestUser Company 1770725149462 €0":
-      - text: low Feb 10 Lead1770725149462 TestUser
-      - button:
-        - img
-      - button:
-        - img
-      - paragraph: Company 1770725149462
-      - text: €0
-    - button "low Feb 10 Lead1770725119442 TestUser Company 1770725119442 €0":
-      - text: low Feb 10 Lead1770725119442 TestUser
-      - button:
-        - img
-      - button:
-        - img
-      - paragraph: Company 1770725119442
-      - text: €0
-    - button "low Feb 9 Lead1770602498092 TestUser Company 1770602498092 €0":
-      - text: low Feb 9 Lead1770602498092 TestUser
-      - button:
-        - img
-      - button:
-        - img
-      - paragraph: Company 1770602498092
-      - text: €0
-    - button "low Feb 8 Lead1770561981489 TestUser Company 1770561981489 €0":
-      - text: low Feb 8 Lead1770561981489 TestUser
-      - button:
-        - img
-      - button:
-        - img
-      - paragraph: Company 1770561981489
-      - text: €0
-    - button "low Feb 7 Lead1770468792440 TestUser Company 1770468792440 €0":
-      - text: low Feb 7 Lead1770468792440 TestUser
-      - button:
-        - img
-      - button:
-        - img
-      - paragraph: Company 1770468792440
-      - text: €0
-    - button "low Feb 7 Lead1770468651350 TestUser Company 1770468651350 €0":
-      - text: low Feb 7 Lead1770468651350 TestUser
-      - button:
-        - img
-      - button:
-        - img
-      - paragraph: Company 1770468651350
-      - text: €0
-    - button "low Feb 7 Lead1770468538797 TestUser Company 1770468538797 €0":
-      - text: low Feb 7 Lead1770468538797 TestUser
-      - button:
-        - img
-      - button:
-        - img
-      - paragraph: Company 1770468538797
-      - text: €0
-    - button "low Feb 7 Lead1770467882360 TestUser Company 1770467882360 €0":
-      - text: low Feb 7 Lead1770467882360 TestUser
-      - button:
-        - img
-      - button:
-        - img
-      - paragraph: Company 1770467882360
-      - text: €0
-    - button "low Feb 7 Lead1770465262931 TestUser Company 1770465262931 €0":
-      - text: low Feb 7 Lead1770465262931 TestUser
-      - button:
-        - img
-      - button:
-        - img
-      - paragraph: Company 1770465262931
-      - text: €0
-    - button "low Feb 7 Lead1770465115237 TestUser Company 1770465115237 €0":
-      - text: low Feb 7 Lead1770465115237 TestUser
-      - button:
-        - img
-      - button:
-        - img
-      - paragraph: Company 1770465115237
-      - text: €0
-    - button "low Feb 7 Lead1770464971752 TestUser Company 1770464971752 €0":
-      - text: low Feb 7 Lead1770464971752 TestUser
-      - button:
-        - img
-      - button:
-        - img
-      - paragraph: Company 1770464971752
-      - text: €0
-    - button "low Feb 7 Lead1770464747939 TestUser Company 1770464747939 €0":
-      - text: low Feb 7 Lead1770464747939 TestUser
-      - button:
-        - img
-      - button:
-        - img
-      - paragraph: Company 1770464747939
-      - text: €0
-    - button "low Feb 7 Lead1770464691654 TestUser Company 1770464691654 €0":
-      - text: low Feb 7 Lead1770464691654 TestUser
-      - button:
-        - img
-      - button:
-        - img
-      - paragraph: Company 1770464691654
-      - text: €0
-    - button "low Feb 7 Lead1770464554637 TestUser Company 1770464554637 €0":
-      - text: low Feb 7 Lead1770464554637 TestUser
-      - button:
-        - img
-      - button:
-        - img
-      - paragraph: Company 1770464554637
-      - text: €0
-    - button "low Feb 7 Lead1770464281899 TestUser Company 1770464281899 €0":
-      - text: low Feb 7 Lead1770464281899 TestUser
-      - button:
-        - img
-      - button:
-        - img
-      - paragraph: Company 1770464281899
-      - text: €0
-    - button "low Feb 7 Lead1770463943423 TestUser Company 1770463943423 €0":
-      - text: low Feb 7 Lead1770463943423 TestUser
-      - button:
-        - img
-      - button:
-        - img
-      - paragraph: Company 1770463943423
-      - text: €0
+    - button "Drag Lead1770467426655 TestUser to another column":
+      - img
+    - text: low Feb 7 Lead1770467426655 TestUser
+    - button "View Lead1770467426655 TestUser":
+      - img
+    - button "Actions for Lead1770467426655 TestUser":
+      - img
+    - paragraph: Company 1770467426655
+    - text: €0
+    - button "Drag Vimal Bahuguna to another column":
+      - img
+    - text: medium Jan 20 Vimal Bahuguna
+    - button "View Vimal Bahuguna":
+      - img
+    - button "Actions for Vimal Bahuguna":
+      - img
+    - paragraph: BuildRight Equipment
+    - text: €19,999
+    - button "Drag Lost to reorder":
+      - img
+    - heading "Lost" [level=3]
+    - text: "2"
+    - button "Add card to Lost":
+      - img
+    - button "Column options for Lost":
+      - img
+    - button "Drag Lead1770468374368 TestUser to another column":
+      - img
+    - text: low Feb 7 Lead1770468374368 TestUser
+    - button "View Lead1770468374368 TestUser":
+      - img
+    - button "Actions for Lead1770468374368 TestUser":
+      - img
+    - paragraph: Company 1770468374368
+    - text: €0
+    - button "Drag Lead1770467571856 TestUser to another column":
+      - img
+    - text: low Feb 7 Lead1770467571856 TestUser
+    - button "View Lead1770467571856 TestUser":
+      - img
+    - button "Actions for Lead1770467571856 TestUser":
+      - img
+    - paragraph: Company 1770467571856
+    - text: €0
+    - button "Drag Converted to reorder":
+      - img
+    - heading "Converted" [level=3]
+    - text: "17"
+    - button "Add card to Converted":
+      - img
+    - button "Column options for Converted":
+      - img
+    - button "Drag Lead1770725185010 TestUser to another column":
+      - img
+    - text: low Feb 10 Lead1770725185010 TestUser
+    - button "View Lead1770725185010 TestUser":
+      - img
+    - button "Actions for Lead1770725185010 TestUser":
+      - img
+    - paragraph: Company 1770725185010
+    - text: €0
+    - button "Drag Lead1770725149462 TestUser to another column":
+      - img
+    - text: low Feb 10 Lead1770725149462 TestUser
+    - button "View Lead1770725149462 TestUser":
+      - img
+    - button "Actions for Lead1770725149462 TestUser":
+      - img
+    - paragraph: Company 1770725149462
+    - text: €0
+    - button "Drag Lead1770725119442 TestUser to another column":
+      - img
+    - text: low Feb 10 Lead1770725119442 TestUser
+    - button "View Lead1770725119442 TestUser":
+      - img
+    - button "Actions for Lead1770725119442 TestUser":
+      - img
+    - paragraph: Company 1770725119442
+    - text: €0
+    - button "Drag Lead1770602498092 TestUser to another column":
+      - img
+    - text: low Feb 9 Lead1770602498092 TestUser
+    - button "View Lead1770602498092 TestUser":
+      - img
+    - button "Actions for Lead1770602498092 TestUser":
+      - img
+    - paragraph: Company 1770602498092
+    - text: €0
+    - button "Drag Lead1770561981489 TestUser to another column":
+      - img
+    - text: low Feb 8 Lead1770561981489 TestUser
+    - button "View Lead1770561981489 TestUser":
+      - img
+    - button "Actions for Lead1770561981489 TestUser":
+      - img
+    - paragraph: Company 1770561981489
+    - text: €0
+    - button "Drag Lead1770468792440 TestUser to another column":
+      - img
+    - text: low Feb 7 Lead1770468792440 TestUser
+    - button "View Lead1770468792440 TestUser":
+      - img
+    - button "Actions for Lead1770468792440 TestUser":
+      - img
+    - paragraph: Company 1770468792440
+    - text: €0
+    - button "Drag Lead1770468651350 TestUser to another column":
+      - img
+    - text: low Feb 7 Lead1770468651350 TestUser
+    - button "View Lead1770468651350 TestUser":
+      - img
+    - button "Actions for Lead1770468651350 TestUser":
+      - img
+    - paragraph: Company 1770468651350
+    - text: €0
+    - button "Drag Lead1770468538797 TestUser to another column":
+      - img
+    - text: low Feb 7 Lead1770468538797 TestUser
+    - button "View Lead1770468538797 TestUser":
+      - img
+    - button "Actions for Lead1770468538797 TestUser":
+      - img
+    - paragraph: Company 1770468538797
+    - text: €0
+    - button "Drag Lead1770467882360 TestUser to another column":
+      - img
+    - text: low Feb 7 Lead1770467882360 TestUser
+    - button "View Lead1770467882360 TestUser":
+      - img
+    - button "Actions for Lead1770467882360 TestUser":
+      - img
+    - paragraph: Company 1770467882360
+    - text: €0
+    - button "Drag Lead1770465262931 TestUser to another column":
+      - img
+    - text: low Feb 7 Lead1770465262931 TestUser
+    - button "View Lead1770465262931 TestUser":
+      - img
+    - button "Actions for Lead1770465262931 TestUser":
+      - img
+    - paragraph: Company 1770465262931
+    - text: €0
+    - button "Drag Lead1770465115237 TestUser to another column":
+      - img
+    - text: low Feb 7 Lead1770465115237 TestUser
+    - button "View Lead1770465115237 TestUser":
+      - img
+    - button "Actions for Lead1770465115237 TestUser":
+      - img
+    - paragraph: Company 1770465115237
+    - text: €0
+    - button "Drag Lead1770464971752 TestUser to another column":
+      - img
+    - text: low Feb 7 Lead1770464971752 TestUser
+    - button "View Lead1770464971752 TestUser":
+      - img
+    - button "Actions for Lead1770464971752 TestUser":
+      - img
+    - paragraph: Company 1770464971752
+    - text: €0
+    - button "Drag Lead1770464747939 TestUser to another column":
+      - img
+    - text: low Feb 7 Lead1770464747939 TestUser
+    - button "View Lead1770464747939 TestUser":
+      - img
+    - button "Actions for Lead1770464747939 TestUser":
+      - img
+    - paragraph: Company 1770464747939
+    - text: €0
+    - button "Drag Lead1770464691654 TestUser to another column":
+      - img
+    - text: low Feb 7 Lead1770464691654 TestUser
+    - button "View Lead1770464691654 TestUser":
+      - img
+    - button "Actions for Lead1770464691654 TestUser":
+      - img
+    - paragraph: Company 1770464691654
+    - text: €0
+    - button "Drag Lead1770464554637 TestUser to another column":
+      - img
+    - text: low Feb 7 Lead1770464554637 TestUser
+    - button "View Lead1770464554637 TestUser":
+      - img
+    - button "Actions for Lead1770464554637 TestUser":
+      - img
+    - paragraph: Company 1770464554637
+    - text: €0
+    - button "Drag Lead1770464281899 TestUser to another column":
+      - img
+    - text: low Feb 7 Lead1770464281899 TestUser
+    - button "View Lead1770464281899 TestUser":
+      - img
+    - button "Actions for Lead1770464281899 TestUser":
+      - img
+    - paragraph: Company 1770464281899
+    - text: €0
+    - button "Drag Lead1770463943423 TestUser to another column":
+      - img
+    - text: low Feb 7 Lead1770463943423 TestUser
+    - button "View Lead1770463943423 TestUser":
+      - img
+    - button "Actions for Lead1770463943423 TestUser":
+      - img
+    - paragraph: Company 1770463943423
+    - text: €0
     - status
     - heading "Contacts" [level=3]
     - table:
@@ -574,7 +607,7 @@
       - tab "Upcoming 0" [selected]
       - tab "Overdue 29"
       - tab "Completed"
-    - text: No upcoming tasks
+    - tabpanel "Upcoming 0": No upcoming tasks
     - paragraph: Total Leads
     - heading "33" [level=3]
     - text: Total Leads
