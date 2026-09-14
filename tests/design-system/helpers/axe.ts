@@ -7,12 +7,30 @@ const AXE_PATH = path.join(REPO_ROOT, 'node_modules', 'axe-core', 'axe.min.js');
 export const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 const GATED: AxeViolationSummary['impact'][] = ['serious', 'critical'];
 
+interface RawAxeNode {
+  target: string[];
+  html: string;
+}
+
 interface RawViolation {
   id: string;
   impact: AxeViolationSummary['impact'] | null;
   help: string;
   helpUrl: string;
-  nodes: { target: string[]; source: string }[];
+  nodes: RawAxeNode[];
+}
+
+interface AttributedNode {
+  target: string[];
+  source: string;
+}
+
+interface AttributedViolation {
+  id: string;
+  impact: AxeViolationSummary['impact'] | null;
+  help: string;
+  helpUrl: string;
+  nodes: AttributedNode[];
 }
 
 export async function runAxe(
@@ -26,12 +44,25 @@ export async function runAxe(
       for (const id of disabled) rules[id] = { enabled: false };
       // @ts-expect-error axe is injected globally by addScriptTag
       const res = await window.axe.run(document, { runOnly: { type: 'tag', values: tags }, rules });
-      return res.violations.map((v: RawViolation) => ({
+      return res.violations.map((v: RawViolation): AttributedViolation => ({
         ...v,
-        nodes: v.nodes.map(n => {
-          const path = /data-component-path="([^"]+)"/.exec(n.html)?.[1]?.replace(/\\/g, '/');
-          const line = /data-component-line="(\d+)"/.exec(n.html)?.[1];
-          return { target: n.target, source: path ? `${path}:${line ?? '?'} ` : '' };
+        nodes: v.nodes.map((n): AttributedNode => {
+          let source = '';
+          try {
+            const el = document.querySelector(n.target.join(' '));
+            let cur: Element | null = el;
+            for (let depth = 0; cur && depth < 5; depth++, cur = cur.parentElement) {
+              const p = cur.getAttribute('data-component-path');
+              const l = cur.getAttribute('data-component-line');
+              if (p) {
+                source = `${p.replace(/\\/g, '/')}:${l ?? '?'} `;
+                break;
+              }
+            }
+          } catch {
+            source = '';
+          }
+          return { target: n.target, source };
         }),
       }));
     },
