@@ -22,6 +22,22 @@ vi.mock('@/components/crm/CRMModuleHeaderNavigation', () => ({
   CRM_HEADER_PRIMARY_CONTROL_SEQUENCE: [],
 }));
 
+vi.mock('@/hooks/useTheme', () => ({
+  useTheme: () => ({ isDark: false }),
+}));
+
+const makeAccount = (i: number) => ({
+  id: `acc-${i}`,
+  name: `Account ${i}`,
+  account_type: 'customer',
+  status: 'active',
+  industry: 'Logistics',
+  phone: null,
+  email: null,
+  website: null,
+  created_at: new Date(2024, 0, 1 + (i % 28)).toISOString(),
+});
+
 const mockAccounts = [
   { id: 'acc-1', name: 'Acme Logistics', account_type: 'customer', status: 'active', industry: 'Logistics', phone: '+15551234567', email: 'acme@example.com', website: null, created_at: new Date().toISOString() },
   { id: 'acc-2', name: 'Globex Freight', account_type: 'prospect', status: 'pending', industry: 'Freight', phone: null, email: 'globex@example.com', website: null, created_at: new Date().toISOString() },
@@ -57,5 +73,33 @@ describe('Accounts', () => {
     expect(await screen.findByText('Acme Logistics')).toBeInTheDocument();
     expect(screen.getByText('Globex Freight')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Search accounts...')).toBeInTheDocument();
+  });
+
+  it('renders at most 100 rows and offers Load more', async () => {
+    localStorage.setItem(
+      'crm.moduleNavigation.v1',
+      JSON.stringify({
+        version: 1,
+        modules: { accounts: { viewMode: 'list', theme: 'Azure Sky' } },
+      }),
+    );
+
+    const manyAccounts = Array.from({ length: 250 }, (_, i) => makeAccount(i));
+    stableScopedDb.from.mockImplementationOnce((table: string) => {
+      if (table === 'v_accounts') {
+        return createChainableQuery({ data: manyAccounts, error: null, count: manyAccounts.length });
+      }
+      return createChainableQuery({ data: [], error: null, count: 0 });
+    });
+
+    render(
+      <BrowserRouter>
+        <Accounts />
+      </BrowserRouter>,
+    );
+
+    const rows = await screen.findAllByRole('row');
+    expect(rows).toHaveLength(101); // header + 100
+    expect(screen.getByRole('button', { name: /load more/i })).toBeInTheDocument();
   });
 });

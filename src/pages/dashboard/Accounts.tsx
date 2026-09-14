@@ -40,6 +40,7 @@ export default function Accounts() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [visible, setVisible] = useState(100);
   const [isDbFallbackActive, setIsDbFallbackActive] = useState(false);
   const [dbFallbackReason, setDbFallbackReason] = useState<'relations_query_failed' | null>(null);
   const { context, scopedDb } = useCRM();
@@ -283,7 +284,7 @@ export default function Accounts() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortedAccounts.map((account) => (
+                  {sortedAccounts.slice(0, visible).map((account) => (
                     <TableRow
                       key={account.id}
                       className="cursor-pointer"
@@ -301,42 +302,67 @@ export default function Accounts() {
                   ))}
                 </TableBody>
               </Table>
+              {visible < sortedAccounts.length && (
+                <div className="flex justify-center pt-4">
+                  <Button variant="outline" onClick={() => setVisible((v) => v + 100)}>
+                    Load more ({sortedAccounts.length - visible} remaining)
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         ) : moduleViewMode === 'grid' ? (
-          <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-            {filteredAccounts.map((account) => (
-              <EntityCard
-                key={account.id}
-                title={account.name}
-                subtitle={account.industry || undefined}
-                meta={[account.phone, account.email, account.website].filter(Boolean).join(' • ')}
-                tags={[
-                  account.status,
-                  account.account_type,
-                  ...(duplicateGroups.some((g) => g.find((x) => x.id === account.id)) ? ['duplicate'] : []),
-                ].filter(Boolean)}
-                onClick={() => (window.location.href = `/dashboard/accounts/${account.id}`)}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+              {filteredAccounts.slice(0, visible).map((account) => (
+                <EntityCard
+                  key={account.id}
+                  title={account.name}
+                  subtitle={account.industry || undefined}
+                  meta={[account.phone, account.email, account.website].filter(Boolean).join(' • ')}
+                  tags={[
+                    account.status,
+                    account.account_type,
+                    ...(duplicateGroups.some((g) => g.find((x) => x.id === account.id)) ? ['duplicate'] : []),
+                  ].filter(Boolean)}
+                  onClick={() => (window.location.href = `/dashboard/accounts/${account.id}`)}
+                />
+              ))}
+            </div>
+            {visible < filteredAccounts.length && (
+              <div className="flex justify-center pt-4">
+                <Button variant="outline" onClick={() => setVisible((v) => v + 100)}>
+                  Load more ({filteredAccounts.length - visible} remaining)
+                </Button>
+              </div>
+            )}
+          </>
         ) : (
-          <div className="flex flex-col gap-3">
-            {filteredAccounts.map((account) => (
-              <EntityCard
-                key={account.id}
-                title={account.name}
-                subtitle={account.industry || undefined}
-                meta={[account.phone, account.email, account.website].filter(Boolean).join(' • ')}
-                tags={[
-                  account.status,
-                  account.account_type,
-                  ...(duplicateGroups.some((g) => g.find((x) => x.id === account.id)) ? ['duplicate'] : []),
-                ].filter(Boolean)}
-                onClick={() => (window.location.href = `/dashboard/accounts/${account.id}`)}
-              />
-            ))}
-          </div>
+          <>
+            <div className="flex flex-col gap-3">
+              {filteredAccounts.slice(0, visible).map((account) => (
+                <EntityCard
+                  key={account.id}
+                  title={account.name}
+                  subtitle={account.industry || undefined}
+                  meta={[account.phone, account.email, account.website].filter(Boolean).join(' • ')}
+                  tags={[
+                    account.status,
+                    account.account_type,
+                    ...(duplicateGroups.some((g) => g.find((x) => x.id === account.id)) ? ['duplicate'] : []),
+                  ].filter(Boolean)}
+                  onClick={() => (window.location.href = `/dashboard/accounts/${account.id}`)}
+                />
+              ))}
+            </div>
+            {visible < filteredAccounts.length && (
+              <div className="flex justify-center pt-4">
+                <Button variant="outline" onClick={() => setVisible((v) => v + 100)}>
+                  Load more ({filteredAccounts.length - visible} remaining)
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </FirstScreenTemplate>
       </div>

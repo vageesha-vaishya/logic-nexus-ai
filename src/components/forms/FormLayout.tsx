@@ -92,7 +92,13 @@ export const FormItem: React.FC<FormItemProps> = ({ span, className, children, .
   }, [span]);
 
   return (
-    <div className={cn(spanClass, className)} {...props}>
+    // `relative` gives each field its own containing block for Radix's
+    // visually-hidden native inputs (Select's bubble <select>, etc.) --
+    // without it their un-clipped intrinsic width can be measured against
+    // the nearest positioned ancestor several levels up (DashboardLayout's
+    // shell), which WebKit sometimes folds into that ancestor's
+    // scrollWidth and reports as a page-level horizontal overflow (F20).
+    <div className={cn("relative min-w-0", spanClass, className)} {...props}>
       {children}
     </div>
   );
