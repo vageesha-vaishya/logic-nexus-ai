@@ -1,0 +1,601 @@
+- region "Notifications alt+T"
+- link "Skip to main content":
+  - /url: "#main-content"
+- button "Toggle Sidebar":
+  - img "SOS Services Logo"
+- button "Toggle CRM menu" [expanded]
+- list:
+  - listitem:
+    - link "Leads":
+      - /url: /dashboard/leads/pipeline
+      - img
+  - listitem:
+    - link "Tasks/Activities":
+      - /url: /dashboard/activities
+      - img
+  - listitem:
+    - link "Opportunities":
+      - /url: /dashboard/opportunities/pipeline
+      - img
+  - listitem:
+    - link "Accounts":
+      - /url: /dashboard/accounts/pipeline
+      - img
+  - listitem:
+    - link "Contacts":
+      - /url: /dashboard/contacts/pipeline
+      - img
+- button "Toggle Sales menu"
+- button "Toggle Markets menu"
+- button "Toggle Financials menu"
+- button "Toggle Logistics menu"
+- button "Toggle UIM menu"
+- button "Toggle AMRO menu"
+- button "Toggle Administration menu"
+- button "Sign Out":
+  - img
+- banner:
+  - button "Go back":
+    - img
+  - navigation "breadcrumb":
+    - list:
+      - listitem:
+        - link "Dashboard":
+          - /url: /dashboard
+      - listitem:
+        - link "Leads" [disabled]
+  - combobox:
+    - img
+    - text: Logistics & Supply Chain Transportation, Warehousing, and Freight Management
+  - button "SOS Services":
+    - img
+    - text: SOS Services
+  - button "Open global search":
+    - img
+    - text: Search... ⌘ K
+  - button "Help":
+    - img
+    - text: Help
+  - button "7 unread notifications":
+    - img
+    - text: "7"
+  - button "Switch to dark mode"
+  - button "Deccan AMRO": DA
+- main:
+  - heading "Leads Workspace" [level=1]
+  - navigation "Leads header navigation":
+    - button "Leads Pipeline view" [pressed]:
+      - img
+      - text: Pipeline
+    - button "Leads Card view":
+      - img
+      - text: Card
+    - button "Leads Grid view":
+      - img
+      - text: Grid
+    - button "Leads List view":
+      - img
+      - text: List
+    - button "Leads New Lead":
+      - img
+      - text: New Lead
+    - button "Leads refresh":
+      - img
+      - text: Refresh
+    - button "Leads import export":
+      - img
+      - text: Import/Export
+    - button "Leads Analytics view":
+      - img
+      - text: Analytics
+  - tabpanel:
+    - textbox "Start date"
+    - textbox "End date"
+    - img
+    - searchbox "Search..."
+    - button "Status":
+      - img
+      - text: Status
+    - button "Source":
+      - img
+      - text: Source
+    - button "Custom Fields":
+      - img
+      - text: Custom Fields
+    - button "New Lead 1":
+      - heading "New Lead" [level=3]
+      - text: "1"
+      - button:
+        - img
+      - button:
+        - img
+    - text: Total Value $12,000
+    - button "medium Jan 20 Sarvesh Gupta €12,000":
+      - text: medium Jan 20 Sarvesh Gupta
+      - button:
+        - img
+      - button:
+        - img
+      - text: €12,000
+    - button "Contacted 1":
+      - heading "Contacted" [level=3]
+      - text: "1"
+      - button:
+        - img
+      - button:
+        - img
+    - button "low Feb 7 Lead1770463359225 TestUser Company 1770463359225 €0":
+      - text: low Feb 7 Lead1770463359225 TestUser
+      - button:
+        - img
+      - button:
+        - img
+      - paragraph: Company 1770463359225
+      - text: €0
+    - button "Qualified 5":
+      - heading "Qualified" [level=3]
+      - text: "5"
+      - button:
+        - img
+      - button:
+        - img
+    - button "low Feb 7 Lead1770467513624 TestUser Company 1770467513624 €0":
+      - text: low Feb 7 Lead1770467513624 TestUser
+      - button:
+        - img
+      - button:
+        - img
+      - paragraph: Company 1770467513624
+      - text: €0
+    - button "medium Feb 7 Lead1770466337512 TestUser Company 1770466337512 €0":
+      - text: medium Feb 7 Lead1770466337512 TestUser
+      - button:
+        - img
+      - button:
+        - img
+      - paragraph: Company 1770466337512
+      - text: €0
+    - button "low Feb 7 Lead1770464111669 TestUser Company 1770464111669 €0":
+      - text: low Feb 7 Lead1770464111669 TestUser
+      - button:
+        - img
+      - button:
+        - img
+      - paragraph: Company 1770464111669
+      - text: €0
+    - button "medium Feb 7 Lead1770463893645 TestUser Company 1770463893645 €0":
+      - text: medium Feb 7 Lead1770463893645 TestUser
+      - button:
+        - img
+      - button:
+        - img
+      - paragraph: Company 1770463893645
+      - text: €0
+    - button "low Feb 7 Lead1770463599674 TestUser Company 1770463599674 €0":
+      - text: low Feb 7 Lead1770463599674 TestUser
+      - button:
+        - img
+      - button:
+        - img
+      - paragraph: Company 1770463599674
+      - text: €0
+    - button "Proposal Sent 3":
+      - heading "Proposal Sent" [level=3]
+      - text: "3"
+      - button:
+        - img
+      - button:
+        - img
+    - button "low Feb 7 Lead1770468476163 TestUser Company 1770468476163 €0":
+      - text: low Feb 7 Lead1770468476163 TestUser
+      - button:
+        - img
+      - button:
+        - img
+      - paragraph: Company 1770468476163
+      - text: €0
+    - button "medium Feb 7 Lead1770466576552 TestUser Company 1770466576552 €0":
+      - text: medium Feb 7 Lead1770466576552 TestUser
+      - button:
+        - img
+      - button:
+        - img
+      - paragraph: Company 1770466576552
+      - text: €0
+    - button "medium Feb 7 Lead1770465183151 TestUser Company 1770465183151 €0":
+      - text: medium Feb 7 Lead1770465183151 TestUser
+      - button:
+        - img
+      - button:
+        - img
+      - paragraph: Company 1770465183151
+      - text: €0
+    - button "Negotiation 2":
+      - heading "Negotiation" [level=3]
+      - text: "2"
+      - button:
+        - img
+      - button:
+        - img
+    - button "low Feb 7 Lead1770463056343 TestUser Company 1770463056343 €0":
+      - text: low Feb 7 Lead1770463056343 TestUser
+      - button:
+        - img
+      - button:
+        - img
+      - paragraph: Company 1770463056343
+      - text: €0
+    - button "low Feb 7 Lead1770463002751 TestUser Company 1770463002751 €0":
+      - text: low Feb 7 Lead1770463002751 TestUser
+      - button:
+        - img
+      - button:
+        - img
+      - paragraph: Company 1770463002751
+      - text: €0
+    - button "Won 2":
+      - heading "Won" [level=3]
+      - text: "2"
+      - button:
+        - img
+      - button:
+        - img
+    - text: Total Value $19,999
+    - button "low Feb 7 Lead1770467426655 TestUser Company 1770467426655 €0":
+      - text: low Feb 7 Lead1770467426655 TestUser
+      - button:
+        - img
+      - button:
+        - img
+      - paragraph: Company 1770467426655
+      - text: €0
+    - button "medium Jan 20 Vimal Bahuguna BuildRight Equipment €19,999":
+      - text: medium Jan 20 Vimal Bahuguna
+      - button:
+        - img
+      - button:
+        - img
+      - paragraph: BuildRight Equipment
+      - text: €19,999
+    - button "Lost 2":
+      - heading "Lost" [level=3]
+      - text: "2"
+      - button:
+        - img
+      - button:
+        - img
+    - button "low Feb 7 Lead1770468374368 TestUser Company 1770468374368 €0":
+      - text: low Feb 7 Lead1770468374368 TestUser
+      - button:
+        - img
+      - button:
+        - img
+      - paragraph: Company 1770468374368
+      - text: €0
+    - button "low Feb 7 Lead1770467571856 TestUser Company 1770467571856 €0":
+      - text: low Feb 7 Lead1770467571856 TestUser
+      - button:
+        - img
+      - button:
+        - img
+      - paragraph: Company 1770467571856
+      - text: €0
+    - button "Converted 17":
+      - heading "Converted" [level=3]
+      - text: "17"
+      - button:
+        - img
+      - button:
+        - img
+    - button "low Feb 10 Lead1770725185010 TestUser Company 1770725185010 €0":
+      - text: low Feb 10 Lead1770725185010 TestUser
+      - button:
+        - img
+      - button:
+        - img
+      - paragraph: Company 1770725185010
+      - text: €0
+    - button "low Feb 10 Lead1770725149462 TestUser Company 1770725149462 €0":
+      - text: low Feb 10 Lead1770725149462 TestUser
+      - button:
+        - img
+      - button:
+        - img
+      - paragraph: Company 1770725149462
+      - text: €0
+    - button "low Feb 10 Lead1770725119442 TestUser Company 1770725119442 €0":
+      - text: low Feb 10 Lead1770725119442 TestUser
+      - button:
+        - img
+      - button:
+        - img
+      - paragraph: Company 1770725119442
+      - text: €0
+    - button "low Feb 9 Lead1770602498092 TestUser Company 1770602498092 €0":
+      - text: low Feb 9 Lead1770602498092 TestUser
+      - button:
+        - img
+      - button:
+        - img
+      - paragraph: Company 1770602498092
+      - text: €0
+    - button "low Feb 8 Lead1770561981489 TestUser Company 1770561981489 €0":
+      - text: low Feb 8 Lead1770561981489 TestUser
+      - button:
+        - img
+      - button:
+        - img
+      - paragraph: Company 1770561981489
+      - text: €0
+    - button "low Feb 7 Lead1770468792440 TestUser Company 1770468792440 €0":
+      - text: low Feb 7 Lead1770468792440 TestUser
+      - button:
+        - img
+      - button:
+        - img
+      - paragraph: Company 1770468792440
+      - text: €0
+    - button "low Feb 7 Lead1770468651350 TestUser Company 1770468651350 €0":
+      - text: low Feb 7 Lead1770468651350 TestUser
+      - button:
+        - img
+      - button:
+        - img
+      - paragraph: Company 1770468651350
+      - text: €0
+    - button "low Feb 7 Lead1770468538797 TestUser Company 1770468538797 €0":
+      - text: low Feb 7 Lead1770468538797 TestUser
+      - button:
+        - img
+      - button:
+        - img
+      - paragraph: Company 1770468538797
+      - text: €0
+    - button "low Feb 7 Lead1770467882360 TestUser Company 1770467882360 €0":
+      - text: low Feb 7 Lead1770467882360 TestUser
+      - button:
+        - img
+      - button:
+        - img
+      - paragraph: Company 1770467882360
+      - text: €0
+    - button "low Feb 7 Lead1770465262931 TestUser Company 1770465262931 €0":
+      - text: low Feb 7 Lead1770465262931 TestUser
+      - button:
+        - img
+      - button:
+        - img
+      - paragraph: Company 1770465262931
+      - text: €0
+    - button "low Feb 7 Lead1770465115237 TestUser Company 1770465115237 €0":
+      - text: low Feb 7 Lead1770465115237 TestUser
+      - button:
+        - img
+      - button:
+        - img
+      - paragraph: Company 1770465115237
+      - text: €0
+    - button "low Feb 7 Lead1770464971752 TestUser Company 1770464971752 €0":
+      - text: low Feb 7 Lead1770464971752 TestUser
+      - button:
+        - img
+      - button:
+        - img
+      - paragraph: Company 1770464971752
+      - text: €0
+    - button "low Feb 7 Lead1770464747939 TestUser Company 1770464747939 €0":
+      - text: low Feb 7 Lead1770464747939 TestUser
+      - button:
+        - img
+      - button:
+        - img
+      - paragraph: Company 1770464747939
+      - text: €0
+    - button "low Feb 7 Lead1770464691654 TestUser Company 1770464691654 €0":
+      - text: low Feb 7 Lead1770464691654 TestUser
+      - button:
+        - img
+      - button:
+        - img
+      - paragraph: Company 1770464691654
+      - text: €0
+    - button "low Feb 7 Lead1770464554637 TestUser Company 1770464554637 €0":
+      - text: low Feb 7 Lead1770464554637 TestUser
+      - button:
+        - img
+      - button:
+        - img
+      - paragraph: Company 1770464554637
+      - text: €0
+    - button "low Feb 7 Lead1770464281899 TestUser Company 1770464281899 €0":
+      - text: low Feb 7 Lead1770464281899 TestUser
+      - button:
+        - img
+      - button:
+        - img
+      - paragraph: Company 1770464281899
+      - text: €0
+    - button "low Feb 7 Lead1770463943423 TestUser Company 1770463943423 €0":
+      - text: low Feb 7 Lead1770463943423 TestUser
+      - button:
+        - img
+      - button:
+        - img
+      - paragraph: Company 1770463943423
+      - text: €0
+    - status
+    - heading "Contacts" [level=3]
+    - table:
+      - rowgroup:
+        - row "Name Company Status":
+          - columnheader "Name"
+          - columnheader "Company"
+          - columnheader "Status"
+      - rowgroup:
+        - row "Lead1770725185010 TestUser Company 1770725185010 converted":
+          - cell "Lead1770725185010 TestUser"
+          - cell "Company 1770725185010"
+          - cell "converted"
+        - row "Lead1770725149462 TestUser Company 1770725149462 converted":
+          - cell "Lead1770725149462 TestUser"
+          - cell "Company 1770725149462"
+          - cell "converted"
+        - row "Lead1770725119442 TestUser Company 1770725119442 converted":
+          - cell "Lead1770725119442 TestUser"
+          - cell "Company 1770725119442"
+          - cell "converted"
+        - row "Lead1770602498092 TestUser Company 1770602498092 converted":
+          - cell "Lead1770602498092 TestUser"
+          - cell "Company 1770602498092"
+          - cell "converted"
+        - row "Lead1770561981489 TestUser Company 1770561981489 converted":
+          - cell "Lead1770561981489 TestUser"
+          - cell "Company 1770561981489"
+          - cell "converted"
+        - row "Lead1770468792440 TestUser Company 1770468792440 converted":
+          - cell "Lead1770468792440 TestUser"
+          - cell "Company 1770468792440"
+          - cell "converted"
+        - row "Lead1770468651350 TestUser Company 1770468651350 converted":
+          - cell "Lead1770468651350 TestUser"
+          - cell "Company 1770468651350"
+          - cell "converted"
+        - row "Lead1770468538797 TestUser Company 1770468538797 converted":
+          - cell "Lead1770468538797 TestUser"
+          - cell "Company 1770468538797"
+          - cell "converted"
+        - row "Lead1770468476163 TestUser Company 1770468476163 proposal":
+          - cell "Lead1770468476163 TestUser"
+          - cell "Company 1770468476163"
+          - cell "proposal"
+        - row "Lead1770468374368 TestUser Company 1770468374368 lost":
+          - cell "Lead1770468374368 TestUser"
+          - cell "Company 1770468374368"
+          - cell "lost"
+        - row "Lead1770467882360 TestUser Company 1770467882360 converted":
+          - cell "Lead1770467882360 TestUser"
+          - cell "Company 1770467882360"
+          - cell "converted"
+        - row "Lead1770467571856 TestUser Company 1770467571856 lost":
+          - cell "Lead1770467571856 TestUser"
+          - cell "Company 1770467571856"
+          - cell "lost"
+        - row "Lead1770467513624 TestUser Company 1770467513624 qualified":
+          - cell "Lead1770467513624 TestUser"
+          - cell "Company 1770467513624"
+          - cell "qualified"
+        - row "Lead1770467426655 TestUser Company 1770467426655 won":
+          - cell "Lead1770467426655 TestUser"
+          - cell "Company 1770467426655"
+          - cell "won"
+        - row "Lead1770466576552 TestUser Company 1770466576552 proposal":
+          - cell "Lead1770466576552 TestUser"
+          - cell "Company 1770466576552"
+          - cell "proposal"
+        - row "Lead1770466337512 TestUser Company 1770466337512 qualified":
+          - cell "Lead1770466337512 TestUser"
+          - cell "Company 1770466337512"
+          - cell "qualified"
+        - row "Lead1770465262931 TestUser Company 1770465262931 converted":
+          - cell "Lead1770465262931 TestUser"
+          - cell "Company 1770465262931"
+          - cell "converted"
+        - row "Lead1770465183151 TestUser Company 1770465183151 proposal":
+          - cell "Lead1770465183151 TestUser"
+          - cell "Company 1770465183151"
+          - cell "proposal"
+        - row "Lead1770465115237 TestUser Company 1770465115237 converted":
+          - cell "Lead1770465115237 TestUser"
+          - cell "Company 1770465115237"
+          - cell "converted"
+        - row "Lead1770464971752 TestUser Company 1770464971752 converted":
+          - cell "Lead1770464971752 TestUser"
+          - cell "Company 1770464971752"
+          - cell "converted"
+        - row "Lead1770464747939 TestUser Company 1770464747939 converted":
+          - cell "Lead1770464747939 TestUser"
+          - cell "Company 1770464747939"
+          - cell "converted"
+        - row "Lead1770464691654 TestUser Company 1770464691654 converted":
+          - cell "Lead1770464691654 TestUser"
+          - cell "Company 1770464691654"
+          - cell "converted"
+        - row "Lead1770464554637 TestUser Company 1770464554637 converted":
+          - cell "Lead1770464554637 TestUser"
+          - cell "Company 1770464554637"
+          - cell "converted"
+        - row "Lead1770464281899 TestUser Company 1770464281899 converted":
+          - cell "Lead1770464281899 TestUser"
+          - cell "Company 1770464281899"
+          - cell "converted"
+        - row "Lead1770464111669 TestUser Company 1770464111669 qualified":
+          - cell "Lead1770464111669 TestUser"
+          - cell "Company 1770464111669"
+          - cell "qualified"
+        - row "Lead1770463943423 TestUser Company 1770463943423 converted":
+          - cell "Lead1770463943423 TestUser"
+          - cell "Company 1770463943423"
+          - cell "converted"
+        - row "Lead1770463893645 TestUser Company 1770463893645 qualified":
+          - cell "Lead1770463893645 TestUser"
+          - cell "Company 1770463893645"
+          - cell "qualified"
+        - row "Lead1770463599674 TestUser Company 1770463599674 qualified":
+          - cell "Lead1770463599674 TestUser"
+          - cell "Company 1770463599674"
+          - cell "qualified"
+        - row "Lead1770463359225 TestUser Company 1770463359225 contacted":
+          - cell "Lead1770463359225 TestUser"
+          - cell "Company 1770463359225"
+          - cell "contacted"
+        - row "Lead1770463056343 TestUser Company 1770463056343 negotiation":
+          - cell "Lead1770463056343 TestUser"
+          - cell "Company 1770463056343"
+          - cell "negotiation"
+        - row "Lead1770463002751 TestUser Company 1770463002751 negotiation":
+          - cell "Lead1770463002751 TestUser"
+          - cell "Company 1770463002751"
+          - cell "negotiation"
+        - row "Sarvesh Gupta - new":
+          - cell "Sarvesh Gupta"
+          - cell "-"
+          - cell "new"
+        - row "Vimal Bahuguna BuildRight Equipment won":
+          - cell "Vimal Bahuguna"
+          - cell "BuildRight Equipment"
+          - cell "won"
+    - heading "Tasks" [level=3]:
+      - img
+      - text: Tasks
+    - button "New Task":
+      - img
+      - text: New Task
+    - tablist:
+      - tab "Upcoming 0" [selected]
+      - tab "Overdue 29"
+      - tab "Completed"
+    - text: No upcoming tasks
+    - paragraph: Total Leads
+    - heading "33" [level=3]
+    - text: Total Leads
+    - paragraph: Won Deals
+    - heading "2" [level=3]
+    - text: Won Deals
+    - paragraph: Contacted
+    - heading "9" [level=3]
+    - text: Contacted
+    - paragraph: High Score
+    - heading "55" [level=3]
+    - text: High Score
+    - heading "Pipeline Funnel" [level=3]
+    - text: "Total: 33"
+    - button "Filter by New Lead": New Lead 1
+    - button "Filter by Contacted": Contacted 1
+    - button "Filter by Qualified": Qualified 5
+    - button "Filter by Proposal Sent": Proposal Sent 3
+    - button "Filter by Negotiation": Negotiation 2
+    - button "Filter by Won": Won 2
+    - button "Filter by Lost": Lost 2
+    - button "Filter by Converted": Converted 17
+- button "Open AI Markets Assistant":
+  - img

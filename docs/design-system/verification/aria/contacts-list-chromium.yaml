@@ -1,0 +1,328 @@
+- region "Notifications alt+T"
+- link "Skip to main content":
+  - /url: "#main-content"
+- button "Toggle Sidebar":
+  - img "SOS Services Logo"
+- button "Toggle CRM menu" [expanded]
+- list:
+  - listitem:
+    - link "Leads":
+      - /url: /dashboard/leads/pipeline
+      - img
+  - listitem:
+    - link "Tasks/Activities":
+      - /url: /dashboard/activities
+      - img
+  - listitem:
+    - link "Opportunities":
+      - /url: /dashboard/opportunities/pipeline
+      - img
+  - listitem:
+    - link "Accounts":
+      - /url: /dashboard/accounts/pipeline
+      - img
+  - listitem:
+    - link "Contacts":
+      - /url: /dashboard/contacts/pipeline
+      - img
+- button "Toggle Sales menu"
+- button "Toggle Markets menu"
+- button "Toggle Financials menu"
+- button "Toggle Logistics menu"
+- button "Toggle UIM menu"
+- button "Toggle AMRO menu"
+- button "Toggle Administration menu"
+- button "Sign Out":
+  - img
+- banner:
+  - button "Go back":
+    - img
+  - navigation "breadcrumb":
+    - list:
+      - listitem:
+        - link "Dashboard":
+          - /url: /dashboard
+      - listitem:
+        - link "Contacts" [disabled]
+  - combobox:
+    - img
+    - text: Logistics & Supply Chain Transportation, Warehousing, and Freight Management
+  - button "SOS Services":
+    - img
+    - text: SOS Services
+  - button "Open global search":
+    - img
+    - text: Search... ⌘ K
+  - button "Help":
+    - img
+    - text: Help
+  - button "7 unread notifications":
+    - img
+    - text: "7"
+  - button "Switch to dark mode"
+  - button "Deccan AMRO": DA
+- main:
+  - heading "Contacts" [level=1]
+  - paragraph: Manage your business contacts
+  - navigation "Contacts header navigation":
+    - button "Contacts Pipeline view" [pressed]:
+      - img
+      - text: Pipeline
+    - button "Contacts Card view":
+      - img
+      - text: Card
+    - button "Contacts Grid view":
+      - img
+      - text: Grid
+    - button "Contacts List view":
+      - img
+      - text: List
+    - button "Contacts New Contact":
+      - img
+      - text: New Contact
+    - button "Contacts refresh":
+      - img
+      - text: Refresh
+    - button "Contacts import export":
+      - img
+      - text: Import/Export
+  - img
+  - textbox "Search contacts..."
+  - text: All Contacts
+  - link "Lead1770725185010 TestUser Company 1770725185010 lead1770725185010@test.com":
+    - /url: /dashboard/contacts/181fa155-b9f9-48e0-9f8c-f10507cd650e
+    - img
+    - heading "Lead1770725185010 TestUser" [level=3]
+    - img
+    - text: Company 1770725185010
+    - img
+    - text: lead1770725185010@test.com
+  - link "Lead1770725149462 TestUser Company 1770725149462 lead1770725149462@test.com":
+    - /url: /dashboard/contacts/666f7804-afed-4c60-982c-686a9eb928cb
+    - img
+    - heading "Lead1770725149462 TestUser" [level=3]
+    - img
+    - text: Company 1770725149462
+    - img
+    - text: lead1770725149462@test.com
+  - link "Lead1770725119442 TestUser Company 1770725119442 lead1770725119442@test.com":
+    - /url: /dashboard/contacts/b967e739-aab4-4f81-a362-a76175410230
+    - img
+    - heading "Lead1770725119442 TestUser" [level=3]
+    - img
+    - text: Company 1770725119442
+    - img
+    - text: lead1770725119442@test.com
+  - link "John Doe Adv Test Customer 1770684216319 john.doe.1770684216409@test.com +1-555-0199":
+    - /url: /dashboard/contacts/2d1a22d1-8c32-427e-95a4-8f30037e3510
+    - img
+    - heading "John Doe" [level=3]
+    - img
+    - text: Adv Test Customer 1770684216319
+    - img
+    - text: john.doe.1770684216409@test.com
+    - img
+    - text: +1-555-0199
+  - link "Lead1770602498092 TestUser Company 1770602498092 lead1770602498092@test.com":
+    - /url: /dashboard/contacts/25c444d0-cec7-4eda-a9d2-8d9d71e72137
+    - img
+    - heading "Lead1770602498092 TestUser" [level=3]
+    - img
+    - text: Company 1770602498092
+    - img
+    - text: lead1770602498092@test.com
+  - link "Lead1770561981489 TestUser Company 1770561981489 lead1770561981489@test.com":
+    - /url: /dashboard/contacts/c1189f12-7065-4253-a58f-a5a058383cdc
+    - img
+    - heading "Lead1770561981489 TestUser" [level=3]
+    - img
+    - text: Company 1770561981489
+    - img
+    - text: lead1770561981489@test.com
+  - link "Lead1770468792440 TestUser Company 1770468792440 lead1770468792440@test.com":
+    - /url: /dashboard/contacts/1e71efb6-08b4-400c-8ef2-4d4005a96b87
+    - img
+    - heading "Lead1770468792440 TestUser" [level=3]
+    - img
+    - text: Company 1770468792440
+    - img
+    - text: lead1770468792440@test.com
+  - link "Lead1770468651350 TestUser Company 1770468651350 lead1770468651350@test.com":
+    - /url: /dashboard/contacts/d2f47cd5-1196-41d2-a7e2-cec3c2baa50e
+    - img
+    - heading "Lead1770468651350 TestUser" [level=3]
+    - img
+    - text: Company 1770468651350
+    - img
+    - text: lead1770468651350@test.com
+  - link "Lead1770468538797 TestUser Company 1770468538797 lead1770468538797@test.com":
+    - /url: /dashboard/contacts/dc190cfc-ba1d-4d6a-b8f8-3ff723972c43
+    - img
+    - heading "Lead1770468538797 TestUser" [level=3]
+    - img
+    - text: Company 1770468538797
+    - img
+    - text: lead1770468538797@test.com
+  - link "Lead1770468476163 TestUser Company 1770468476163 lead1770468476163@test.com":
+    - /url: /dashboard/contacts/fa918b7f-23da-4f2a-a04a-4859bb510e22
+    - img
+    - heading "Lead1770468476163 TestUser" [level=3]
+    - img
+    - text: Company 1770468476163
+    - img
+    - text: lead1770468476163@test.com
+  - link "Lead1770468374368 TestUser Company 1770468374368 lead1770468374368@test.com":
+    - /url: /dashboard/contacts/19ae2229-2617-4d56-bbc2-cfc2cace6749
+    - img
+    - heading "Lead1770468374368 TestUser" [level=3]
+    - img
+    - text: Company 1770468374368
+    - img
+    - text: lead1770468374368@test.com
+  - link "Lead1770467882360 TestUser Company 1770467882360 lead1770467882360@test.com":
+    - /url: /dashboard/contacts/1e6d5a11-aeb7-4410-b9e7-cb185d297530
+    - img
+    - heading "Lead1770467882360 TestUser" [level=3]
+    - img
+    - text: Company 1770467882360
+    - img
+    - text: lead1770467882360@test.com
+  - link "Lead1770467571856 TestUser Company 1770467571856 lead1770467571856@test.com":
+    - /url: /dashboard/contacts/546dddd9-e36d-4772-8153-5e380a2bd6a1
+    - img
+    - heading "Lead1770467571856 TestUser" [level=3]
+    - img
+    - text: Company 1770467571856
+    - img
+    - text: lead1770467571856@test.com
+  - link "Lead1770467513624 TestUser Company 1770467513624 lead1770467513624@test.com":
+    - /url: /dashboard/contacts/b453e0c6-e16a-4083-90b3-579a3e1ccada
+    - img
+    - heading "Lead1770467513624 TestUser" [level=3]
+    - img
+    - text: Company 1770467513624
+    - img
+    - text: lead1770467513624@test.com
+  - link "Lead1770467426655 TestUser Company 1770467426655 lead1770467426655@test.com":
+    - /url: /dashboard/contacts/84f2d182-fc2b-40c7-bc8c-765f6eccc859
+    - img
+    - heading "Lead1770467426655 TestUser" [level=3]
+    - img
+    - text: Company 1770467426655
+    - img
+    - text: lead1770467426655@test.com
+  - link "Lead1770466576552 TestUser Company 1770466576552 lead1770466576552@test.com":
+    - /url: /dashboard/contacts/e0a4d901-6bec-4b3f-a368-3bc02859fb16
+    - img
+    - heading "Lead1770466576552 TestUser" [level=3]
+    - img
+    - text: Company 1770466576552
+    - img
+    - text: lead1770466576552@test.com
+  - link "Lead1770466337512 TestUser Company 1770466337512 lead1770466337512@test.com":
+    - /url: /dashboard/contacts/309dc888-ad24-4882-8ebf-463faad13afa
+    - img
+    - heading "Lead1770466337512 TestUser" [level=3]
+    - img
+    - text: Company 1770466337512
+    - img
+    - text: lead1770466337512@test.com
+  - link "Lead1770465262931 TestUser Company 1770465262931 lead1770465262931@test.com":
+    - /url: /dashboard/contacts/06ea5e88-f794-4294-aebd-cba0a2114e53
+    - img
+    - heading "Lead1770465262931 TestUser" [level=3]
+    - img
+    - text: Company 1770465262931
+    - img
+    - text: lead1770465262931@test.com
+  - link "Lead1770465183151 TestUser Company 1770465183151 lead1770465183151@test.com":
+    - /url: /dashboard/contacts/880460ee-d458-4959-b29c-879706a8fa50
+    - img
+    - heading "Lead1770465183151 TestUser" [level=3]
+    - img
+    - text: Company 1770465183151
+    - img
+    - text: lead1770465183151@test.com
+  - link "Lead1770465115237 TestUser Company 1770465115237 lead1770465115237@test.com":
+    - /url: /dashboard/contacts/f125d865-bf2a-4e78-a9e7-42b198298314
+    - img
+    - heading "Lead1770465115237 TestUser" [level=3]
+    - img
+    - text: Company 1770465115237
+    - img
+    - text: lead1770465115237@test.com
+  - link "Lead1770464971752 TestUser Company 1770464971752 lead1770464971752@test.com":
+    - /url: /dashboard/contacts/25e45b4a-c935-4c8c-aef8-21f1082dff10
+    - img
+    - heading "Lead1770464971752 TestUser" [level=3]
+    - img
+    - text: Company 1770464971752
+    - img
+    - text: lead1770464971752@test.com
+  - link "Lead1770464747939 TestUser Company 1770464747939 lead1770464747939@test.com":
+    - /url: /dashboard/contacts/7fe6e8c3-34f5-46ed-bad9-96fb020ed8b1
+    - img
+    - heading "Lead1770464747939 TestUser" [level=3]
+    - img
+    - text: Company 1770464747939
+    - img
+    - text: lead1770464747939@test.com
+  - link "Lead1770464691654 TestUser Company 1770464691654 lead1770464691654@test.com":
+    - /url: /dashboard/contacts/efe6fbf9-0390-452c-a8b1-168bab3da8da
+    - img
+    - heading "Lead1770464691654 TestUser" [level=3]
+    - img
+    - text: Company 1770464691654
+    - img
+    - text: lead1770464691654@test.com
+  - link "Lead1770464554637 TestUser Company 1770464554637 lead1770464554637@test.com":
+    - /url: /dashboard/contacts/41511d88-04a5-40e5-9d2d-593b6893e59f
+    - img
+    - heading "Lead1770464554637 TestUser" [level=3]
+    - img
+    - text: Company 1770464554637
+    - img
+    - text: lead1770464554637@test.com
+  - link "Lead1770464281899 TestUser Company 1770464281899 lead1770464281899@test.com":
+    - /url: /dashboard/contacts/cfae4768-f8f2-46fa-a11f-cf34a1f8411f
+    - img
+    - heading "Lead1770464281899 TestUser" [level=3]
+    - img
+    - text: Company 1770464281899
+    - img
+    - text: lead1770464281899@test.com
+  - link "Lead1770463943423 TestUser Company 1770463943423 lead1770463943423@test.com":
+    - /url: /dashboard/contacts/fe09b822-1153-49ca-ae5f-76a19d080f1a
+    - img
+    - heading "Lead1770463943423 TestUser" [level=3]
+    - img
+    - text: Company 1770463943423
+    - img
+    - text: lead1770463943423@test.com
+  - link "Lead1770463056343 TestUser Company 1770463056343 lead1770463056343@test.com":
+    - /url: /dashboard/contacts/4a80991b-d0c5-4519-8e9a-910af08ccbc9
+    - img
+    - heading "Lead1770463056343 TestUser" [level=3]
+    - img
+    - text: Company 1770463056343
+    - img
+    - text: lead1770463056343@test.com
+  - link "Lead1770463002751 TestUser Company 1770463002751 lead1770463002751@test.com":
+    - /url: /dashboard/contacts/d1effcf7-d76b-4430-a09f-15db5721e596
+    - img
+    - heading "Lead1770463002751 TestUser" [level=3]
+    - img
+    - text: Company 1770463002751
+    - img
+    - text: lead1770463002751@test.com
+  - link "Vimal Bahuguna Presedent bahuguna.vimal@gmail.com +919548254438":
+    - /url: /dashboard/contacts/58ec0890-f395-43f2-9b6f-fb466c1d38c5
+    - img
+    - heading "Vimal Bahuguna" [level=3]
+    - paragraph: Presedent
+    - img
+    - text: bahuguna.vimal@gmail.com
+    - img
+    - text: "+919548254438"
+- button "Open AI Markets Assistant":
+  - img

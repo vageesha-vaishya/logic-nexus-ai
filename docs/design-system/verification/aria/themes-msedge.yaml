@@ -1,0 +1,529 @@
+- region "Notifications alt+T"
+- link "Skip to main content":
+  - /url: "#main-content"
+- button "Toggle Sidebar":
+  - img "SOS Services Logo"
+- button "Toggle CRM menu" [expanded]
+- list:
+  - listitem:
+    - link "Leads":
+      - /url: /dashboard/leads/pipeline
+      - img
+  - listitem:
+    - link "Tasks/Activities":
+      - /url: /dashboard/activities
+      - img
+  - listitem:
+    - link "Opportunities":
+      - /url: /dashboard/opportunities/pipeline
+      - img
+  - listitem:
+    - link "Accounts":
+      - /url: /dashboard/accounts/pipeline
+      - img
+  - listitem:
+    - link "Contacts":
+      - /url: /dashboard/contacts/pipeline
+      - img
+- button "Toggle Sales menu"
+- button "Toggle Markets menu"
+- button "Toggle Financials menu"
+- button "Toggle Logistics menu"
+- button "Toggle UIM menu"
+- button "Toggle AMRO menu"
+- button "Toggle Administration menu"
+- button "Sign Out":
+  - img
+- banner:
+  - button "Go back":
+    - img
+  - navigation "breadcrumb":
+    - list:
+      - listitem:
+        - link "Dashboard":
+          - /url: /dashboard
+      - listitem:
+        - link "Theme Management" [disabled]
+  - combobox:
+    - img
+    - text: Logistics & Supply Chain Transportation, Warehousing, and Freight Management
+  - button "SOS Services":
+    - img
+    - text: SOS Services
+  - button "Open global search":
+    - img
+    - text: Search... ⌘ K
+  - button "Help":
+    - img
+    - text: Help
+  - button "7 unread notifications":
+    - img
+    - text: "7"
+  - button "Switch to dark mode"
+  - button "Deccan AMRO": DA
+- main:
+  - heading "Theme Management" [level=1]
+  - paragraph: Create, preview, and apply gradient themes.
+  - text: Scope
+  - button "User"
+  - button "Franchise"
+  - button "Tenant"
+  - button "Platform"
+  - heading "Main Menu Group Strip Colors" [level=3]
+  - text: Configure individual color strips for CRM, Sales, Financials, Logistics, AMRO, Administration, and Other Modules. CRM Strip (HSL) Pick
+  - textbox: "#932bee"
+  - text: Hue
+  - slider: "272"
+  - spinbutton: "272"
+  - text: Sat
+  - slider: "85"
+  - spinbutton: "85"
+  - text: Light
+  - slider: "55"
+  - spinbutton: "55"
+  - textbox "e.g., 217 91% 60%": 272 85% 55%
+  - text: Sales Strip (HSL) Pick
+  - textbox: "#3c83f6"
+  - text: Hue
+  - slider: "217"
+  - spinbutton: "217"
+  - text: Sat
+  - slider: "91"
+  - spinbutton: "91"
+  - text: Light
+  - slider: "60"
+  - spinbutton: "60"
+  - textbox "e.g., 217 91% 60%": 217 91% 60%
+  - text: Financials Strip (HSL) Pick
+  - textbox: "#11bb66"
+  - text: Hue
+  - slider: "150"
+  - spinbutton: "150"
+  - text: Sat
+  - slider: "83"
+  - spinbutton: "83"
+  - text: Light
+  - slider: "40"
+  - spinbutton: "40"
+  - textbox "e.g., 217 91% 60%": 150 83% 40%
+  - text: Logistics Strip (HSL) Pick
+  - textbox: "#f59f0a"
+  - text: Hue
+  - slider: "38"
+  - spinbutton: "38"
+  - text: Sat
+  - slider: "92"
+  - spinbutton: "92"
+  - text: Light
+  - slider: "50"
+  - spinbutton: "50"
+  - textbox "e.g., 217 91% 60%": 38 92% 50%
+  - text: AMRO Strip (HSL) Pick
+  - textbox: "#05afd1"
+  - text: Hue
+  - slider: "190"
+  - spinbutton: "190"
+  - text: Sat
+  - slider: "95"
+  - spinbutton: "95"
+  - text: Light
+  - slider: "42"
+  - spinbutton: "42"
+  - textbox "e.g., 217 91% 60%": 190 95% 42%
+  - text: Administration Strip (HSL) Pick
+  - textbox: "#e633c8"
+  - text: Hue
+  - slider: "310"
+  - spinbutton: "310"
+  - text: Sat
+  - slider: "78"
+  - spinbutton: "78"
+  - text: Light
+  - slider: "55"
+  - spinbutton: "55"
+  - textbox "e.g., 217 91% 60%": 310 78% 55%
+  - text: Other Modules Strip (HSL) Pick
+  - textbox: "#8a94a8"
+  - text: Hue
+  - slider: "220"
+  - spinbutton: "220"
+  - text: Sat
+  - slider: "15"
+  - spinbutton: "15"
+  - text: Light
+  - slider: "60"
+  - spinbutton: "60"
+  - textbox "e.g., 217 91% 60%": 220 15% 60%
+  - text: CRM Sales Financials Logistics AMRO Administration Other Modules
+  - heading "Create / Preview" [level=3]
+  - text: Theme Name
+  - textbox: Custom Theme
+  - text: Gradient Start (HSL) Pick
+  - textbox: "#3c83f6"
+  - text: Hue
+  - slider: "217"
+  - spinbutton: "217"
+  - text: Sat
+  - slider: "91"
+  - spinbutton: "91"
+  - text: Light
+  - slider: "60"
+  - spinbutton: "60"
+  - textbox "e.g., 217 91% 60%": 217 91% 60%
+  - text: Gradient End (HSL) Pick
+  - textbox: "#2eaadc"
+  - text: Hue
+  - slider: "197"
+  - spinbutton: "197"
+  - text: Sat
+  - slider: "71"
+  - spinbutton: "71"
+  - text: Light
+  - slider: "52"
+  - spinbutton: "52"
+  - textbox "e.g., 217 91% 60%": 197 71% 52%
+  - text: Primary (HSL) Pick
+  - textbox: "#3c83f6"
+  - text: Hue
+  - slider: "217"
+  - spinbutton: "217"
+  - text: Sat
+  - slider: "91"
+  - spinbutton: "91"
+  - text: Light
+  - slider: "60"
+  - spinbutton: "60"
+  - textbox "e.g., 217 91% 60%": 217 91% 60%
+  - text: Accent (HSL) Pick
+  - textbox: "#2eaadc"
+  - text: Hue
+  - slider: "197"
+  - spinbutton: "197"
+  - text: Sat
+  - slider: "71"
+  - spinbutton: "71"
+  - text: Light
+  - slider: "52"
+  - spinbutton: "52"
+  - textbox "e.g., 217 91% 60%": 197 71% 52%
+  - text: List Title Strip (HSL) Pick
+  - textbox: "#2eaadc"
+  - text: Hue
+  - slider: "197"
+  - spinbutton: "197"
+  - text: Sat
+  - slider: "71"
+  - spinbutton: "71"
+  - text: Light
+  - slider: "52"
+  - spinbutton: "52"
+  - textbox "e.g., 217 91% 60%": 197 71% 52%
+  - text: Table Header Text (HSL) Pick
+  - textbox: "#ffffff"
+  - text: Hue
+  - slider: "0"
+  - spinbutton: "0"
+  - text: Sat
+  - slider: "0"
+  - spinbutton: "0"
+  - text: Light
+  - slider: "100"
+  - spinbutton: "100"
+  - textbox "e.g., 217 91% 60%": 0 0% 100%
+  - text: Table Header Separator (HSL) Pick
+  - textbox: "#000000"
+  - text: Hue
+  - slider: "0"
+  - spinbutton: "0"
+  - text: Sat
+  - slider: "0"
+  - spinbutton: "0"
+  - text: Light
+  - slider: "0"
+  - spinbutton: "0"
+  - textbox "e.g., 217 91% 60%": 0 0% 0% / 0.2
+  - text: Table Header Background (HSL) Pick
+  - textbox: "#2eaadc"
+  - text: Hue
+  - slider: "197"
+  - spinbutton: "197"
+  - text: Sat
+  - slider: "71"
+  - spinbutton: "71"
+  - text: Light
+  - slider: "52"
+  - spinbutton: "52"
+  - textbox "e.g., 217 91% 60%": 197 71% 52%
+  - text: Table Background (HSL) Pick
+  - textbox: "#ffffff"
+  - text: Hue
+  - slider: "0"
+  - spinbutton: "0"
+  - text: Sat
+  - slider: "0"
+  - spinbutton: "0"
+  - text: Light
+  - slider: "100"
+  - spinbutton: "100"
+  - textbox "e.g., 217 91% 60%": 0 0% 100%
+  - text: Table Text (HSL) Pick
+  - textbox: "#020817"
+  - text: Hue
+  - slider: "222"
+  - spinbutton: "222.2"
+  - text: Sat
+  - slider: "84"
+  - spinbutton: "84"
+  - text: Light
+  - slider: "5"
+  - spinbutton: "4.9"
+  - textbox "e.g., 217 91% 60%": 222.2 84% 4.9%
+  - button "Reset Table Defaults"
+  - text: Header Banner
+  - switch
+  - text: Visible Banner Content
+  - textbox "Type banner content"
+  - paragraph: Displays existing header labels and text fields exactly with the banner background.
+  - text: Banner Background (HSL) Pick
+  - textbox: "#3c83f6"
+  - text: Hue
+  - slider: "217"
+  - spinbutton: "217"
+  - text: Sat
+  - slider: "91"
+  - spinbutton: "91"
+  - text: Light
+  - slider: "60"
+  - spinbutton: "60"
+  - textbox "e.g., 217 91% 60%": 217 91% 60%
+  - text: Banner Text (HSL) Pick
+  - textbox: "#ffffff"
+  - text: Hue
+  - slider: "0"
+  - spinbutton: "0"
+  - text: Sat
+  - slider: "0"
+  - spinbutton: "0"
+  - text: Light
+  - slider: "100"
+  - spinbutton: "100"
+  - textbox "e.g., 217 91% 60%": 0 0% 100%
+  - text: Banner Height
+  - textbox "e.g., 48px": 48px
+  - text: Table Preview
+  - table:
+    - rowgroup:
+      - row "Column A Column B Column C":
+        - columnheader "Column A"
+        - columnheader "Column B"
+        - columnheader "Column C"
+    - rowgroup:
+      - row "Alpha Bravo Charlie":
+        - cell "Alpha"
+        - cell "Bravo"
+        - cell "Charlie"
+      - row "Delta Echo Foxtrot":
+        - cell "Delta"
+        - cell "Echo"
+        - cell "Foxtrot"
+  - text: Gradient Angle
+  - slider: "135"
+  - spinbutton: "135"
+  - text: Main Background Gradient BG Start (HSL) Pick
+  - textbox: "#3c83f6"
+  - text: Hue
+  - slider: "217"
+  - spinbutton: "217"
+  - text: Sat
+  - slider: "91"
+  - spinbutton: "91"
+  - text: Light
+  - slider: "60"
+  - spinbutton: "60"
+  - textbox "e.g., 217 91% 60%": 217 91% 60%
+  - text: BG End (HSL) Pick
+  - textbox: "#2eaadc"
+  - text: Hue
+  - slider: "197"
+  - spinbutton: "197"
+  - text: Sat
+  - slider: "71"
+  - spinbutton: "71"
+  - text: Light
+  - slider: "52"
+  - spinbutton: "52"
+  - textbox "e.g., 217 91% 60%": 197 71% 52%
+  - text: BG Angle
+  - slider: "135"
+  - spinbutton: "135"
+  - text: Border Radius
+  - combobox:
+    - option "0"
+    - option "0.25rem"
+    - option "0.5rem"
+    - option "0.75rem" [selected]
+    - option "1rem"
+    - option "1.5rem"
+    - option "2rem"
+  - textbox "e.g., 0.75rem": 0.75rem
+  - text: Sidebar Background (HSL) Pick
+  - textbox: "#0f1729"
+  - text: Hue
+  - slider: "222"
+  - spinbutton: "222"
+  - text: Sat
+  - slider: "47"
+  - spinbutton: "47"
+  - text: Light
+  - slider: "11"
+  - spinbutton: "11"
+  - textbox "e.g., 217 91% 60%": 222 47% 11%
+  - text: Sidebar Accent (HSL) Pick
+  - textbox: "#1d2839"
+  - text: Hue
+  - slider: "217"
+  - spinbutton: "217"
+  - text: Sat
+  - slider: "32"
+  - spinbutton: "32"
+  - text: Light
+  - slider: "17"
+  - spinbutton: "17"
+  - textbox "e.g., 217 91% 60%": 217 32% 17%
+  - text: Kanban Card Background (HSL) Pick
+  - textbox: "#000000"
+  - text: Hue
+  - slider: "0"
+  - spinbutton: "0"
+  - text: Sat
+  - slider: "0"
+  - spinbutton: "0"
+  - text: Light
+  - slider: "0"
+  - spinbutton: "0"
+  - textbox "e.g., 217 91% 60%"
+  - text: Kanban Card Radius
+  - combobox:
+    - option "0"
+    - option "0.25rem"
+    - option "0.5rem" [selected]
+    - option "0.75rem"
+    - option "1rem"
+  - textbox "e.g., 0.5rem": 0.5rem
+  - switch
+  - text: Dark Mode
+  - button "Preview"
+  - button "Save As"
+  - button "Primary Button"
+  - text: Card Preview
+  - heading "Presets & Saved Themes" [level=3]
+  - text: Default Simple
+  - button "Apply"
+  - button "Customize"
+  - text: Default Dark
+  - button "Apply"
+  - button "Customize"
+  - text: Ocean Breeze
+  - button "Apply"
+  - button "Customize"
+  - text: Sunset Glow
+  - button "Apply"
+  - button "Customize"
+  - text: Royal Purple
+  - button "Apply"
+  - button "Customize"
+  - text: Emerald Mist
+  - button "Apply"
+  - button "Customize"
+  - text: Berry Crush
+  - button "Apply"
+  - button "Customize"
+  - text: Azure Sky
+  - button "Apply"
+  - button "Customize"
+  - text: Golden Hour
+  - button "Apply"
+  - button "Customize"
+  - text: Forest Trail
+  - button "Apply"
+  - button "Customize"
+  - text: Coral Reef
+  - button "Apply"
+  - button "Customize"
+  - text: Slate Aurora
+  - button "Apply"
+  - button "Customize"
+  - text: Citrus Splash
+  - button "Apply"
+  - button "Customize"
+  - text: Pink Lemonade
+  - button "Apply"
+  - button "Customize"
+  - text: Nordic Frost
+  - button "Apply"
+  - button "Customize"
+  - text: Royal Gold
+  - button "Apply"
+  - button "Customize"
+  - text: Teal Drift
+  - button "Apply"
+  - button "Customize"
+  - text: Ruby Flame
+  - button "Apply"
+  - button "Customize"
+  - text: Lavender Dream
+  - button "Apply"
+  - button "Customize"
+  - text: Mint Whisper
+  - button "Apply"
+  - button "Customize"
+  - text: Midnight Blue
+  - button "Apply"
+  - button "Customize"
+  - text: Amber Flow
+  - button "Apply"
+  - button "Customize"
+  - text: Midnight Aurora
+  - button "Apply"
+  - button "Customize"
+  - text: Sunset Canyon
+  - button "Apply"
+  - button "Customize"
+  - text: Forest Night
+  - button "Apply"
+  - button "Customize"
+  - text: Original Logistics
+  - button "Apply"
+  - button "Customize"
+  - text: Azure Minimal
+  - button "Apply"
+  - button "Customize"
+  - text: Royal Plum
+  - button "Apply"
+  - button "Customize"
+  - text: Citrus Pop
+  - button "Apply"
+  - button "Customize"
+  - text: SOS Brand
+  - button "Apply"
+  - button "Customize"
+  - text: High Contrast Blue
+  - button "Apply"
+  - button "Customize"
+  - text: High Contrast Dark
+  - button "Apply"
+  - button "Customize"
+  - text: Solarized Light
+  - button "Apply"
+  - button "Customize"
+  - text: Solarized Dark
+  - button "Apply"
+  - button "Customize"
+  - text: Accessible Warm
+  - button "Apply"
+  - button "Customize"
+  - text: Accessible Cool
+  - button "Apply"
+  - button "Customize"
+- button "Open AI Markets Assistant":
+  - img

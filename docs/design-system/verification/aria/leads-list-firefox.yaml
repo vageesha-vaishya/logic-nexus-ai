@@ -1,0 +1,243 @@
+- region "Notifications alt+T"
+- link "Skip to main content":
+  - /url: "#main-content"
+- button "Toggle Sidebar":
+  - img "SOS Services Logo"
+- button "Toggle CRM menu" [expanded]
+- list:
+  - listitem:
+    - link "Leads":
+      - /url: /dashboard/leads/pipeline
+      - img
+  - listitem:
+    - link "Tasks/Activities":
+      - /url: /dashboard/activities
+      - img
+  - listitem:
+    - link "Opportunities":
+      - /url: /dashboard/opportunities/pipeline
+      - img
+  - listitem:
+    - link "Accounts":
+      - /url: /dashboard/accounts/pipeline
+      - img
+  - listitem:
+    - link "Contacts":
+      - /url: /dashboard/contacts/pipeline
+      - img
+- button "Toggle Sales menu"
+- button "Toggle Markets menu"
+- button "Toggle Financials menu"
+- button "Toggle Logistics menu"
+- button "Toggle UIM menu"
+- button "Toggle AMRO menu"
+- button "Toggle Administration menu"
+- button "Sign Out":
+  - img
+- banner:
+  - button "Go back":
+    - img
+  - navigation "breadcrumb":
+    - list:
+      - listitem:
+        - link "Dashboard":
+          - /url: /dashboard
+      - listitem:
+        - link "Leads" [disabled]
+  - combobox:
+    - img
+    - text: Logistics & Supply Chain Transportation, Warehousing, and Freight Management
+  - button "SOS Services":
+    - img
+    - text: SOS Services
+  - button "Open global search":
+    - img
+    - text: Search... ⌘ K
+  - button "Help":
+    - img
+    - text: Help
+  - button "7 unread notifications":
+    - img
+    - text: "7"
+  - button "Switch to dark mode"
+  - button "Deccan AMRO": DA
+- main:
+  - heading "Leads Workspace" [level=1]
+  - navigation "Leads header navigation":
+    - button "Leads Pipeline view" [pressed]:
+      - img
+      - text: Pipeline
+    - button "Leads Card view":
+      - img
+      - text: Card
+    - button "Leads Grid view":
+      - img
+      - text: Grid
+    - button "Leads List view":
+      - img
+      - text: List
+    - button "Leads New Lead":
+      - img
+      - text: New Lead
+    - button "Leads refresh":
+      - img
+      - text: Refresh
+    - button "Leads import export":
+      - img
+      - text: Import/Export
+    - button "Leads Analytics view":
+      - img
+      - text: Analytics
+  - text: API unavailable, showing DB fallback
+  - heading "Leads Workspace" [level=1]
+  - paragraph: Focus on pipeline and active contacts
+  - text: "Tenant: bb451198-2877-4345-a578-d404c5720f1a"
+  - button "Refresh"
+  - button "Import/Export"
+  - button "New Lead"
+  - heading "Lead Search and Filter" [level=3]
+  - img
+  - textbox "Search leads..."
+  - combobox:
+    - img
+    - text: All Status
+  - combobox:
+    - img
+    - text: Any Owner
+  - combobox:
+    - img
+    - text: All Scores
+  - combobox "Group By": No Grouping
+  - spinbutton
+  - text: "-"
+  - spinbutton
+  - combobox: Contains
+  - textbox "Lead Name"
+  - button "Fields":
+    - img
+    - text: Fields
+  - button "Clear Filters" [disabled]
+  - heading "Lead Records" [level=3]
+  - button "Lead1770725185010 TestUser, Converted, score 5":
+    - checkbox "Select Lead1770725185010 TestUser" [checked]:
+      - img
+    - heading "Lead1770725185010 TestUser" [level=3]
+    - text: "Company 1770725185010 - lead1770725185010@test.com No Phone Status Converted Lead Score 5 Source: other 2/10/2026"
+    - button "Call Lead1770725185010 TestUser" [disabled]:
+      - img
+    - button "Email Lead1770725185010 TestUser":
+      - img
+    - button "Edit Lead1770725185010 TestUser":
+      - img
+    - button "Delete Lead1770725185010 TestUser":
+      - img
+  - button "Lead1770725149462 TestUser, Converted, score 5":
+    - checkbox "Select Lead1770725149462 TestUser"
+    - heading "Lead1770725149462 TestUser" [level=3]
+    - text: "Company 1770725149462 - lead1770725149462@test.com No Phone Status Converted Lead Score 5 Source: other 2/10/2026"
+    - button "Call Lead1770725149462 TestUser" [disabled]:
+      - img
+    - button "Email Lead1770725149462 TestUser":
+      - img
+    - button "Edit Lead1770725149462 TestUser":
+      - img
+    - button "Delete Lead1770725149462 TestUser":
+      - img
+  - button "Lead1770725119442 TestUser, Converted, score 5":
+    - checkbox "Select Lead1770725119442 TestUser"
+    - heading "Lead1770725119442 TestUser" [level=3]
+    - text: "Company 1770725119442 - lead1770725119442@test.com No Phone Status Converted Lead Score 5 Source: other 2/10/2026"
+    - button "Call Lead1770725119442 TestUser" [disabled]:
+      - img
+    - button "Email Lead1770725119442 TestUser":
+      - img
+    - button "Edit Lead1770725119442 TestUser":
+      - img
+    - button "Delete Lead1770725119442 TestUser":
+      - img
+  - button "Lead1770602498092 TestUser, Converted, score 5":
+    - checkbox "Select Lead1770602498092 TestUser"
+    - heading "Lead1770602498092 TestUser" [level=3]
+    - text: "Company 1770602498092 - lead1770602498092@test.com No Phone Status Converted Lead Score 5 Source: other 2/9/2026"
+    - button "Call Lead1770602498092 TestUser" [disabled]:
+      - img
+    - button "Email Lead1770602498092 TestUser":
+      - img
+    - button "Edit Lead1770602498092 TestUser":
+      - img
+    - button "Delete Lead1770602498092 TestUser":
+      - img
+  - button "Lead1770561981489 TestUser, Converted, score 5":
+    - checkbox "Select Lead1770561981489 TestUser"
+    - heading "Lead1770561981489 TestUser" [level=3]
+    - text: "Company 1770561981489 - lead1770561981489@test.com No Phone Status Converted Lead Score 5 Source: other 2/8/2026"
+    - button "Call Lead1770561981489 TestUser" [disabled]:
+      - img
+    - button "Email Lead1770561981489 TestUser":
+      - img
+    - button "Edit Lead1770561981489 TestUser":
+      - img
+    - button "Delete Lead1770561981489 TestUser":
+      - img
+  - button "Lead1770468792440 TestUser, Converted, score 5":
+    - checkbox "Select Lead1770468792440 TestUser"
+    - heading "Lead1770468792440 TestUser" [level=3]
+    - text: "Company 1770468792440 - lead1770468792440@test.com No Phone Status Converted Lead Score 5 Source: other 2/7/2026"
+    - button "Call Lead1770468792440 TestUser" [disabled]:
+      - img
+    - button "Email Lead1770468792440 TestUser":
+      - img
+    - button "Edit Lead1770468792440 TestUser":
+      - img
+    - button "Delete Lead1770468792440 TestUser":
+      - img
+  - button "Lead1770468651350 TestUser, Converted, score 5":
+    - checkbox "Select Lead1770468651350 TestUser"
+    - heading "Lead1770468651350 TestUser" [level=3]
+    - text: "Company 1770468651350 - lead1770468651350@test.com No Phone Status Converted Lead Score 5 Source: other 2/7/2026"
+    - button "Call Lead1770468651350 TestUser" [disabled]:
+      - img
+    - button "Email Lead1770468651350 TestUser":
+      - img
+    - button "Edit Lead1770468651350 TestUser":
+      - img
+    - button "Delete Lead1770468651350 TestUser":
+      - img
+  - button "Lead1770468538797 TestUser, Converted, score 5":
+    - checkbox "Select Lead1770468538797 TestUser"
+    - heading "Lead1770468538797 TestUser" [level=3]
+    - text: "Company 1770468538797 - lead1770468538797@test.com No Phone Status Converted Lead Score 5 Source: other 2/7/2026"
+    - button "Call Lead1770468538797 TestUser" [disabled]:
+      - img
+    - button "Email Lead1770468538797 TestUser":
+      - img
+    - button "Edit Lead1770468538797 TestUser":
+      - img
+    - button "Delete Lead1770468538797 TestUser":
+      - img
+  - button "Lead1770468476163 TestUser, Proposal Sent, score 5":
+    - checkbox "Select Lead1770468476163 TestUser"
+    - heading "Lead1770468476163 TestUser" [level=3]
+    - text: "Company 1770468476163 - lead1770468476163@test.com No Phone Status Proposal Sent Lead Score 5 Source: other 2/7/2026"
+    - button "Call Lead1770468476163 TestUser" [disabled]:
+      - img
+    - button "Email Lead1770468476163 TestUser":
+      - img
+    - button "Edit Lead1770468476163 TestUser":
+      - img
+    - button "Delete Lead1770468476163 TestUser":
+      - img
+  - button "Lead1770468374368 TestUser, Lost, score 5":
+    - checkbox "Select Lead1770468374368 TestUser"
+    - heading "Lead1770468374368 TestUser" [level=3]
+    - text: "Company 1770468374368 - lead1770468374368@test.com No Phone Status Lost Lead Score 5 Source: other 2/7/2026"
+    - button "Call Lead1770468374368 TestUser" [disabled]:
+      - img
+    - button "Email Lead1770468374368 TestUser":
+      - img
+    - button "Edit Lead1770468374368 TestUser":
+      - img
+    - button "Delete Lead1770468374368 TestUser":
+      - img
+- button "Open AI Markets Assistant":
+  - img

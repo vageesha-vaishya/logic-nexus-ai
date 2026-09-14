@@ -1,0 +1,104 @@
+- region "Notifications alt+T"
+- link "Skip to main content":
+  - /url: "#main-content"
+- button "Toggle Sidebar":
+  - img "SOS Services Logo"
+- button "Toggle CRM menu" [expanded]
+- list:
+  - listitem:
+    - link "Leads":
+      - /url: /dashboard/leads/pipeline
+      - img
+  - listitem:
+    - link "Tasks/Activities":
+      - /url: /dashboard/activities
+      - img
+  - listitem:
+    - link "Opportunities":
+      - /url: /dashboard/opportunities/pipeline
+      - img
+  - listitem:
+    - link "Accounts":
+      - /url: /dashboard/accounts/pipeline
+      - img
+  - listitem:
+    - link "Contacts":
+      - /url: /dashboard/contacts/pipeline
+      - img
+- button "Toggle Sales menu"
+- button "Toggle Markets menu"
+- button "Toggle Financials menu"
+- button "Toggle Logistics menu"
+- button "Toggle UIM menu"
+- button "Toggle AMRO menu"
+- button "Toggle Administration menu"
+- button "Sign Out":
+  - img
+- banner:
+  - button "Go back":
+    - img
+  - navigation "breadcrumb":
+    - list:
+      - listitem:
+        - link "Dashboard":
+          - /url: /dashboard
+  - combobox:
+    - img
+    - text: Logistics & Supply Chain Transportation, Warehousing, and Freight Management
+  - button "SOS Services":
+    - img
+    - text: SOS Services
+  - button "Open global search":
+    - img
+    - text: Search... ⌘ K
+  - button "Help":
+    - img
+    - text: Help
+  - button "7 unread notifications":
+    - img
+    - text: "7"
+  - button "Switch to dark mode"
+  - button "Deccan AMRO": DA
+- main:
+  - heading "Executive Performance Dashboard" [level=1]
+  - paragraph: Enterprise command surface for revenue coverage, risk visibility, and strategic throughput
+  - text: Executive Performance
+  - button "Create Action"
+  - paragraph: Pipeline Opportunities
+  - heading "83" [level=3]
+  - text: 252% lead-to-opportunity vs last period
+  - paragraph: Quotes in Motion
+  - heading "333" [level=3]
+  - text: 4.0x coverage vs last period
+  - paragraph: Shipment Footprint
+  - heading "34" [level=3]
+  - text: 41% operational leverage vs last period
+  - paragraph: Open Exceptions
+  - heading "0" [level=3]
+  - text: Stable vs last period
+  - heading "Execution Board" [level=3]
+  - paragraph: Operational lanes with capacity and SLA visibility
+  - paragraph: High-Coverage Opportunities
+  - paragraph: 83 records
+  - text: Growth
+  - progressbar
+  - paragraph: Quote Concentration
+  - paragraph: 333 records
+  - text: Focus
+  - progressbar
+  - paragraph: Exception Exposure
+  - paragraph: 0 records
+  - text: Stable
+  - progressbar
+  - paragraph: Delivery Throughput
+  - paragraph: 34 records
+  - text: SLA
+  - progressbar
+  - heading "Service Commitments" [level=3]
+  - paragraph: Enterprise SLA and quality markers
+  - text: Escalation Response 11m Billing Accuracy 99.2% Carrier Compliance 97.8% Customer NPS 62
+  - heading "Command Feed" [level=3]
+  - paragraph: Recent events with ownership and execution status
+  - text: Account 1 Discussion for Shipment Operations Desk In Progress Next Account 2 Introduction email from SO Services Operations Desk In Progress Next Account 3 Introductiory Operations Desk In Progress Next Account 4 Tenant onboarding phase 1 updated Operations Desk Resolved Done
+- button "Open AI Markets Assistant":
+  - img

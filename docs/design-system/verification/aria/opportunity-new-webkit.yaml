@@ -1,0 +1,112 @@
+- region "Notifications alt+T"
+- link "Skip to main content":
+  - /url: "#main-content"
+- button "Toggle Sidebar":
+  - img "SOS Services Logo"
+- button "Toggle CRM menu" [expanded]
+- list:
+  - listitem:
+    - link "Leads":
+      - /url: /dashboard/leads/pipeline
+      - img
+  - listitem:
+    - link "Tasks/Activities":
+      - /url: /dashboard/activities
+      - img
+  - listitem:
+    - link "Opportunities":
+      - /url: /dashboard/opportunities/pipeline
+      - img
+  - listitem:
+    - link "Accounts":
+      - /url: /dashboard/accounts/pipeline
+      - img
+  - listitem:
+    - link "Contacts":
+      - /url: /dashboard/contacts/pipeline
+      - img
+- button "Toggle Sales menu"
+- button "Toggle Markets menu"
+- button "Toggle Financials menu"
+- button "Toggle Logistics menu"
+- button "Toggle UIM menu"
+- button "Toggle AMRO menu"
+- button "Toggle Administration menu"
+- button "Sign Out":
+  - img
+- banner:
+  - button "Go back":
+    - img
+  - navigation "breadcrumb":
+    - list:
+      - listitem:
+        - link "Dashboard":
+          - /url: /dashboard
+      - listitem:
+        - link "Opportunities" [disabled]
+  - combobox:
+    - img
+    - text: Logistics & Supply Chain Transportation, Warehousing, and Freight Management
+  - button "SOS Services":
+    - img
+    - text: SOS Services
+  - button "Open global search":
+    - img
+    - text: Search... ⌘ K
+  - button "Help":
+    - img
+    - text: Help
+  - button "7 unread notifications":
+    - img
+    - text: "7"
+  - button "Switch to dark mode"
+  - button "Deccan AMRO": DA
+- main:
+  - button "Back":
+    - img
+  - heading "New Opportunity" [level=1]
+  - paragraph: Create a new sales opportunity
+  - heading "New Opportunity Details" [level=3]
+  - paragraph: Core opportunity information, pipeline stage, and related records
+  - text: Opportunity Name *
+  - textbox "Opportunity Name *":
+    - /placeholder: Enter opportunity name
+  - text: Stage
+  - combobox "Stage": Prospecting
+  - text: Amount
+  - spinbutton "Amount"
+  - text: Probability (%)
+  - spinbutton "Probability (%)"
+  - text: Expected Close Date
+  - textbox "Expected Close Date"
+  - text: Account
+  - combobox "Account": Select account
+  - text: Primary Contact
+  - combobox "Primary Contact": Select contact
+  - text: Related Lead
+  - combobox "Related Lead": Select lead
+  - text: Lead Source
+  - combobox "Lead Source": Select lead source
+  - text: Type
+  - textbox "Type":
+    - /placeholder: New Business, Upsell, Renewal, etc.
+  - text: Forecast Category
+  - textbox "Forecast Category":
+    - /placeholder: Pipeline, Best Case, Commit, etc.
+  - text: Tenant *
+  - combobox "Tenant *": SOS Services
+  - text: Franchise
+  - combobox "Franchise": Select franchise
+  - text: Description
+  - textbox "Description":
+    - /placeholder: Enter opportunity description
+  - text: Next Step
+  - textbox "Next Step":
+    - /placeholder: What's the next action?
+  - text: Competitors
+  - textbox "Competitors":
+    - /placeholder: List competing companies or solutions
+  - button "Cancel"
+  - button "Create Opportunity"
+- button "Open AI Markets Assistant":
+  - img

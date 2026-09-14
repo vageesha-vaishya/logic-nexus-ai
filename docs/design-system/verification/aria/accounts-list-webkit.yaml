@@ -1,0 +1,745 @@
+- region "Notifications alt+T"
+- link "Skip to main content":
+  - /url: "#main-content"
+- button "Toggle Sidebar":
+  - img "SOS Services Logo"
+- button "Toggle CRM menu" [expanded]
+- list:
+  - listitem:
+    - link "Leads":
+      - /url: /dashboard/leads/pipeline
+      - img
+  - listitem:
+    - link "Tasks/Activities":
+      - /url: /dashboard/activities
+      - img
+  - listitem:
+    - link "Opportunities":
+      - /url: /dashboard/opportunities/pipeline
+      - img
+  - listitem:
+    - link "Accounts":
+      - /url: /dashboard/accounts/pipeline
+      - img
+  - listitem:
+    - link "Contacts":
+      - /url: /dashboard/contacts/pipeline
+      - img
+- button "Toggle Sales menu"
+- button "Toggle Markets menu"
+- button "Toggle Financials menu"
+- button "Toggle Logistics menu"
+- button "Toggle UIM menu"
+- button "Toggle AMRO menu"
+- button "Toggle Administration menu"
+- button "Sign Out":
+  - img
+- banner:
+  - button "Go back":
+    - img
+  - navigation "breadcrumb":
+    - list:
+      - listitem:
+        - link "Dashboard":
+          - /url: /dashboard
+      - listitem:
+        - link "Accounts" [disabled]
+  - combobox:
+    - img
+    - text: Logistics & Supply Chain Transportation, Warehousing, and Freight Management
+  - button "SOS Services":
+    - img
+    - text: SOS Services
+  - button "Open global search":
+    - img
+    - text: Search... ⌘ K
+  - button "Help":
+    - img
+    - text: Help
+  - button "7 unread notifications":
+    - img
+    - text: "7"
+  - button "Switch to dark mode"
+  - button "Deccan AMRO": DA
+- main:
+  - navigation "breadcrumb":
+    - list:
+      - listitem:
+        - link "Dashboard":
+          - /url: /dashboard
+      - listitem:
+        - link "Accounts" [disabled]
+  - heading "Accounts" [level=1]
+  - paragraph: Manage your company accounts
+  - button "New":
+    - img
+    - text: New
+  - navigation "Accounts header navigation":
+    - button "Accounts Pipeline view" [pressed]:
+      - img
+      - text: Pipeline
+    - button "Accounts Card view":
+      - img
+      - text: Card
+    - button "Accounts Grid view":
+      - img
+      - text: Grid
+    - button "Accounts List view":
+      - img
+      - text: List
+    - button "Accounts New Account":
+      - img
+      - text: New Account
+    - button "Accounts refresh":
+      - img
+      - text: Refresh
+    - button "Accounts import export":
+      - img
+      - text: Import/Export
+  - button "DeDup (6)"
+  - img
+  - textbox "Search accounts..."
+  - text: Account relation data unavailable, showing base records
+  - heading "MGL Matrix Test Customer" [level=3]
+  - text: active customer
+  - heading "Hapag-Lloyd" [level=3]
+  - text: active duplicate
+  - heading "CMA CGM" [level=3]
+  - text: active duplicate
+  - heading "Maersk" [level=3]
+  - text: active
+  - heading "MSC" [level=3]
+  - text: active
+  - heading "Zim" [level=3]
+  - text: active duplicate
+  - heading "Generic Carrier" [level=3]
+  - text: active
+  - heading "Maersk Line" [level=3]
+  - text: active duplicate
+  - heading "EVERGREEN LINES" [level=3]
+  - text: active
+  - heading "Company 1770725185010" [level=3]
+  - paragraph: lead1770725185010@test.com
+  - text: active prospect
+  - heading "Company 1770725149462" [level=3]
+  - paragraph: lead1770725149462@test.com
+  - text: active prospect
+  - heading "Company 1770725119442" [level=3]
+  - paragraph: lead1770725119442@test.com
+  - text: active prospect
+  - heading "Adv Test Customer 1770699707535" [level=3]
+  - paragraph: test.1770699707535@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770699542961" [level=3]
+  - paragraph: test.1770699542961@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770699137977" [level=3]
+  - paragraph: test.1770699137977@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770699096685" [level=3]
+  - paragraph: test.1770699096685@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770697948978" [level=3]
+  - paragraph: test.1770697948978@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770692162285" [level=3]
+  - paragraph: test.1770692162285@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770691574037" [level=3]
+  - paragraph: test.1770691574037@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770691544297" [level=3]
+  - paragraph: test.1770691544297@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770691518807" [level=3]
+  - paragraph: test.1770691518807@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770691492628" [level=3]
+  - paragraph: test.1770691492628@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770691467843" [level=3]
+  - paragraph: test.1770691467843@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770691443079" [level=3]
+  - paragraph: test.1770691443079@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770691394128" [level=3]
+  - paragraph: test.1770691394128@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770691353071" [level=3]
+  - paragraph: test.1770691353071@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770691316198" [level=3]
+  - paragraph: test.1770691316198@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770690783868" [level=3]
+  - paragraph: test.1770690783868@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770689979303" [level=3]
+  - paragraph: test.1770689979303@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770688575188" [level=3]
+  - paragraph: test.1770688575188@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770687252175" [level=3]
+  - paragraph: test.1770687252175@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770686591285" [level=3]
+  - paragraph: test.1770686591285@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770686201286" [level=3]
+  - paragraph: test.1770686201286@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770685502290" [level=3]
+  - paragraph: test.1770685502290@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770685066207" [level=3]
+  - paragraph: test.1770685066207@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770684494667" [level=3]
+  - paragraph: test.1770684494667@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770684239559" [level=3]
+  - paragraph: test.1770684239559@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770684216319" [level=3]
+  - paragraph: test.1770684216319@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770684193794" [level=3]
+  - paragraph: test.1770684193794@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770684030301" [level=3]
+  - paragraph: test.1770684030301@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770680482362" [level=3]
+  - paragraph: test.1770680482362@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770657014362" [level=3]
+  - paragraph: test.1770657014362@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770656216963" [level=3]
+  - paragraph: test.1770656216963@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770656180165" [level=3]
+  - paragraph: test.1770656180165@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770656134768" [level=3]
+  - paragraph: test.1770656134768@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770655155720" [level=3]
+  - paragraph: test.1770655155720@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770653298337" [level=3]
+  - paragraph: test.1770653298337@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770651293876" [level=3]
+  - paragraph: test.1770651293876@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770651240798" [level=3]
+  - paragraph: test.1770651240798@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770651197753" [level=3]
+  - paragraph: test.1770651197754@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770651166218" [level=3]
+  - paragraph: test.1770651166218@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770651135346" [level=3]
+  - paragraph: test.1770651135346@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770651094080" [level=3]
+  - paragraph: test.1770651094080@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770650921693" [level=3]
+  - paragraph: test.1770650921693@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770650427849" [level=3]
+  - paragraph: +1-555-0199 • test.1770650427849@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770650379409" [level=3]
+  - paragraph: +1-555-0199 • test.1770650379409@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770650337958" [level=3]
+  - paragraph: +1-555-0199 • test.1770650337958@example.com
+  - text: active customer
+  - heading "Adv Test Customer 1770650313150" [level=3]
+  - paragraph: +1-555-0199 • test.1770650313150@example.com
+  - text: active customer
+  - heading "Test Customer 1770648846199" [level=3]
+  - text: active customer
+  - heading "Test Customer 1770646936171" [level=3]
+  - text: active customer
+  - heading "Company 1770602498092" [level=3]
+  - paragraph: lead1770602498092@test.com
+  - text: active prospect
+  - heading "Company 1770561981489" [level=3]
+  - paragraph: lead1770561981489@test.com
+  - text: active prospect
+  - heading "Company 1770468792440" [level=3]
+  - paragraph: lead1770468792440@test.com
+  - text: active prospect
+  - heading "Company 1770468651350" [level=3]
+  - paragraph: lead1770468651350@test.com
+  - text: active prospect
+  - heading "Company 1770468538797" [level=3]
+  - paragraph: lead1770468538797@test.com
+  - text: active prospect
+  - heading "Company 1770468476163" [level=3]
+  - paragraph: lead1770468476163@test.com
+  - text: active prospect
+  - heading "Company 1770468374368" [level=3]
+  - paragraph: lead1770468374368@test.com
+  - text: active prospect
+  - heading "Company 1770467882360" [level=3]
+  - paragraph: lead1770467882360@test.com
+  - text: active prospect
+  - heading "Company 1770467571856" [level=3]
+  - paragraph: lead1770467571856@test.com
+  - text: active prospect
+  - heading "Company 1770467513624" [level=3]
+  - paragraph: lead1770467513624@test.com
+  - text: active prospect
+  - heading "Company 1770467426655" [level=3]
+  - paragraph: lead1770467426655@test.com
+  - text: active prospect
+  - heading "Company 1770466576552" [level=3]
+  - paragraph: lead1770466576552@test.com
+  - text: active prospect
+  - heading "Company 1770466337512" [level=3]
+  - paragraph: lead1770466337512@test.com
+  - text: active prospect
+  - heading "Company 1770465262931" [level=3]
+  - paragraph: lead1770465262931@test.com
+  - text: active prospect
+  - heading "Company 1770465183151" [level=3]
+  - paragraph: lead1770465183151@test.com
+  - text: active prospect
+  - heading "Company 1770465115237" [level=3]
+  - paragraph: lead1770465115237@test.com
+  - text: active prospect
+  - heading "Company 1770464971752" [level=3]
+  - paragraph: lead1770464971752@test.com
+  - text: active prospect
+  - heading "Company 1770464747939" [level=3]
+  - paragraph: lead1770464747939@test.com
+  - text: active prospect
+  - heading "Company 1770464691654" [level=3]
+  - paragraph: lead1770464691654@test.com
+  - text: active prospect
+  - heading "Company 1770464554637" [level=3]
+  - paragraph: lead1770464554637@test.com
+  - text: active prospect
+  - heading "Company 1770464281899" [level=3]
+  - paragraph: lead1770464281899@test.com
+  - text: active prospect
+  - heading "Company 1770463943423" [level=3]
+  - paragraph: lead1770463943423@test.com
+  - text: active prospect
+  - heading "Company 1770463056343" [level=3]
+  - paragraph: lead1770463056343@test.com
+  - text: active prospect
+  - heading "Company 1770463002751" [level=3]
+  - paragraph: lead1770463002751@test.com
+  - text: active prospect
+  - heading "Qatar Airways Cargo" [level=3]
+  - text: active duplicate
+  - heading "DSV Road" [level=3]
+  - text: active
+  - heading "DB Schenker" [level=3]
+  - text: active duplicate
+  - heading "UPS Freight" [level=3]
+  - text: active
+  - heading "DHL Freight" [level=3]
+  - text: active
+  - heading "Test Customer 1770019637173" [level=3]
+  - text: active customer
+  - heading "Test Customer 1770019328179" [level=3]
+  - text: active customer
+  - heading "Test Customer 1770019185065" [level=3]
+  - text: active customer
+  - heading "Test Customer 1770019083871" [level=3]
+  - text: active customer
+  - heading "Test Customer 1770019016134" [level=3]
+  - text: active customer
+  - heading "Test Customer 1770018923118" [level=3]
+  - text: active customer
+  - heading "Schmeler Inc" [level=3]
+  - text: active
+  - heading "Olson - Beahan" [level=3]
+  - text: active
+  - heading "Yundt - Tremblay" [level=3]
+  - text: active
+  - heading "Altenwerth LLC" [level=3]
+  - text: active
+  - heading "Altenwerth, Carroll and O'Conner" [level=3]
+  - text: active
+  - heading "Lynch and Sons" [level=3]
+  - text: active
+  - heading "McGlynn - Romaguera" [level=3]
+  - text: active
+  - heading "Wiza LLC" [level=3]
+  - text: active
+  - heading "Weimann, Gutkowski and Hills" [level=3]
+  - text: active
+  - heading "Collins, Padberg and Turner" [level=3]
+  - text: active
+  - heading "Schneider LLC" [level=3]
+  - text: active
+  - heading "Harber Inc" [level=3]
+  - text: active
+  - heading "Kertzmann - Haley" [level=3]
+  - text: active
+  - heading "Gislason LLC" [level=3]
+  - text: active
+  - heading "Bergnaum - Hudson" [level=3]
+  - text: active
+  - heading "Ortiz, Shields and Wilderman" [level=3]
+  - text: active
+  - heading "Pfannerstill, Kirlin and Fadel" [level=3]
+  - text: active
+  - heading "Beer, Medhurst and Ledner" [level=3]
+  - text: active
+  - heading "Berge - McDermott" [level=3]
+  - text: active
+  - heading "Anderson, Wolff and Rutherford" [level=3]
+  - text: active
+  - heading "Gerhold Inc" [level=3]
+  - text: active
+  - heading "Gleason, Jenkins and Leannon" [level=3]
+  - text: active
+  - heading "Berge - Schmeler" [level=3]
+  - text: active
+  - heading "Murphy, Reilly and Goodwin" [level=3]
+  - text: active
+  - heading "Swaniawski and Sons" [level=3]
+  - text: active
+  - heading "Reilly - Harris" [level=3]
+  - text: active
+  - heading "Robel, Stroman and Daugherty" [level=3]
+  - text: active
+  - heading "Quitzon - Predovic" [level=3]
+  - text: active
+  - heading "Crona, Lynch and Lynch" [level=3]
+  - text: active
+  - heading "Davis - Kohler" [level=3]
+  - text: active
+  - heading "Cassin LLC" [level=3]
+  - text: active
+  - heading "Cummings LLC" [level=3]
+  - text: active
+  - heading "Sauer - Howe" [level=3]
+  - text: active
+  - heading "Kertzmann, Medhurst and Toy" [level=3]
+  - text: active
+  - heading "Hayes Group" [level=3]
+  - text: active
+  - heading "Tillman Inc" [level=3]
+  - text: active
+  - heading "Lakin LLC" [level=3]
+  - text: active
+  - heading "Goyette - Ruecker" [level=3]
+  - text: active
+  - heading "Hansen, Gleichner and Zboncak" [level=3]
+  - text: active
+  - heading "Collier, Waelchi and Hand" [level=3]
+  - text: active
+  - heading "Reynolds Inc" [level=3]
+  - text: active
+  - heading "Runolfsdottir LLC" [level=3]
+  - text: active
+  - heading "Doyle and Sons" [level=3]
+  - text: active
+  - heading "Nolan - Wilderman" [level=3]
+  - text: active
+  - heading "Waelchi - Bosco" [level=3]
+  - text: active
+  - heading "Erdman - Hahn" [level=3]
+  - text: active
+  - heading "Reynolds Group" [level=3]
+  - text: active
+  - heading "Lehner - Orn" [level=3]
+  - text: active
+  - heading "Gleason - Hettinger" [level=3]
+  - text: active
+  - heading "Morar - Macejkovic" [level=3]
+  - text: active
+  - heading "Bednar - Brekke" [level=3]
+  - text: active
+  - heading "Kautzer LLC" [level=3]
+  - text: active
+  - heading "Orn - Kerluke" [level=3]
+  - text: active
+  - heading "Cummings - Miller" [level=3]
+  - text: active
+  - heading "Daugherty - Lemke" [level=3]
+  - text: active
+  - heading "Hyatt - Mayer" [level=3]
+  - text: active
+  - heading "Bernier, Beahan and Bernier" [level=3]
+  - text: active
+  - heading "MacGyver - Durgan" [level=3]
+  - text: active
+  - heading "Dickens, Homenick and Auer" [level=3]
+  - text: active
+  - heading "Bartell Inc" [level=3]
+  - text: active
+  - heading "Keebler Group" [level=3]
+  - text: active
+  - heading "Schowalter - Heller" [level=3]
+  - text: active
+  - heading "Feil, Bergstrom and Ankunding" [level=3]
+  - text: active
+  - heading "Wolf Inc" [level=3]
+  - text: active
+  - heading "Bogan - Hand" [level=3]
+  - text: active
+  - heading "Predovic - Bechtelar" [level=3]
+  - text: active
+  - heading "Dickens - Bosco" [level=3]
+  - text: active
+  - heading "Shanahan - Weissnat" [level=3]
+  - text: active
+  - heading "Roob, Mueller and Gleichner" [level=3]
+  - text: active
+  - heading "Heller - Bartell" [level=3]
+  - text: active
+  - heading "Huels and Sons" [level=3]
+  - text: active
+  - heading "Gleason, Beatty and Carter" [level=3]
+  - text: active
+  - heading "Cummerata, Lakin and Cormier" [level=3]
+  - text: active
+  - heading "Orn, Orn and Farrell" [level=3]
+  - text: active
+  - heading "Mraz - Macejkovic" [level=3]
+  - text: active
+  - heading "Christiansen - Gleichner" [level=3]
+  - text: active
+  - heading "Zboncak, Quitzon and Hirthe" [level=3]
+  - text: active
+  - heading "Kozey, Hodkiewicz and Weimann" [level=3]
+  - text: active
+  - heading "Kertzmann, Connelly and Trantow" [level=3]
+  - text: active
+  - heading "Hills, Borer and Kreiger" [level=3]
+  - text: active
+  - heading "Maggio Inc" [level=3]
+  - text: active
+  - heading "Batz, Pacocha and Dare" [level=3]
+  - text: active
+  - heading "Mann, Fadel and Bogan" [level=3]
+  - text: active
+  - heading "Homenick Inc" [level=3]
+  - text: active
+  - heading "Mosciski LLC" [level=3]
+  - text: active
+  - heading "Wisoky - Rempel" [level=3]
+  - text: active
+  - heading "Haag, Kessler and Bergnaum" [level=3]
+  - text: active
+  - heading "Goyette, Mante and Bednar" [level=3]
+  - text: active
+  - heading "Bogisich Inc" [level=3]
+  - text: active
+  - heading "Bolloré Logistics" [level=3]
+  - text: active
+  - heading "Hellmann Worldwide" [level=3]
+  - text: active
+  - heading "Sinotrans" [level=3]
+  - text: active
+  - heading "C.H. Robinson" [level=3]
+  - text: active
+  - heading "Nippon Express" [level=3]
+  - text: active
+  - heading "Expeditors" [level=3]
+  - text: active
+  - heading "DB Schenker" [level=3]
+  - text: active duplicate
+  - heading "DSV Panalpina" [level=3]
+  - text: active
+  - heading "DHL Global Forwarding" [level=3]
+  - text: active
+  - heading "Kuehne + Nagel" [level=3]
+  - text: active
+  - heading "TFI International" [level=3]
+  - text: active
+  - heading "Estes Express Lines" [level=3]
+  - text: active
+  - heading "Werner Enterprises" [level=3]
+  - text: active
+  - heading "Landstar System" [level=3]
+  - text: active
+  - heading "YRC Worldwide" [level=3]
+  - text: active
+  - heading "Old Dominion Freight Line" [level=3]
+  - text: active
+  - heading "Schneider National" [level=3]
+  - text: active
+  - heading "Knight-Swift" [level=3]
+  - text: active
+  - heading "XPO Logistics" [level=3]
+  - text: active
+  - heading "JB Hunt" [level=3]
+  - text: active
+  - heading "Purolator" [level=3]
+  - text: active
+  - heading "SF Express" [level=3]
+  - text: active
+  - heading "GLS" [level=3]
+  - text: active
+  - heading "DPD" [level=3]
+  - text: active
+  - heading "Blue Dart" [level=3]
+  - text: active
+  - heading "Aramex" [level=3]
+  - text: active
+  - heading "TNT" [level=3]
+  - text: active
+  - heading "UPS" [level=3]
+  - text: active
+  - heading "FedEx" [level=3]
+  - text: active
+  - heading "DHL Express" [level=3]
+  - text: active
+  - heading "China Airlines Cargo" [level=3]
+  - text: active
+  - heading "Cargolux" [level=3]
+  - text: active
+  - heading "Qatar Airways Cargo" [level=3]
+  - text: active duplicate
+  - heading "Lufthansa Cargo" [level=3]
+  - text: active
+  - heading "Korean Air Cargo" [level=3]
+  - text: active
+  - heading "Cathay Pacific Cargo" [level=3]
+  - text: active
+  - heading "Emirates SkyCargo" [level=3]
+  - text: active
+  - heading "DHL Aviation" [level=3]
+  - text: active
+  - heading "UPS Airlines" [level=3]
+  - text: active
+  - heading "FedEx Express" [level=3]
+  - text: active
+  - heading "ZIM" [level=3]
+  - text: active duplicate
+  - heading "Yang Ming" [level=3]
+  - text: active
+  - heading "HMM" [level=3]
+  - text: active
+  - heading "ONE (Ocean Network Express)" [level=3]
+  - text: active
+  - heading "Evergreen Marine" [level=3]
+  - text: active
+  - heading "Hapag-Lloyd" [level=3]
+  - text: active duplicate
+  - heading "COSCO Shipping" [level=3]
+  - text: active
+  - heading "CMA CGM" [level=3]
+  - text: active duplicate
+  - heading "MSC Mediterranean Shipping Company" [level=3]
+  - text: active
+  - heading "Maersk Line" [level=3]
+  - text: active duplicate
+  - heading "Strosin - Kunze" [level=3]
+  - text: active
+  - heading "Davis Inc" [level=3]
+  - text: active
+  - heading "Paucek - Parker" [level=3]
+  - text: active
+  - heading "Frami - Lakin" [level=3]
+  - text: active
+  - heading "Bernier, Monahan and Bode" [level=3]
+  - text: active
+  - heading "Kihn, Bauch and Smitham" [level=3]
+  - text: active
+  - heading "Hills - Kerluke" [level=3]
+  - text: active
+  - heading "Greenfelder Inc" [level=3]
+  - text: active
+  - heading "Hudson and Sons" [level=3]
+  - text: active
+  - heading "Hansen, Mitchell and Reynolds" [level=3]
+  - text: active
+  - heading "Connelly - Ferry" [level=3]
+  - text: active
+  - heading "Gerhold, Toy and Walsh" [level=3]
+  - text: active
+  - heading "Franecki, Beier and Ziemann" [level=3]
+  - text: active
+  - heading "Mraz LLC" [level=3]
+  - text: active
+  - heading "Robel, Rohan and Bernier" [level=3]
+  - text: active
+  - heading "Thiel - Schuster" [level=3]
+  - text: active
+  - heading "Bosco, Botsford and Hyatt" [level=3]
+  - text: active
+  - heading "Nikolaus LLC" [level=3]
+  - text: active
+  - heading "Oberbrunner Inc" [level=3]
+  - text: active
+  - heading "Becker, Terry and Price" [level=3]
+  - text: active
+  - heading "McDermott, Abbott and Ledner" [level=3]
+  - text: active
+  - heading "Wiza, Ledner and Mertz" [level=3]
+  - text: active
+  - heading "Sauer - Bednar" [level=3]
+  - text: active
+  - heading "Ruecker, Frami and Marquardt" [level=3]
+  - text: active
+  - heading "Nicolas - O'Hara" [level=3]
+  - text: active
+  - heading "Zulauf Inc" [level=3]
+  - text: active
+  - heading "Schiller and Sons" [level=3]
+  - text: active
+  - heading "Marks and Sons" [level=3]
+  - text: active
+  - heading "Schneider Inc" [level=3]
+  - text: active
+  - heading "Jones, VonRueden and Breitenberg" [level=3]
+  - text: active
+  - heading "Hudson, Klocko and Kozey" [level=3]
+  - text: active
+  - heading "Skiles, Bernier and Collier" [level=3]
+  - text: active
+  - heading "Deckow, Hand and Cummings" [level=3]
+  - text: active
+  - heading "Gutmann - Treutel" [level=3]
+  - text: active
+  - heading "Reilly and Sons" [level=3]
+  - text: active
+  - heading "Harvey - Kris" [level=3]
+  - text: active
+  - heading "Mertz - King" [level=3]
+  - text: active
+  - heading "Marquardt, Kling and Schulist" [level=3]
+  - text: active
+  - heading "Conn and Sons" [level=3]
+  - text: active
+  - heading "Rogahn, Roob and Sanford" [level=3]
+  - text: active
+  - heading "Ward, Gulgowski and Boyle" [level=3]
+  - text: active
+  - heading "Kuhic - Beahan" [level=3]
+  - text: active
+  - heading "Wilderman Inc" [level=3]
+  - text: active
+  - heading "Kshlerin, McClure and Hoppe" [level=3]
+  - text: active
+  - heading "Adams - Carroll" [level=3]
+  - text: active
+  - heading "Gutmann - Smith" [level=3]
+  - text: active
+  - heading "Denesik - Renner" [level=3]
+  - text: active
+  - heading "Anderson and Sons" [level=3]
+  - text: active
+  - heading "Kiehn, Stehr and Trantow" [level=3]
+  - text: active
+  - heading "Kuvalis - Dietrich" [level=3]
+  - text: active
+- button "Open AI Markets Assistant":
+  - img

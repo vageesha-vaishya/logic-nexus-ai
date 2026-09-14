@@ -1,0 +1,195 @@
+- region "Notifications alt+T"
+- link "Skip to main content":
+  - /url: "#main-content"
+- button "Toggle Sidebar":
+  - img "SOS Services Logo"
+- button "Toggle CRM menu" [expanded]
+- list:
+  - listitem:
+    - link "Leads":
+      - /url: /dashboard/leads/pipeline
+      - img
+  - listitem:
+    - link "Tasks/Activities":
+      - /url: /dashboard/activities
+      - img
+  - listitem:
+    - link "Opportunities":
+      - /url: /dashboard/opportunities/pipeline
+      - img
+  - listitem:
+    - link "Accounts":
+      - /url: /dashboard/accounts/pipeline
+      - img
+  - listitem:
+    - link "Contacts":
+      - /url: /dashboard/contacts/pipeline
+      - img
+- button "Toggle Sales menu"
+- button "Toggle Markets menu"
+- button "Toggle Financials menu"
+- button "Toggle Logistics menu"
+- button "Toggle UIM menu"
+- button "Toggle AMRO menu"
+- button "Toggle Administration menu"
+- button "Sign Out":
+  - img
+- banner:
+  - button "Go back":
+    - img
+  - navigation "breadcrumb":
+    - list:
+      - listitem:
+        - link "Dashboard":
+          - /url: /dashboard
+      - listitem:
+        - link "Leads" [disabled]
+  - combobox:
+    - img
+    - text: Logistics & Supply Chain Transportation, Warehousing, and Freight Management
+  - button "Scoped View":
+    - img
+    - text: Scoped View
+  - button "Open global search":
+    - img
+    - text: Search... ⌘ K
+  - button "Help":
+    - img
+    - text: Help
+  - button "Notifications":
+    - img
+  - button "Switch to dark mode"
+  - button "Deccan AMRO": DA
+- main:
+  - heading "Leads Workspace" [level=1]
+  - navigation "Leads header navigation":
+    - button "Leads Pipeline view" [pressed]:
+      - img
+      - text: Pipeline
+    - button "Leads Card view":
+      - img
+      - text: Card
+    - button "Leads Grid view":
+      - img
+      - text: Grid
+    - button "Leads List view":
+      - img
+      - text: List
+    - button "Leads New Lead":
+      - img
+      - text: New Lead
+    - button "Leads refresh":
+      - img
+      - text: Refresh
+    - button "Leads import export":
+      - img
+      - text: Import/Export
+    - button "Leads Analytics view":
+      - img
+      - text: Analytics
+  - heading "Leads Workspace" [level=1]
+  - paragraph: Focus on pipeline and active contacts
+  - text: "Tenant: bb451198-2877-4345-a578-d404c5720f1a"
+  - button "Refreshing..." [disabled]
+  - button "Import/Export"
+  - button "New Lead"
+  - heading "Lead Search and Filter" [level=3]
+  - img
+  - textbox "Search leads..."
+  - combobox:
+    - img
+    - text: All Status
+  - combobox:
+    - img
+    - text: Any Owner
+  - combobox:
+    - img
+    - text: All Scores
+  - combobox "Group By": No Grouping
+  - spinbutton
+  - text: "-"
+  - spinbutton
+  - combobox: Contains
+  - textbox "Lead Name"
+  - button "Fields":
+    - img
+    - text: Fields
+  - button "Clear Filters" [disabled]
+  - heading "Lead Records" [level=3]
+  - table:
+    - rowgroup:
+      - row:
+        - columnheader
+        - columnheader
+        - columnheader
+        - columnheader
+        - columnheader
+        - columnheader
+        - columnheader
+    - rowgroup:
+      - row:
+        - cell
+        - cell
+        - cell
+        - cell
+        - cell
+        - cell
+        - cell
+      - row:
+        - cell
+        - cell
+        - cell
+        - cell
+        - cell
+        - cell
+        - cell
+      - row:
+        - cell
+        - cell
+        - cell
+        - cell
+        - cell
+        - cell
+        - cell
+      - row:
+        - cell
+        - cell
+        - cell
+        - cell
+        - cell
+        - cell
+        - cell
+      - row:
+        - cell
+        - cell
+        - cell
+        - cell
+        - cell
+        - cell
+        - cell
+      - row:
+        - cell
+        - cell
+        - cell
+        - cell
+        - cell
+        - cell
+        - cell
+      - row:
+        - cell
+        - cell
+        - cell
+        - cell
+        - cell
+        - cell
+        - cell
+      - row:
+        - cell
+        - cell
+        - cell
+        - cell
+        - cell
+        - cell
+        - cell
+- button "Open AI Markets Assistant":
+  - img
