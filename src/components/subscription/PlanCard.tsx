@@ -29,10 +29,10 @@ export function PlanCard({ plan, isCurrentPlan, onSelect, showActions = true }: 
 
   const getTierColor = (tier: string | null) => {
     const colors: Record<string, string> = {
-      starter: 'bg-status-info text-status-info-foreground',
-      professional: 'bg-status-special text-status-special-foreground',
-      business: 'bg-status-warning text-status-warning-foreground',
-      enterprise: 'bg-status-success text-status-success-foreground',
+      starter: 'bg-primary/10 text-primary',
+      professional: 'bg-primary/10 text-primary',
+      business: 'bg-primary/10 text-primary',
+      enterprise: 'bg-primary/10 text-primary',
     };
     return tier ? colors[tier.toLowerCase()] || 'bg-status-neutral text-status-neutral-foreground' : 'bg-status-neutral text-status-neutral-foreground';
   };

@@ -31,9 +31,9 @@ function fmtINR(n: number | string | null | undefined): string {
 }
 
 const TIER_COLORS: Record<string, string> = {
-  starter:      "bg-status-info text-status-info-foreground border-status-info-border",
-  professional: "bg-status-special text-status-special-foreground border-status-special-border",
-  enterprise:   "bg-status-warning text-status-warning-foreground border-status-warning-border",
+  starter:      "bg-primary/10 text-primary border-primary/20",
+  professional: "bg-primary/10 text-primary border-primary/20",
+  enterprise:   "bg-primary/10 text-primary border-primary/20",
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -49,7 +49,7 @@ const INVOICE_STATUS: Record<string, string> = {
   issued:  "bg-status-info text-status-info-foreground",
   overdue: "bg-status-danger text-status-danger-foreground",
   draft:   "bg-status-neutral text-status-neutral-foreground",
-  void:    "bg-status-neutral text-status-neutral-foreground line-through",
+  void:    "bg-status-neutral text-status-neutral-foreground line-through opacity-60",
 };
 
 // ── Plan card ─────────────────────────────────────────────────────────────────
