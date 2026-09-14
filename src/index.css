@@ -156,10 +156,10 @@ All colors MUST be HSL.
 
     /* Markets / financial up-down semantics (ADR-026 §5).
        Muted ~50% saturation for long-session legibility; pair with arrows in UI. */
-    --up: 142 60% 38%;
+    --up: 142 60% 30%;
     --up-foreground: 0 0% 100%;
     --up-soft: 142 60% 95%;
-    --down: 0 70% 50%;
+    --down: 0 70% 48%;
     --down-foreground: 0 0% 100%;
     --down-soft: 0 70% 96%;
     --neutral: 215 16% 47%;
@@ -351,12 +351,15 @@ All colors MUST be HSL.
     --warning: 38 92% 50%;
     --warning-foreground: 222 47% 11%;
 
-    /* Markets / financial up-down semantics — dark theme (ADR-026 §5). */
+    /* Markets / financial up-down semantics — dark theme (ADR-026 §5).
+       Foregrounds are ink, not white: on a 9%-lightness page the solid must stay
+       bright enough to clear 4.5:1 against the background, which caps white-on-solid
+       at ~2.1:1. Same resolution as --success-foreground / --warning-foreground. */
     --up: 142 58% 50%;
-    --up-foreground: 0 0% 100%;
+    --up-foreground: 222 47% 11%;
     --up-soft: 142 50% 14%;
-    --down: 0 70% 60%;
-    --down-foreground: 0 0% 100%;
+    --down: 0 70% 62%;
+    --down-foreground: 222 47% 11%;
     --down-soft: 0 50% 14%;
     --neutral: 215 14% 65%;
 

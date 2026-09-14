@@ -82,7 +82,7 @@ HSL triples (no `hsl()` wrapper) so they compose with Tailwind's `/opacity` modi
 | `--popover` | `0 0% 100%` | `222 33% 17%` | Dropdowns/menus. Dark: one step above card so stacked layers stay legible. |
 | `--secondary` / `--muted` | `210 40% 96%` | `222 25% 20%` / `222 22% 18%` | Subtle fills, hover states. |
 | `--foreground` | `222 47% 11%` | `210 40% 98%` | Primary text. 17.9:1 / 17.8:1 on background. |
-| `--muted-foreground` | `215 16% 47%` | `215 20% 70%` | Secondary text. 4.72:1 / 8.45:1. |
+| `--muted-foreground` | `215 16% 42%` | `215 20% 70%` | Secondary text. 5.65:1 / 8.45:1 on background. Light was `215 16% 47%` (4.72:1) — retuned in Plan 2 because it measured only 4.30:1 on `--muted` / `--secondary` (inactive tabs, funnel counters); now 5.15:1 there. |
 | `--border` | `214 32% 91%` | `217 22% 28%` | Decorative dividers (cards, tables). *Deliberately* subtle — see §5.2. |
 | `--input` | `214 20% 58%` | `217 20% 46%` | Form-field boundaries. Split from `--border` in this revision to clear WCAG 1.4.11's 3:1. |
 | `--sidebar-*` | neutral light | `222`-hue navy family | Dark sidebar unified onto the page's hue (was a mismatched neutral gray). |
@@ -99,7 +99,50 @@ HSL triples (no `hsl()` wrapper) so they compose with Tailwind's `/opacity` modi
 | `--destructive` (dark) | `0 70% 48%` | white | **5.29:1** | Already compliant. |
 | `--title-strip` | = accent | `--title-strip-foreground` (computed) | ≥4.5:1 | Colored table-header band on CRM list pages. **New token**; text color computed at runtime (§3.6). |
 
-The brand blue (`217 91% 53%`) is *only* for actions, links, selection, and focus. Record state uses the `--menu-strip-*` module hues and the `--up`/`--down`/`--neutral` financial semantics, never `--primary`.
+**Status tones — light / dark**
+
+Six semantic tones for *record state* (status, priority, stage, severity). Each is a
+triple: a tinted `surface`, a `foreground` ink, and a `border`. Consumed as
+`<Badge tone="…">` or `bg-status-* text-status-*-foreground border-status-*-border`
+— never as raw palette classes (§4.5). Ratios are measured by the Appendix A audit;
+the foreground target is ≥7:1 (well past the 4.5 gate) and the border is a non-text
+boundary gated at ≥3:1 against `--card`.
+
+| Tone | Light surface / foreground / border | Dark surface / foreground / border | Light fg ÷ border | Dark fg ÷ border |
+|---|---|---|---|---|
+| `success` | `142 60% 93%` / `142 72% 20%` / `142 45% 44%` | `142 45% 15%` / `142 60% 78%` / `142 40% 34%` | **7.73** / 3.18 | **9.29** / 3.15 |
+| `warning` | `38 92% 92%` / `28 90% 24%` / `38 80% 42%` | `38 70% 15%` / `40 90% 74%` / `38 60% 34%` | **7.93** / 3.25 | **8.94** / 3.11 |
+| `danger` | `0 85% 94%` / `0 72% 30%` / `0 70% 66%` | `0 55% 17%` / `0 85% 82%` / `0 50% 50%` | **8.22** / 3.15 | **8.42** / 3.16 |
+| `info` | `217 90% 94%` / `217 80% 30%` / `217 70% 64%` | `217 60% 17%` / `217 90% 82%` / `217 50% 48%` | **8.51** / 3.05 | **8.89** / 3.17 |
+| `neutral` | `215 20% 93%` / `215 22% 28%` / `215 18% 60%` | `215 18% 19%` / `215 20% 82%` / `215 16% 44%` | **8.28** / 3.01 | **8.65** / 3.14 |
+| `special` | `270 80% 94%` / `270 60% 32%` / `270 60% 68%` | `270 45% 19%` / `270 80% 84%` / `270 40% 52%` | **9.05** / 3.11 | **8.65** / 3.08 |
+
+The surfaces and foregrounds are as designed; every **border** lightness was tuned
+down (light) or up (dark) from its first draft, which sat 1.5–2.6:1 against `--card` —
+a tinted hairline that reads as "soft" is almost always invisible. Hue and saturation
+were not touched.
+
+**Up / Down — financial delta semantics (light / dark)**
+
+`--up` / `--down` carry market and financial deltas, used both as solid pills
+(`bg-up` + `text-up-foreground`) and as tinted pills (`bg-up-soft` + `text-up`).
+
+| Token | Light | Dark | Ratios (light / dark) |
+|---|---|---|---|
+| `--up` | `142 60% 30%` | `142 58% 50%` | on `--up-soft` **4.94** / **6.24**; on background **5.34** / **8.65** |
+| `--up-foreground` | `0 0% 100%` white | `222 47% 11%` ink | on `--up` **5.34** / **8.32** |
+| `--up-soft` | `142 60% 95%` | `142 50% 14%` | tinted pill surface |
+| `--down` | `0 70% 48%` | `0 70% 62%` | on `--down-soft` **4.67** / **4.69**; on background **5.29** / **5.18** |
+| `--down-foreground` | `0 0% 100%` white | `222 47% 11%` ink | on `--down` **5.29** / **4.99** |
+| `--down-soft` | `0 70% 96%` | `0 50% 14%` | tinted pill surface |
+
+Light `--up` was `38%` (3.30:1 on `--up-soft`) and `--down` was `50%` (4.37:1); both
+were darkened until the tinted pill cleared 4.5:1. In **dark** mode the foregrounds had
+to stop being white: on a 9%-lightness page the solid must stay bright enough to clear
+4.5:1 against the background, which caps white-on-solid at ~2.1:1 — the same conflict
+`--success-foreground` and `--warning-foreground` resolve with dark ink.
+
+The brand blue (`217 91% 53%`) is *only* for actions, links, selection, and focus. Record state uses the `--status-*` tones above (via `<Badge tone>`), the `--menu-strip-*` module hues, and the `--up`/`--down`/`--neutral` financial semantics, never `--primary`.
 
 ### 3.3 Spacing
 
@@ -175,7 +218,11 @@ Built on shadcn/ui + Radix. Rules that were established or enforced in this revi
 
 ### 4.5 Color usage rules
 - **Never** `bg-white`, `bg-gray-*`, `bg-slate-*`, `text-gray-*`, `text-slate-*`, `border-gray-*`, or literal hex in `className`. Use `bg-card`, `bg-muted`, `text-foreground`, `text-muted-foreground`, `border-border`.
-- Semantic Tailwind palette classes (`text-red-600`, `bg-amber-50`) are acceptable *only* for status/priority badges that are the same in both modes, and should be reviewed for dark-mode legibility.
+- Record state uses `<Badge tone>` / `bg-status-*` — raw palette pairs are lint-banned (`STATUS_PALETTE_BANS`).
+  The rule is a `no-restricted-syntax` selector in `eslint.config.js`, scoped to `src/**`, and matches a
+  `bg-<hue>-<n> text-<hue>-<n>` pair in a single string literal. Tone choice is semantic, not chromatic:
+  pick `danger` because the state is bad, not because the old class was red. `scripts/codemod-status-tones.mjs`
+  performs the mechanical rewrite; it is not a substitute for reading the call site.
 - Any component that hardcodes a foreground on a themed surface must use the corresponding `*-foreground` token so runtime presets stay compliant.
 
 ---
@@ -197,7 +244,7 @@ Measured with the script in Appendix A (WCAG relative-luminance formula). **Befo
 | Input border vs card (dark) | 1.67 | **3.27** | 3.0 | PASS |
 | Table title-strip text on gold accent | 1.84 (white) | **8.37** (ink) | 4.5 | PASS |
 
-Unchanged pairs already passing: foreground/background 17.9 & 17.8, muted-foreground 4.72 & 8.45, secondary 16.3 & 13.0, sidebar 10.0 & 16.0, destructive (dark) 5.29.
+Unchanged pairs already passing: foreground/background 17.9 & 17.8, secondary 16.3 & 13.0, sidebar 10.0 & 16.0, destructive (dark) 5.29. (`muted-foreground` on background was 4.72 & 8.45 here; Plan 2 retuned the light value — now 5.65 & 8.45, see §3.2.)
 
 **Buttons are "normal text."** WCAG's large-text exemption (3:1) starts at 18.66px bold / 24px regular; button and badge labels here are 12–14px, so 4.5:1 applies even when bold.
 
@@ -277,6 +324,26 @@ Both override `font-family` and color within their own scope and are unaffected 
 
 Earlier in the same day (separate commits): dark/light theme unification, header reorganisation, reactive per-page accent theming, Kanban dark-mode fix.
 
+### 8.1 Plan 2 — status tokens and baseline findings (2026-09-14)
+
+Plan 2 of the 2026-09-13 spec: a semantic status-tone system, a sweep of the raw
+palette classes it replaces, and a fix for every finding raised by the Plan 1 baseline
+verification run. One row per task.
+
+| # | Area | Change | Files |
+|---|---|---|---|
+| 2 | Tokens | 18 light + 18 dark `--status-*` tokens (surface/foreground/border × 6 tones), wired into Tailwind as the `status` color group; all 12 border lightnesses tuned to clear 3:1 vs `--card`; light `--muted-foreground` retuned `47%`→`42%` for F14 | `index.css`, `tailwind.config.ts`, `contrast-audit.mjs` |
+| 3 | Components | `Badge` gains a `tone` axis (typed so `tone` + solid `variant` is a compile error); `statusConfig` emits tones instead of raw classes | `ui/badge.tsx`, `config/statusConfig.ts`, `Quotes.tsx` |
+| 4 | Tooling | `scripts/codemod-status-tones.mjs` rewrites raw `bg-<hue>-<n> text-<hue>-<n>` pairs to tones; ESLint `STATUS_PALETTE_BANS` (`no-restricted-syntax`, scoped to `src/**`) makes new ones an error | `eslint.config.js`, `scripts/codemod-status-tones.mjs` (+ tests) |
+| 5 | Sweep | ~509 hardcoded badge pairs rewritten to semantic tones across the app; then a hand pass reverting the ones that were *category/tier* labels rather than state (a plan tier is not an alert) to primary chips | 129 files under `src/`, then `PlanCard.tsx`, `MfScreener.tsx`, `InteractionTimeline.tsx`, `SubscriptionManagement.tsx`, `EnterpriseToolingEditor.tsx` |
+| 6 | A11y — app shell | Domain select named; collapsed-nav toggles dropped from the tab order; progress bars labelled; onboarding tour promoted to a real `dialog` | `EnterpriseDashboardShell.tsx`, `CommandCenterNav.tsx`, `DomainSwitcher.tsx`, `OnboardingTour.tsx` |
+| 7 | A11y — leads list | Filter selects named; lead card un-nested (was an interactive element inside an interactive element); single `h1`; toolbar wraps at 360 | `LeadCard.tsx`, `LeadsFilterToolbar.tsx`, `Leads.tsx` |
+| 8 | A11y — kanban | Buttons named; drag handle moved out of the actions group and onto dnd-kit's `setActivatorNodeRef`; scroll viewport made focusable; tabs given real panels | `KanbanCard.tsx`, `KanbanColumn.tsx`, `TaskScheduler.tsx`, `ui/scroll-area.tsx` |
+| 9 | A11y — Themes page | Colour inputs labelled; selects and switches named; preview header made contrast-safe; preview row wraps | `ui/hsl-picker.tsx`, `ThemeManagement.tsx`, `hooks/useTheme.tsx` |
+| 10 | A11y — auth page | `main` landmark added; duplicate `h1` collapsed to one; new `--link` token (7.10:1 light / 7.25:1 dark) because `--primary` could not clear 4.5:1 as inline text on the tinted gradient | `Auth.tsx`, `index.css`, `tailwind.config.ts`, `contrast-audit.mjs` |
+| 11 | Layout | Opportunity form fits 768px (`FormItem` gains `relative min-w-0` so grid children may shrink); Accounts list renders in pages of 100 instead of one unbounded list | `forms/FormLayout.tsx`, `Accounts.tsx` |
+| 12 | Docs + evidence | This section, §3.2's status-tone and Up/Down tables, §4.5's lint rule, Appendix B refresh, spec §4.4's single-engine disposition rule; `--up`/`--down` retuned and gated by six new audit pairs; full four-engine harness re-run regenerating `verification/**` | `README.md`, spec §4.4, `index.css`, `contrast-audit.mjs`, `verification/**` |
+
 ---
 
 ## Appendix A — Re-running the audits
@@ -300,11 +367,11 @@ Requires `E2E_ADMIN_EMAIL` / `E2E_ADMIN_PASSWORD` in the gitignored repo-root `e
 - Real usability testing rounds (requires human participants).
 - Screen-reader runtime pass (structure is now snapshot-verified; announcement behaviour is not).
 - Real Safari and real devices (WebKit engine and emulated viewports are verified — see `verification/REPORT.md`).
-- Findings from the baseline verification run (`verification/REPORT.md` at this commit) — addressed in Plan 2 of the 2026-09-13 spec.
+- **WebKit link tabbing.** WebKit's Tab skips links unless the OS "full keyboard access" setting is on, so link focus visibility is not gated on that engine. A link-only focus regression would be caught by chromium and firefox but not webkit.
+- **`lead-detail` is still unmeasured.** Every `lead-detail` cell is refused by the content-readiness gate (`#main-content` renders 14 characters — "Lead not found"), in the Plan 1 run *and* in the Plan 2 re-run with `crm-api` up. The cause is in the harness, not the page: `resolveFirstLead` (`tests/design-system/pages.ts`) picks the newest lead visible to the E2E admin's raw REST token, while `LeadDetail` reads through `ScopedDataAccess`, which adds `.eq('tenant_id', …)` (and a franchise filter). When the newest lead belongs to another tenant the two disagree and the page legitimately renders "not found". Fixing this means resolving the route through the same scoped context the app uses — until then the page's axe/ARIA/layout results are absent, not green.
 - `LeadDetail` / `QuoteDetail` keep their own richer navigation; not migrated to the sticky-bar pattern (business-critical workspace pages, deliberately left alone).
 - Lead/Activity/Opportunity/Quote "New" pages keep their own shells; `EntityCreatePageShell` is coupled to `UnifiedPartnerForm` and would need generalising first.
-- `EnterpriseButton/Form/Header/Modal/ActivityFeed` still contain hardcoded light colors but are not imported by any live page (dead code or Storybook-only).
-- Status/priority badge palettes (`bg-red-50 text-red-600` etc.) are legible but not tuned per mode.
+- **Server-side pagination for Accounts.** Plan 2 shipped client-side paging ("Load more", 100 rows a page) so the list no longer renders every row at once, but the full result set is still fetched. The real fix is a ranged query.
 
 ## Appendix C — Research sources
 

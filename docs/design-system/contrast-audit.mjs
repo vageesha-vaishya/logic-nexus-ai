@@ -72,6 +72,13 @@ const PAIRS = [
   // F14: muted text on muted surfaces (inactive tabs, funnel counters) measured 4.28:1.
   ['muted-foreground on muted', 'muted-foreground', 'muted', 4.5],
   ['muted-foreground on secondary', 'muted-foreground', 'secondary', 4.5],
+  // Financial delta pills (text-up on bg-up-soft etc.) — Task 5 review measured ~3.3:1 in light mode.
+  ['up on up-soft', 'up', 'up-soft', 4.5],
+  ['down on down-soft', 'down', 'down-soft', 4.5],
+  ['up on background', 'up', 'background', 4.5],
+  ['down on background', 'down', 'background', 4.5],
+  ['up-foreground on up', 'up-foreground', 'up', 4.5],
+  ['down-foreground on down', 'down-foreground', 'down', 4.5],
 ];
 
 function hslToRgb(h, s, l) {

@@ -220,6 +220,7 @@ Each tone has `--status-<tone>`, `--status-<tone>-foreground`,
 | Missing visible focus / focus trap | Fix (gate) |
 | Illogical tab order | Fix if local to a component; log if it needs page restructuring |
 | ARIA gate (h1 count, landmarks, unnamed controls) | Fix (gate) |
+| Keyboard/ARIA finding present in ONE engine only | Harness suspect first: check REPORT.md "Engine-specific divergences" and the engine caveats before changing app code (Plan 1 final review: three such cases, all tooling) |
 
 ### 4.5 Housekeeping
 - `EnterpriseButton/Form/Header/Modal/ActivityFeed`: grep for imports including
