@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card';
-import { H2 } from '@/components/ui/Heading';
+import { H1 } from '@/components/ui/Heading';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { z } from 'zod';
@@ -365,13 +365,13 @@ export default function Auth() {
         <>
           <div className="pt-2 text-center text-sm text-muted-foreground">
             First time setup?{' '}
-            <Link to="/setup-admin" className="text-primary underline">Create Platform Admin</Link>
+            <Link to="/setup-admin" className="text-link underline">Create Platform Admin</Link>
           </div>
           <div className="text-center text-sm text-muted-foreground">
             New here?{' '}
-            <Link to="/signup" className="text-primary underline">Register your organization</Link>
+            <Link to="/signup" className="text-link underline">Register your organization</Link>
             {' '}or{' '}
-            <Link to="/welcome" className="text-primary underline">explore options</Link>
+            <Link to="/welcome" className="text-link underline">explore options</Link>
           </div>
         </>
       )}
@@ -452,7 +452,7 @@ function SosChrome({ title, subtitle, children, domainHint }: ChromeProps) {
   const productName = domainHint?.sidebar?.label ?? domainHint?.name;
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
+    <main className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
       <Card className="relative w-full max-w-md overflow-hidden">
         {/* MV-5 — domain accent strip at the top of the login card. */}
         {accentHex && (
@@ -466,7 +466,7 @@ function SosChrome({ title, subtitle, children, domainHint }: ChromeProps) {
           <div className="flex justify-center mb-4">
             <SosLogo size={64} productName={productName} />
           </div>
-          <H2>{title}</H2>
+          <H1>{title}</H1>
           {productName && (
             <p className="text-[11px] uppercase tracking-[0.32em] text-muted-foreground">
               Welcome back to SOS {productName}
@@ -476,13 +476,13 @@ function SosChrome({ title, subtitle, children, domainHint }: ChromeProps) {
         </CardHeader>
         <CardContent>{children}</CardContent>
       </Card>
-    </div>
+    </main>
   );
 }
 
 function SthiraChrome({ title, subtitle, children }: ChromeProps) {
   return (
-    <div
+    <main
       className={cn(
         // w-full is load-bearing: Auth is rendered inside SidebarProvider's
         // flex row container (see src/components/ui/sidebar.tsx). Without
@@ -508,6 +508,6 @@ function SthiraChrome({ title, subtitle, children }: ChromeProps) {
         </CardHeader>
         <CardContent>{children}</CardContent>
       </Card>
-    </div>
+    </main>
   );
 }

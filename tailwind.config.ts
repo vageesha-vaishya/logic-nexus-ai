@@ -72,6 +72,8 @@ export default {
         neutral: {
           DEFAULT: "hsl(var(--neutral))",
         },
+        // F19 — deeper ink for inline text links vs --primary.
+        link: "hsl(var(--link))",
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",

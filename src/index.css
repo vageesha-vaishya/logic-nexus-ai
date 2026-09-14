@@ -164,6 +164,10 @@ All colors MUST be HSL.
     --down-soft: 0 70% 96%;
     --neutral: 215 16% 47%;
 
+    /* F19 — inline text links (e.g. Auth page) need deeper ink than
+       --primary to clear 4.5:1 on tinted gradient backgrounds. */
+    --link: 217 91% 40%;
+
     /* --border stays a light, subtle divider for cards/tables/sections --
        a deliberate trade-off shared with most production enterprise SaaS
        (see docs/design-system/README.md's accessibility section): full
@@ -355,6 +359,9 @@ All colors MUST be HSL.
     --down-foreground: 0 0% 100%;
     --down-soft: 0 50% 14%;
     --neutral: 215 14% 65%;
+
+    /* F19 — dark-theme link ink (see light-theme comment above). */
+    --link: 217 91% 70%;
 
     /* Was identical to --card, so panels/inputs had no visible edge at
        all -- lifted well clear of card lightness for real separation.

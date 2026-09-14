@@ -56,6 +56,9 @@ const PAIRS = [
   ['sidebar-foreground on sidebar-bg', 'sidebar-foreground', 'sidebar-background', 4.5],
   ['title-strip-foreground on title-strip', 'title-strip-foreground', 'title-strip', 4.5],
   ['primary as icon/link on background', 'primary', 'background', 3.0],
+  // F19 — Auth page inline text links (Auth.tsx) needed a deeper ink than
+  // --primary to clear 4.5:1 normal-text contrast on tinted backgrounds.
+  ['link on background', 'link', 'background', 4.5],
   ['ring (focus) vs background', 'ring', 'background', 3.0],
   ['input border vs background', 'input', 'background', 3.0],
   ['input border vs card', 'input', 'card', 3.0],
