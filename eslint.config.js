@@ -59,6 +59,23 @@ const COMPLIANCE_SCHEMA_BANS = [
 // Covers both ESM `import` and CommonJS `require()` forms. Patterns
 // include sub-imports (`firebase-admin/auth`, `@twilio/voice-sdk`) plus
 // type-only imports (TS still emits an ImportDeclaration node for those).
+// Task 4 (design-system status tones) — raw Tailwind palette badge pairs
+// (bg-X-N text-X-M, same hue) are banned platform-wide now that
+// bg-status-<tone>/text-status-<tone>-foreground exist. The codemod at
+// scripts/codemod-status-tones.mjs rewrites existing occurrences; this ban
+// stops new ones from landing during the sweep and afterward.
+const STATUS_PALETTE_HUES = "green|emerald|teal|yellow|amber|orange|red|rose|blue|cyan|indigo|gray|slate|purple|violet";
+const STATUS_PALETTE_BANS = [
+  {
+    selector: `Literal[value=/\\bbg-(${STATUS_PALETTE_HUES})-\\d{2,3}\\s+text-\\1-\\d{2,3}\\b/]`,
+    message: "Raw palette badge pairs are banned in the platform shell — use <Badge tone> or bg-status-*/text-status-*-foreground (docs/design-system/README.md §4.5).",
+  },
+  {
+    selector: `TemplateElement[value.raw=/\\bbg-(${STATUS_PALETTE_HUES})-\\d{2,3}\\s+text-\\1-\\d{2,3}\\b/]`,
+    message: "Raw palette badge pairs are banned in the platform shell — use <Badge tone> or bg-status-*/text-status-*-foreground (docs/design-system/README.md §4.5).",
+  },
+];
+
 const COMMS_PROVIDER_SDK_BANS = [
   {
     selector: "ImportDeclaration[source.value=/^(resend|nodemailer|twilio|firebase-admin|mailgun\\.js|postmark|sendgrid|@sendgrid\\u002Fmail|@sendgrid\\u002Fclient)$/]",
@@ -114,7 +131,7 @@ export default tseslint.config(
       // Phase 2 Step 7 + Phase 6 Step 32 — composed bans (see consts at top
       // of file for the full rationale on each set). Tests + the providers
       // dir + supabase/functions get scoped overrides below.
-      "no-restricted-syntax": ["error", ...PARTIES_BANS, ...COMMS_PROVIDER_SDK_BANS, ...COMPLIANCE_SCHEMA_BANS],
+      "no-restricted-syntax": ["error", ...PARTIES_BANS, ...COMMS_PROVIDER_SDK_BANS, ...COMPLIANCE_SCHEMA_BANS, ...STATUS_PALETTE_BANS],
     },
     settings: {},
   },
