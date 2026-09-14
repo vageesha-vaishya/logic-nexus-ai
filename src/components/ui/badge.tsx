@@ -15,6 +15,14 @@ const badgeVariants = cva(
         warning: "border-transparent bg-warning text-warning-foreground hover:bg-warning/80",
         outline: "text-foreground",
       },
+      tone: {
+        success: "border-status-success-border bg-status-success text-status-success-foreground",
+        warning: "border-status-warning-border bg-status-warning text-status-warning-foreground",
+        danger:  "border-status-danger-border bg-status-danger text-status-danger-foreground",
+        info:    "border-status-info-border bg-status-info text-status-info-foreground",
+        neutral: "border-status-neutral-border bg-status-neutral text-status-neutral-foreground",
+        special: "border-status-special-border bg-status-special text-status-special-foreground",
+      },
     },
     defaultVariants: {
       variant: "default",
@@ -24,8 +32,9 @@ const badgeVariants = cva(
 
 export interface BadgeProps extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof badgeVariants> {}
 
-const Badge = React.forwardRef<HTMLDivElement, BadgeProps>(({ className, variant, ...props }, ref) => {
-  return <div ref={ref} className={cn(badgeVariants({ variant }), className)} {...props} />;
+const Badge = React.forwardRef<HTMLDivElement, BadgeProps>(({ className, variant, tone, ...props }, ref) => {
+  // A tone describes record state; when present it owns the surface, so the action variant is dropped to "outline".
+  return <div ref={ref} className={cn(badgeVariants({ variant: tone ? "outline" : variant, tone }), className)} {...props} />;
 });
 Badge.displayName = "Badge";
 

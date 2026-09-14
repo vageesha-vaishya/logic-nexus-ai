@@ -656,7 +656,7 @@ export default function Quotes() {
       render: (q) => {
         const config = statusConfig[q.status];
         return (
-          <Badge className={config?.color}>
+          <Badge tone={config?.tone ?? 'neutral'}>
             {config?.label || q.status.toUpperCase()}
           </Badge>
         );
