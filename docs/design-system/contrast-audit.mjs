@@ -61,6 +61,14 @@ const PAIRS = [
   ['input border vs card', 'input', 'card', 3.0],
   // Deliberately below 3:1 -- decorative divider, documented trade-off (README 5.2).
   ['border (decorative) vs background', 'border', 'background', 0],
+  // Status tones (Plan 2). Foreground target ≥7:1; gate 4.5. Border vs card ≥3:1.
+  ...['success', 'warning', 'danger', 'info', 'neutral', 'special'].flatMap(t => [
+    [`status-${t}-foreground on status-${t}`, `status-${t}-foreground`, `status-${t}`, 4.5],
+    [`status-${t}-border on card`, `status-${t}-border`, 'card', 3],
+  ]),
+  // F14: muted text on muted surfaces (inactive tabs, funnel counters) measured 4.28:1.
+  ['muted-foreground on muted', 'muted-foreground', 'muted', 4.5],
+  ['muted-foreground on secondary', 'muted-foreground', 'secondary', 4.5],
 ];
 
 function hslToRgb(h, s, l) {
