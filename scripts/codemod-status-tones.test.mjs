@@ -20,6 +20,16 @@ describe('rewriteClassString', () => {
     expect(rewriteClassString('bg-red-100 text-red-800 hover:bg-red-200').output).toBe('bg-status-danger text-status-danger-foreground hover:bg-status-danger/80');
   });
 
+  it('scopes dark: sibling stripping to the hue actually rewritten, not the whole tone family', () => {
+    const r = rewriteClassString('bg-green-100 text-green-800 dark:bg-emerald-900 dark:text-emerald-200');
+    expect(r.output).toBe('bg-status-success text-status-success-foreground dark:bg-emerald-900 dark:text-emerald-200');
+  });
+
+  it('scopes hover: sibling rewriting to the hue actually rewritten, not the whole tone family', () => {
+    const r = rewriteClassString('bg-green-100 text-green-800 hover:bg-teal-200');
+    expect(r.output).toBe('bg-status-success text-status-success-foreground hover:bg-teal-200');
+  });
+
   it('leaves mixed-hue pairs and lone colours alone but reports them', () => {
     const r = rewriteClassString('bg-blue-100 text-gray-800');
     expect(r.output).toBe('bg-blue-100 text-gray-800');

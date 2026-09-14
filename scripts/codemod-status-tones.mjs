@@ -4,7 +4,7 @@
 // reported for manual review so meaning ("selected" vs "info") is judged by a human.
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url';
 
 const HUE_TO_TONE = {
   green: 'success', emerald: 'success', teal: 'success',
@@ -19,18 +19,22 @@ const PAIR = new RegExp(`\\bbg-(${HUES})-(\\d{2,3})(?:\\/\\d+)?\\s+text-(${HUES}
 
 export function rewriteClassString(input) {
   const manual = [];
+  const rewrittenHues = new Set();
   let output = input.replace(PAIR, (m, bgHue, _bgN, fgHue) => {
     if (bgHue !== fgHue) { manual.push(m); return m; }
     const tone = HUE_TO_TONE[bgHue];
+    rewrittenHues.add(bgHue);
     return `bg-status-${tone} text-status-${tone}-foreground`;
   });
   // Siblings of a rewritten pair: dark: overrides are dropped (tones carry dark mode); hover: surface → tone/80.
-  for (const tone of new Set(Object.values(HUE_TO_TONE))) {
-    if (!output.includes(`bg-status-${tone}`)) continue;
-    const hues = Object.entries(HUE_TO_TONE).filter(([, t]) => t === tone).map(([h]) => h).join('|');
+  // Scoped strictly to the hue that was actually rewritten in *this* string — a sibling of a
+  // different hue in the same tone family (e.g. dark:bg-emerald-* next to a rewritten
+  // bg-green-*) must never be touched just because it shares a tone.
+  for (const hue of rewrittenHues) {
+    const tone = HUE_TO_TONE[hue];
     output = output
-      .replace(new RegExp(`\\s*dark:(?:bg|text|border)-(?:${hues})-\\d{2,3}(?:\\/\\d+)?`, 'g'), '')
-      .replace(new RegExp(`\\bhover:bg-(?:${hues})-\\d{2,3}\\b`, 'g'), `hover:bg-status-${tone}/80`);
+      .replace(new RegExp(`\\s*dark:(?:bg|text|border)-${hue}-\\d{2,3}(?:\\/\\d+)?`, 'g'), '')
+      .replace(new RegExp(`\\bhover:bg-${hue}-\\d{2,3}\\b`, 'g'), `hover:bg-status-${tone}/80`);
   }
   return { output: output.replace(/\s{2,}/g, ' '), manual };
 }
@@ -38,6 +42,9 @@ export function rewriteClassString(input) {
 const SUB_BRAND = /--sq-|--sthira-/;
 
 export function rewriteFile(file, write) {
+  // Second guard: never rewrite test files even when passed as an explicit CLI path (walk()
+  // already excludes them for directory roots, but explicit args bypass walk()).
+  if (/\.test\./.test(file)) return { file, skipped: 'test-file', changed: false, manual: [] };
   const src = fs.readFileSync(file, 'utf8');
   if (SUB_BRAND.test(src)) return { file, skipped: 'sub-brand', changed: false, manual: [] };
   const manual = [];
@@ -53,11 +60,17 @@ export function rewriteFile(file, write) {
   return { file, changed, manual, skipped: null };
 }
 
+// Shared eligibility filter — applied inside walk() for directory roots, and again below to
+// explicit CLI file args (which otherwise bypass walk() entirely).
+function isEligibleFile(name) {
+  return /\.(tsx?|jsx?)$/.test(name) && !/\.test\./.test(name);
+}
+
 function walk(dir, acc = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
     const p = path.join(dir, e.name);
     if (e.isDirectory()) { if (!/node_modules|__snapshots__/.test(e.name)) walk(p, acc); }
-    else if (/\.(tsx?|jsx?)$/.test(e.name) && !/\.test\./.test(e.name)) acc.push(p);
+    else if (isEligibleFile(e.name)) acc.push(p);
   }
   return acc;
 }
@@ -66,7 +79,8 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const args = process.argv.slice(2);
   const write = args.includes('--write');
   const roots = args.filter(a => !a.startsWith('--'));
-  const files = (roots.length ? roots : ['src']).flatMap(r => fs.statSync(r).isDirectory() ? walk(r) : [r]);
+  const files = (roots.length ? roots : ['src']).flatMap(r =>
+    fs.statSync(r).isDirectory() ? walk(r) : (isEligibleFile(r) ? [r] : []));
   let changedCount = 0; const manualAll = [];
   for (const f of files) {
     const r = rewriteFile(f, write);
