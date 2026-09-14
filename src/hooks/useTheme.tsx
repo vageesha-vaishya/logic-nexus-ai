@@ -132,7 +132,7 @@ const INK_LUMINANCE = hslTripleToLuminance(INK_FOREGROUND) ?? 0.0106;
 // golds, pastels). Prefers white when it passes, since that's the
 // conventional look for primary/danger actions; falls back to dark ink
 // otherwise -- the same pairing most design systems use for amber.
-const contrastSafeForeground = (surface: string): string => {
+export const contrastSafeForeground = (surface: string): string => {
   const lum = hslTripleToLuminance(surface);
   if (lum === null) return WHITE_FOREGROUND;
   const whiteRatio = (WHITE_LUMINANCE + 0.05) / (lum + 0.05);

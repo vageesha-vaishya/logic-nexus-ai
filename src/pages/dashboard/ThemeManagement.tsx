@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { HslPicker } from '@/components/ui/hsl-picker';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { THEME_PRESETS } from '@/theme/themes';
-import { DEFAULT_MENU_GROUP_STRIP_COLORS, useTheme } from '@/hooks/useTheme';
+import { DEFAULT_MENU_GROUP_STRIP_COLORS, contrastSafeForeground, useTheme } from '@/hooks/useTheme';
 import { useCRM } from '@/hooks/useCRM';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -345,6 +345,17 @@ export default function ThemeManagement() {
     applyTheme(themePayload);
   }, [applyTheme, themePayload]);
 
+  // The preview table's header background is whatever accent/titleStrip
+  // the user is currently previewing (not the app's own already-applied
+  // --table-header-text). Derive the header text from that previewed
+  // surface with the same contrast helper applyTheme() uses for saved
+  // presets, so the preview never shows illegible text on a light accent.
+  const previewHeaderBackground = tableHeaderBackground ?? titleStrip ?? accent;
+  const previewHeaderText = useMemo(
+    () => contrastSafeForeground(previewHeaderBackground),
+    [previewHeaderBackground],
+  );
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -450,7 +461,7 @@ export default function ThemeManagement() {
                 <div className="text-sm font-medium mb-3">Header Banner</div>
                 <div className="grid gap-4 md:grid-cols-6">
                   <div className="space-y-2 flex items-center gap-2">
-                    <Switch checked={headerBannerVisible} onCheckedChange={setHeaderBannerVisible} />
+                    <Switch aria-label="Show header banner" checked={headerBannerVisible} onCheckedChange={setHeaderBannerVisible} />
                     <Label>Visible</Label>
                   </div>
                   <div className="space-y-2 md:col-span-3">
@@ -475,8 +486,8 @@ export default function ThemeManagement() {
                 className="border rounded-lg overflow-hidden"
                 style={{
                   ["--table-background" as any]: tableBackground ?? (dark ? '222 47% 11%' : '0 0% 100%'),
-                  ["--table-header-background" as any]: tableHeaderBackground ?? titleStrip ?? accent,
-                  ["--table-header-text" as any]: tableHeaderText ?? (dark ? '210 40% 98%' : '222.2 84% 4.9%'),
+                  ["--table-header-background" as any]: previewHeaderBackground,
+                  ["--table-header-text" as any]: previewHeaderText,
                   ["--table-header-separator" as any]: tableHeaderSeparator ?? (dark ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'),
                   ["--table-foreground" as any]: tableForeground ?? (dark ? '210 40% 98%' : '222.2 84% 4.9%'),
                 }}
@@ -532,7 +543,7 @@ export default function ThemeManagement() {
               <div className="space-y-2">
                 <label className="text-sm">Border Radius</label>
                 <div className="flex items-center gap-2">
-                  <select className="border rounded px-2 py-1 text-sm" value={radius} onChange={(e) => setRadius(e.target.value)}>
+                  <select aria-label="Card radius" className="border rounded px-2 py-1 text-sm" value={radius} onChange={(e) => setRadius(e.target.value)}>
                     <option value="0rem">0</option>
                     <option value="0.25rem">0.25rem</option>
                     <option value="0.5rem">0.5rem</option>
@@ -550,7 +561,7 @@ export default function ThemeManagement() {
               <div className="space-y-2">
                 <label className="text-sm">Kanban Card Radius</label>
                 <div className="flex items-center gap-2">
-                  <select className="border rounded px-2 py-1 text-sm" value={kanbanCardRadius} onChange={(e) => setKanbanCardRadius(e.target.value)}>
+                  <select aria-label="Kanban card radius" className="border rounded px-2 py-1 text-sm" value={kanbanCardRadius} onChange={(e) => setKanbanCardRadius(e.target.value)}>
                     <option value="0rem">0</option>
                     <option value="0.25rem">0.25rem</option>
                     <option value="0.5rem">0.5rem</option>
@@ -563,14 +574,14 @@ export default function ThemeManagement() {
             </div>
 
             <div className="mt-4 flex items-center gap-3">
-              <Switch checked={dark} onCheckedChange={(v) => { setDark(v); toggleDark(v); }} />
+              <Switch aria-label="Dark mode" checked={dark} onCheckedChange={(v) => { setDark(v); toggleDark(v); }} />
               <Label>Dark Mode</Label>
             </div>
 
-            <div className="mt-6 flex items-center gap-3">
+            <div className="mt-6 flex flex-wrap items-center gap-3">
               <Button onClick={() => applyTheme(themePayload)}>Preview</Button>
               <Button variant="secondary" onClick={() => setOpen(true)} disabled={!canWrite}>Save As</Button>
-              <div className="flex-1 h-16 rounded-lg bg-gradient-primary shadow-primary flex items-center justify-between px-4">
+              <div className="flex-1 min-w-[16rem] h-16 rounded-lg bg-gradient-primary shadow-primary flex items-center justify-between px-4">
                 <Button className="rounded-lg" variant="default">Primary Button</Button>
                 <div className="rounded-lg p-3 border bg-card text-card-foreground">Card Preview</div>
               </div>

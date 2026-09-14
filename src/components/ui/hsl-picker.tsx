@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useId, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -65,33 +65,39 @@ export function HslPicker({ label, value, onChange }: HslPickerProps) {
   const safeValue = value ?? '';
   const { h, s, l } = useMemo(() => parseHslString(safeValue), [safeValue]);
   const hex = useMemo(() => hslToHexString(h, s, l), [h, s, l]);
+  const labelText = label ?? 'Color';
+  const baseId = useId();
+  const pickId = `${baseId}-pick`;
+  const hueRangeId = `${baseId}-hue-range`;
+  const satRangeId = `${baseId}-sat-range`;
+  const lightRangeId = `${baseId}-light-range`;
 
   return (
     <div className="space-y-2">
       {label && <Label className="text-sm">{label} (HSL)</Label>}
       <div className="flex items-center gap-2">
-        <Label className="text-xs">Pick</Label>
-        <Input type="color" value={hex} onChange={(e) => onChange(hexToHslString(e.target.value))} />
+        <Label htmlFor={pickId} className="text-xs">Pick</Label>
+        <Input id={pickId} type="color" value={hex} onChange={(e) => onChange(hexToHslString(e.target.value))} />
         <div className="h-6 w-6 rounded" style={{ backgroundColor: hex }} />
       </div>
       <div className="space-y-1">
         <div className="grid grid-cols-5 items-center gap-2">
-          <Label className="text-xs">Hue</Label>
-          <input className="col-span-3" type="range" min={0} max={360} value={h} onChange={(e) => onChange(composeHslString(Number(e.target.value), s, l))} />
-          <Input className="text-xs" type="number" min={0} max={360} value={h} onChange={(e) => onChange(composeHslString(Number(e.target.value), s, l))} />
+          <Label htmlFor={hueRangeId} className="text-xs">Hue</Label>
+          <input id={hueRangeId} className="col-span-3" type="range" min={0} max={360} value={h} onChange={(e) => onChange(composeHslString(Number(e.target.value), s, l))} />
+          <Input className="text-xs" type="number" min={0} max={360} value={h} aria-label={`${labelText} Hue (number)`} onChange={(e) => onChange(composeHslString(Number(e.target.value), s, l))} />
         </div>
         <div className="grid grid-cols-5 items-center gap-2">
-          <Label className="text-xs">Sat</Label>
-          <input className="col-span-3" type="range" min={0} max={100} value={s} onChange={(e) => onChange(composeHslString(h, Number(e.target.value), l))} />
-          <Input className="text-xs" type="number" min={0} max={100} value={s} onChange={(e) => onChange(composeHslString(h, Number(e.target.value), l))} />
+          <Label htmlFor={satRangeId} className="text-xs">Sat</Label>
+          <input id={satRangeId} className="col-span-3" type="range" min={0} max={100} value={s} onChange={(e) => onChange(composeHslString(h, Number(e.target.value), l))} />
+          <Input className="text-xs" type="number" min={0} max={100} value={s} aria-label={`${labelText} Sat (number)`} onChange={(e) => onChange(composeHslString(h, Number(e.target.value), l))} />
         </div>
         <div className="grid grid-cols-5 items-center gap-2">
-          <Label className="text-xs">Light</Label>
-          <input className="col-span-3" type="range" min={0} max={100} value={l} onChange={(e) => onChange(composeHslString(h, s, Number(e.target.value))) } />
-          <Input className="text-xs" type="number" min={0} max={100} value={l} onChange={(e) => onChange(composeHslString(h, s, Number(e.target.value))) } />
+          <Label htmlFor={lightRangeId} className="text-xs">Light</Label>
+          <input id={lightRangeId} className="col-span-3" type="range" min={0} max={100} value={l} onChange={(e) => onChange(composeHslString(h, s, Number(e.target.value))) } />
+          <Input className="text-xs" type="number" min={0} max={100} value={l} aria-label={`${labelText} Light (number)`} onChange={(e) => onChange(composeHslString(h, s, Number(e.target.value))) } />
         </div>
       </div>
-      <Input value={safeValue} onChange={(e) => onChange(e.target.value)} placeholder="e.g., 217 91% 60%" />
+      <Input value={safeValue} onChange={(e) => onChange(e.target.value)} aria-label={`${labelText} HSL value`} placeholder="e.g., 217 91% 60%" />
     </div>
   );
 }
