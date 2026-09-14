@@ -13,15 +13,24 @@ const OUT = path.join(HERE, 'REPORT.md');
 const ENGINES = ['chromium', 'firefox', 'webkit', 'msedge'];
 const WIDTHS = [360, 768, 1280, 1920];
 const MODES = ['light', 'dark'];
-// Mirrors tests/design-system/pages.ts (this file can't import the TS). Keep in sync.
+// Mirrors tests/design-system/pages.ts (this file can't import the TS); tests/design-system/pages.unit.test.ts asserts they match.
 export const PAGE_KEYS = [
   'auth', 'dashboard', 'leads-list', 'lead-detail', 'leads-kanban',
   'contacts-list', 'accounts-list', 'opportunities-list', 'opportunity-new', 'themes',
 ];
-const KEYBOARD_ENGINES = ['chromium', 'firefox', 'webkit']; // msedge is excluded via testIgnore
+export const KEYBOARD_ENGINES = ['chromium', 'firefox', 'webkit']; // msedge is excluded via testIgnore (same engine as chromium)
 const DESKTOP_WIDTH = 1280;
 
 const cellPassed = c => (c.layout?.passed ?? true) && (c.axe?.passed ?? true) && !c.error;
+/** Pass/fail for any cell kind: matrix = layout + axe, keyboard/aria = their own gate; an error cell never passes. */
+const kindPassed = c => {
+  if (c.error) return false;
+  if (c.kind === 'keyboard') return c.keyboard?.passed === true;
+  if (c.kind === 'aria') return c.aria?.passed === true;
+  return cellPassed(c);
+};
+/** Table rows sorted by page, then engine, so one page's engines sit together. */
+const byPageThenEngine = (a, b) => a.page.localeCompare(b.page) || a.engine.localeCompare(b.engine);
 
 /** Markdown table cells: escape pipes and collapse newlines so dynamic text can't break the row. */
 const cell = s => String(s ?? '').replace(/\|/g, '\\|').replace(/\s*\n\s*/g, ' ');
@@ -30,13 +39,19 @@ const cell = s => String(s ?? '').replace(/\|/g, '\\|').replace(/\s*\n\s*/g, ' '
 const ANSI = new RegExp(String.fromCharCode(27) + '\\[[0-9;]*m', 'g'); // ESC [ digits ; m — ESC is mandatory; built from char code so no raw escape sits in this source
 export const stripAnsi = s => String(s ?? '').replace(ANSI, '');
 
-/** One-line summary of an `error`: an `expect(` header plus the first non-empty line after it, else the first line. */
+/**
+ * One-line summary of an `error`: an `expect(` header plus the first non-empty line after it
+ * (and the `Received:` line when the assertion has one), else the first line.
+ */
 export function errorSummary(error) {
   const lines = stripAnsi(error).split('\n').map(l => l.trim()).filter(Boolean);
   if (!lines.length) return '';
   const header = lines.findIndex(l => /expect\(/.test(l));
   if (header < 0) return lines[0];
-  return lines[header + 1] ? `${lines[header]} — ${lines[header + 1]}` : lines[header];
+  const parts = [lines[header], lines[header + 1]].filter(Boolean);
+  const received = lines.slice(header + 2).find(l => /^Received:/.test(l));
+  if (received) parts.push(received.replace(/\s+/g, ' '));
+  return parts.join(' — ');
 }
 
 /** Every cell id the full run should have produced: `${kind}-${page}-${engine}-${width}-${mode}`. */
@@ -48,6 +63,17 @@ export function expectedCellIds() {
   return ids;
 }
 const cellId = c => `${c.kind}-${c.page}-${c.engine}-${c.width}-${c.mode}`;
+
+/**
+ * True when lead-detail could not be measured as a real page: with the CRM API down it renders only
+ * "Lead not found" plus a "Failed to load lead" toast, so its cells either fail the content gate
+ * (error) or, before that gate existed, walked onto the toast.
+ */
+const leadDetailApiDown = cells =>
+  cells.some(c => c.page === 'lead-detail' && (
+    (c.error && /main-content|toBeGreaterThan|toBeEmpty/.test(c.error)) ||
+    (c.keyboard?.stops ?? []).some(s => /failed to load/i.test(s.name))
+  ));
 
 export function buildReport(cells, meta) {
   const matrix = cells.filter(c => c.kind === 'matrix');
@@ -67,16 +93,21 @@ export function buildReport(cells, meta) {
   L.push('- **ARIA snapshots are structure only** — this is not a screen-reader session (NVDA/JAWS/VoiceOver were not run); it catches missing names and landmarks, not announcement order or live regions.');
   L.push('- **Viewports** are emulated at 360/768/1280/1920; no real devices.');
   L.push('- Gates: layout integrity (no page-level horizontal scroll, no unscrolled overflow), axe-core WCAG 2.1 A/AA `serious`+`critical`, keyboard visible-focus/no-trap (1280 light), ARIA structure (1280 light). axe `moderate`/`minor` are reported, not gated.');
+  L.push("- **WebKit's Tab skips links by default** (Safari reaches them with Option+Tab; Playwright's WebKit does not honour Alt+Tab); link focus visibility is not gated on WebKit, and links are not counted as Tab-reachable there.");
+  if (leadDetailApiDown(cells)) {
+    L.push('- **`lead-detail` was measured with the CRM API down**: the page renders only "Lead not found" and a "Failed to load lead" toast, so its keyboard/ARIA cells fail the content-readiness gate and are listed under "Cells that did not complete" rather than scored.');
+  }
   L.push('');
   L.push('## Running');
   L.push('');
   L.push('```bash');
   L.push('# needs E2E_ADMIN_EMAIL / E2E_ADMIN_PASSWORD in the gitignored repo-root `env` file');
+  L.push('npx playwright install               # chromium, firefox, webkit; msedge must be installed system-wide (channel: msedge)');
   L.push('npm run audit:design-system          # all 4 engines');
   L.push('npm run audit:design-system:quick    # chromium only');
   L.push('```');
   L.push('');
-  L.push('Start the backend services first (`npm run services:start`) or CRM pages render with degraded data.');
+  L.push('Start the backend services first (`npm run services:start`; each `services/*` package needs its own `npm install` beforehand) or CRM pages render with degraded data.');
   L.push('');
   if (meta.notes?.length) {
     L.push('Run metadata:');
@@ -146,12 +177,13 @@ export function buildReport(cells, meta) {
   L.push('');
   L.push('| Page | Engine | Stops (visited/focusable) | Result | First failure |');
   L.push('|---|---|---|---|---|');
-  for (const c of keyboard) {
+  const keyboardSorted = [...keyboard].sort(byPageThenEngine);
+  for (const c of keyboardSorted) {
     const k = c.keyboard;
     L.push(`| ${cell(c.page)} | ${cell(c.engine)} | ${k ? `${k.stops.length}${k.focusableCount != null ? `/${k.focusableCount}` : ''}` : 0} | ${k?.passed ? '✅' : '❌'} | ${cell(k?.failures[0] ?? errorSummary(c.error))} |`);
   }
   L.push('');
-  for (const c of keyboard) {
+  for (const c of keyboardSorted) {
     if (!c.keyboard) continue;
     L.push(`<details><summary>${c.page} / ${c.engine} — tab order (${c.keyboard.stops.length} stops)</summary>`);
     L.push('');
@@ -164,32 +196,40 @@ export function buildReport(cells, meta) {
 
   L.push('## ARIA structure (1280, light)');
   L.push('');
-  L.push('| Page | Engine | Result | Failures | Snapshot |');
-  L.push('|---|---|---|---|---|');
-  for (const c of aria) {
+  L.push('Main text = rendered characters in `#main-content` (`#root` on the login page) when the readiness gate passed; a near-empty page cannot pass by having nothing to check.');
+  L.push('');
+  L.push('| Page | Engine | Result | Main text | Failures | Snapshot |');
+  L.push('|---|---|---|---|---|---|');
+  for (const c of [...aria].sort(byPageThenEngine)) {
     const a = c.aria;
-    L.push(`| ${cell(c.page)} | ${cell(c.engine)} | ${a?.passed ? '✅' : '❌'} | ${cell(a?.failures.join('; ') ?? errorSummary(c.error))} | ${a ? `[yaml](${a.snapshot})` : ''} |`);
+    L.push(`| ${cell(c.page)} | ${cell(c.engine)} | ${a?.passed ? '✅' : '❌'} | ${c.mainTextLength ?? '—'} | ${cell(a?.failures.join('; ') ?? errorSummary(c.error))} | ${a ? `[yaml](${a.snapshot})` : ''} |`);
   }
   L.push('');
 
   L.push('## Engine-specific divergences');
   L.push('');
-  L.push('A gate that passes in at least one engine and fails in another for the same page/width/mode — the cross-browser findings.');
+  L.push('A gate that passes in at least one engine and fails in another for the same page/width/mode (matrix) or page (keyboard, aria) — the cross-browser findings.');
   L.push('');
   const groups = new Map();
   for (const c of matrix) {
-    const k = `${c.page}|${c.width}|${c.mode}`;
+    const k = `matrix|${c.page}|${c.width}|${c.mode}`;
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(c);
+  }
+  for (const c of [...keyboard, ...aria]) {
+    const k = `${c.kind}|${c.page}||`;
     if (!groups.has(k)) groups.set(k, []);
     groups.get(k).push(c);
   }
   let any = false;
   for (const [k, cs] of groups) {
-    const pass = cs.filter(cellPassed).map(c => c.engine);
-    const fail = cs.filter(c => !cellPassed(c)).map(c => c.engine);
+    const pass = cs.filter(kindPassed).map(c => c.engine);
+    const fail = cs.filter(c => !kindPassed(c)).map(c => c.engine);
     if (pass.length && fail.length) {
       any = true;
-      const [page, width, mode] = k.split('|');
-      L.push(`- **${page}** ${width}px ${mode}: passes in ${pass.join(', ')}; fails in ${fail.join(', ')}`);
+      const [kind, page, width, mode] = k.split('|');
+      const where = kind === 'matrix' ? `${width}px ${mode}` : `${kind} (${DESKTOP_WIDTH} light)`;
+      L.push(`- **${page}** ${where}: passes in ${pass.join(', ')}; fails in ${fail.join(', ')}`);
     }
   }
   if (!any) L.push('_None — every failure reproduces in all engines._');

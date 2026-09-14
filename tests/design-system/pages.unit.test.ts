@@ -1,10 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { PAGES, VIEWPORTS, MODES, screenshotRelPath, ariaRelPath } from './pages';
+import { PAGE_KEYS } from '../../docs/design-system/verification/generate-report.mjs';
 
 describe('design-system page set', () => {
   it('has 10 pages with unique keys', () => {
     expect(PAGES).toHaveLength(10);
     expect(new Set(PAGES.map(p => p.key)).size).toBe(10);
+  });
+
+  it('matches the page list the report generator expects (it cannot import this TS file)', () => {
+    expect(PAGES.map(p => p.key)).toEqual(PAGE_KEYS);
   });
 
   it('marks only /auth as unauthenticated', () => {

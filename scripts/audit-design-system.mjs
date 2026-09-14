@@ -123,12 +123,12 @@ function runEngine(engine, workers) {
   return status;
 }
 
+
 async function main() {
   const engines = parseEngines(process.argv.slice(2));
   const workers = process.argv.find(a => a.startsWith('--workers='))?.slice('--workers='.length);
   console.log(`[audit] engines: ${engines.join(', ')}${workers ? `; workers: ${workers}` : ''}`);
 
-  let vite = null;
   if (await isServing()) {
     if (!(await servesHarnessCsp())) {
       throw new Error(
@@ -136,21 +136,35 @@ async function main() {
       );
     }
     console.log(`[audit] reusing the server already on ${SERVER_URL} (CSP verified: no upgrade-insecure-requests)`);
-  } else {
-    vite = startVite();
-    await waitForServer(180_000);
-    console.log(`[audit] vite ready on ${SERVER_URL}`);
+    return run(engines, workers);
   }
 
+  // From here on we own a Vite child: every exit path — the wait timing out, an
+  // engine throwing, Ctrl+C — must take it down with us.
+  const vite = startVite();
+  const onInterrupt = () => {
+    console.error('\n[audit] interrupted; stopping vite');
+    killTree(vite);
+    process.exit(130);
+  };
+  process.on('SIGINT', onInterrupt);
+  try {
+    await waitForServer(180_000);
+    console.log(`[audit] vite ready on ${SERVER_URL}`);
+    return await run(engines, workers);
+  } finally {
+    process.off('SIGINT', onInterrupt);
+    killTree(vite);
+  }
+}
+
+/** Runs every engine, regenerates the report, and returns the process exit code. */
+async function run(engines, workers) {
   const started = Date.now();
   const servicesNote = await backendServicesNote();
   console.log(`[audit] ${servicesNote}`);
   const statuses = {};
-  try {
-    for (const engine of engines) statuses[engine] = runEngine(engine, workers);
-  } finally {
-    if (vite) killTree(vite);
-  }
+  for (const engine of engines) statuses[engine] = runEngine(engine, workers);
 
   const notes = [servicesNote, `Engines run: ${engines.join(', ')}; each with its own setup login.`, process.env.DS_REPORT_NOTES]
     .filter(Boolean).join(' | ');
@@ -160,10 +174,13 @@ async function main() {
   const minutes = Math.round((Date.now() - started) / 60_000);
   console.log(`\n[audit] done in ${minutes} min; engine exit codes: ${JSON.stringify(statuses)}`);
   const failed = Object.values(statuses).some(s => s !== 0) || report.status !== 0;
-  process.exit(failed ? 1 : 0);
+  return failed ? 1 : 0;
 }
 
-main().catch(err => {
-  console.error(`[audit] ${err instanceof Error ? err.message : err}`);
-  process.exit(1);
-});
+main().then(
+  code => process.exit(code),
+  err => {
+    console.error(`[audit] ${err instanceof Error ? err.message : err}`);
+    process.exit(1);
+  },
+);

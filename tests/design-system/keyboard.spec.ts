@@ -1,40 +1,28 @@
 import { test, expect, type Page } from '@playwright/test';
 import { DESKTOP, PAGES, type PageDef } from './pages';
 import { applyModeInitScript, expectMode } from './helpers/theme';
-import { expectPageBooted } from './helpers/ready';
+import { expectPageBooted, settle } from './helpers/ready';
 import { walkTabOrder } from './helpers/focus';
-import { writeCellResult, type CellResult } from './helpers/results';
-import { routeFor } from './helpers/route';
+import { runCell } from './helpers/results';
 
 test.use({ viewport: DESKTOP });
 
-async function settle(page: Page) {
-  await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => { /* SPAs poll; proceed */ });
-  await page.waitForTimeout(500);
-}
-
 /** One keyboard cell. `cellPage` is the report row label; `firstRun` leaves the onboarding tour on. */
 async function keyboardCell(page: Page, engine: string, def: PageDef, cellPage: string, firstRun: boolean) {
-  const result: CellResult = {
-    page: cellPage, route: typeof def.route === 'string' ? def.route : def.key, engine,
-    width: DESKTOP.width, height: DESKTOP.height, mode: 'light',
-  };
-  try {
-    const route = routeFor(def);
-    result.route = route;
-    await applyModeInitScript(page, 'light', { firstRun });
-    await page.goto(route, { waitUntil: 'domcontentloaded' });
-    await settle(page);
-    await expectPageBooted(page, def.authenticated);
-    await expectMode(page, 'light');
-    await expectMode(page, 'light'); // re-assert right before the walk (late theme flip = error cell)
-    result.keyboard = await walkTabOrder(page, 40);
-  } catch (e) {
-    result.error = e instanceof Error ? e.message : String(e);
-    throw e;
-  } finally {
-    writeCellResult('keyboard', result);
-  }
+  const result = await runCell(
+    'keyboard',
+    def,
+    { page: cellPage, engine, width: DESKTOP.width, height: DESKTOP.height, mode: 'light' },
+    async (cell, route) => {
+      await applyModeInitScript(page, 'light', { firstRun });
+      await page.goto(route, { waitUntil: 'domcontentloaded' });
+      await settle(page);
+      cell.mainTextLength = await expectPageBooted(page, def.authenticated);
+      await expectMode(page, 'light');
+      cell.keyboard = await walkTabOrder(page, 40, { engine });
+      await expectMode(page, 'light'); // re-assert: a theme flip during the walk must be an error cell, not a pass
+    },
+  );
   expect.soft(result.keyboard?.passed, result.keyboard?.failures.join('\n')).toBe(true);
 }
 
