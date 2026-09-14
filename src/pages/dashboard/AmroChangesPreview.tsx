@@ -130,17 +130,17 @@ const TASK_COLUMNS: ColumnType[] = [
 ];
 
 const STATUS_BADGE_TONE: Record<string, string> = {
-  planning: "bg-slate-100 text-slate-700 hover:bg-slate-100",
-  approved: "bg-blue-100 text-blue-700 hover:bg-blue-100",
-  scheduled: "bg-indigo-100 text-indigo-700 hover:bg-indigo-100",
-  in_progress: "bg-amber-100 text-amber-800 hover:bg-amber-100",
-  on_hold: "bg-orange-100 text-orange-800 hover:bg-orange-100",
-  completed: "bg-emerald-100 text-emerald-700 hover:bg-emerald-100",
-  closed: "bg-emerald-100 text-emerald-700 hover:bg-emerald-100",
-  cancelled: "bg-rose-100 text-rose-700 hover:bg-rose-100",
-  pending: "bg-slate-100 text-slate-700 hover:bg-slate-100",
-  not_started: "bg-slate-100 text-slate-700 hover:bg-slate-100",
-  rework_required: "bg-red-100 text-red-700 hover:bg-red-100",
+  planning: "bg-status-neutral text-status-neutral-foreground hover:bg-status-neutral/80",
+  approved: "bg-status-info text-status-info-foreground hover:bg-status-info/80",
+  scheduled: "bg-status-info text-status-info-foreground hover:bg-status-info/80",
+  in_progress: "bg-status-warning text-status-warning-foreground hover:bg-status-warning/80",
+  on_hold: "bg-status-warning text-status-warning-foreground hover:bg-status-warning/80",
+  completed: "bg-status-success text-status-success-foreground hover:bg-status-success/80",
+  closed: "bg-status-success text-status-success-foreground hover:bg-status-success/80",
+  cancelled: "bg-status-danger text-status-danger-foreground hover:bg-status-danger/80",
+  pending: "bg-status-neutral text-status-neutral-foreground hover:bg-status-neutral/80",
+  not_started: "bg-status-neutral text-status-neutral-foreground hover:bg-status-neutral/80",
+  rework_required: "bg-status-danger text-status-danger-foreground hover:bg-status-danger/80",
 };
 
 const PRIORITY_LABELS: Record<number, string> = {

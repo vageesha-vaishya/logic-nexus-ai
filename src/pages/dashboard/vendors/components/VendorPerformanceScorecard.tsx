@@ -59,9 +59,9 @@ export function VendorPerformanceScorecard({ metrics, history, onRefresh }: Vend
   };
 
   const getScoreBadge = (score: number) => {
-    if (score >= 90) return <Badge className="bg-green-100 text-green-800 hover:bg-green-200">Excellent</Badge>;
-    if (score >= 70) return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200">Good</Badge>;
-    return <Badge className="bg-red-100 text-red-800 hover:bg-red-200">Needs Improvement</Badge>;
+    if (score >= 90) return <Badge className="bg-status-success text-status-success-foreground hover:bg-status-success/80">Excellent</Badge>;
+    if (score >= 70) return <Badge className="bg-status-warning text-status-warning-foreground hover:bg-status-warning/80">Good</Badge>;
+    return <Badge className="bg-status-danger text-status-danger-foreground hover:bg-status-danger/80">Needs Improvement</Badge>;
   };
 
   return (

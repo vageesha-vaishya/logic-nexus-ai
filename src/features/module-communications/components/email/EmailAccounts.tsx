@@ -321,7 +321,7 @@ export function EmailAccounts() {
                       <Badge 
                         variant="outline"
                         className={account.is_active 
-                          ? "bg-green-500/10 text-green-600 border-green-200" 
+                          ? "bg-status-success text-status-success-foreground border-status-success-border" 
                           : "bg-muted/50 text-muted-foreground border-border"
                         }
                       >

@@ -362,7 +362,7 @@ export function QuoteComparisonView({
                                     
                                     {(opt.environmental || opt.co2_kg) && (
                                         <div className="flex items-center gap-1 text-xs" title="CO2 Emissions">
-                                            <Badge variant="outline" className="h-5 px-1 bg-green-50 text-green-700 border-green-200">
+                                            <Badge variant="outline" className="h-5 px-1 bg-status-success text-status-success-foreground border-status-success-border">
                                                 🌱 {opt.co2_kg ? `${Math.round(opt.co2_kg)} kg` : opt.environmental?.co2_emissions}
                                             </Badge>
                                         </div>

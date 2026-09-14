@@ -120,11 +120,11 @@ export function PipelineDashboard() {
                       
                       {snapshot.validation ? (
                         snapshot.validation.valid ? (
-                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-[10px] h-5 px-1">
+                          <Badge variant="outline" className="bg-status-success text-status-success-foreground border-status-success-border text-[10px] h-5 px-1">
                             <CheckCircle className="w-3 h-3 mr-1" /> Valid
                           </Badge>
                         ) : (
-                          <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 text-[10px] h-5 px-1">
+                          <Badge variant="outline" className="bg-status-danger text-status-danger-foreground border-status-danger-border text-[10px] h-5 px-1">
                             <XCircle className="w-3 h-3 mr-1" /> {snapshot.validation.errors.length} Errors
                           </Badge>
                         )

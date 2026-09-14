@@ -51,11 +51,11 @@ export function ServiceQualityScorecard() {
 
   const getScoreColor = (score: number, benchmark: number) => {
     if (score >= benchmark) {
-      return 'bg-green-100 text-green-800';
+      return 'bg-status-success text-status-success-foreground';
     } else if (score >= benchmark * 0.95) {
-      return 'bg-yellow-100 text-yellow-800';
+      return 'bg-status-warning text-status-warning-foreground';
     }
-    return 'bg-red-100 text-red-800';
+    return 'bg-status-danger text-status-danger-foreground';
   };
 
   const getScoreIcon = (score: number, benchmark: number) => {

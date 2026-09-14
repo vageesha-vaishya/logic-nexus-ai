@@ -42,9 +42,9 @@ export function RouteEfficiency() {
   const totalFuel = routeMetrics.reduce((sum, r) => sum + parseFloat(r.fuelUsed), 0);
 
   const getEfficiencyColor = (efficiency: number) => {
-    if (efficiency >= 90) return 'bg-green-100 text-green-800';
-    if (efficiency >= 85) return 'bg-yellow-100 text-yellow-800';
-    return 'bg-red-100 text-red-800';
+    if (efficiency >= 90) return 'bg-status-success text-status-success-foreground';
+    if (efficiency >= 85) return 'bg-status-warning text-status-warning-foreground';
+    return 'bg-status-danger text-status-danger-foreground';
   };
 
   return (

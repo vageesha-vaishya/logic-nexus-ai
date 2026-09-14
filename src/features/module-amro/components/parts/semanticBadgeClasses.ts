@@ -3,33 +3,33 @@
 
 export const statusBadgeClasses = {
   // Inventory status
-  'in_stock': 'bg-green-100 text-green-800 border-green-300',
-  'low_stock': 'bg-amber-100 text-amber-800 border-amber-300',
-  'out_of_stock': 'bg-red-100 text-red-800 border-red-300',
-  'quarantined': 'bg-purple-100 text-purple-800 border-purple-300',
-  'unserviceable': 'bg-gray-100 text-gray-800 border-gray-300',
+  'in_stock': 'bg-status-success text-status-success-foreground border-status-success-border',
+  'low_stock': 'bg-status-warning text-status-warning-foreground border-status-warning-border',
+  'out_of_stock': 'bg-status-danger text-status-danger-foreground border-status-danger-border',
+  'quarantined': 'bg-status-special text-status-special-foreground border-status-special-border',
+  'unserviceable': 'bg-status-neutral text-status-neutral-foreground border-status-neutral-border',
 
   // Criticality
-  'critical': 'bg-red-100 text-red-800 border-red-300',
-  'high': 'bg-orange-100 text-orange-800 border-orange-300',
-  'medium': 'bg-amber-100 text-amber-800 border-amber-300',
-  'low': 'bg-green-100 text-green-800 border-green-300',
+  'critical': 'bg-status-danger text-status-danger-foreground border-status-danger-border',
+  'high': 'bg-status-warning text-status-warning-foreground border-status-warning-border',
+  'medium': 'bg-status-warning text-status-warning-foreground border-status-warning-border',
+  'low': 'bg-status-success text-status-success-foreground border-status-success-border',
 
   // ABC Classification
-  'A': 'bg-red-100 text-red-800 border-red-300',
-  'B': 'bg-amber-100 text-amber-800 border-amber-300',
-  'C': 'bg-green-100 text-green-800 border-green-300',
+  'A': 'bg-status-danger text-status-danger-foreground border-status-danger-border',
+  'B': 'bg-status-warning text-status-warning-foreground border-status-warning-border',
+  'C': 'bg-status-success text-status-success-foreground border-status-success-border',
 
   // Forecast Status
-  'forecast_critical': 'bg-red-100 text-red-800 border-red-300',
-  'forecast_reorder_due': 'bg-orange-100 text-orange-800 border-orange-300',
-  'forecast_watch': 'bg-amber-100 text-amber-800 border-amber-300',
-  'forecast_healthy': 'bg-green-100 text-green-800 border-green-300',
+  'forecast_critical': 'bg-status-danger text-status-danger-foreground border-status-danger-border',
+  'forecast_reorder_due': 'bg-status-warning text-status-warning-foreground border-status-warning-border',
+  'forecast_watch': 'bg-status-warning text-status-warning-foreground border-status-warning-border',
+  'forecast_healthy': 'bg-status-success text-status-success-foreground border-status-success-border',
 
   // Risk Band
-  'risk_critical': 'bg-red-100 text-red-800 border-red-300',
-  'risk_watch': 'bg-amber-100 text-amber-800 border-amber-300',
-  'risk_healthy': 'bg-green-100 text-green-800 border-green-300',
+  'risk_critical': 'bg-status-danger text-status-danger-foreground border-status-danger-border',
+  'risk_watch': 'bg-status-warning text-status-warning-foreground border-status-warning-border',
+  'risk_healthy': 'bg-status-success text-status-success-foreground border-status-success-border',
 } as const;
 
 /**
@@ -37,7 +37,7 @@ export const statusBadgeClasses = {
  */
 export function getStatusBadgeClass(status: string): string {
   return statusBadgeClasses[status as keyof typeof statusBadgeClasses] || 
-    'bg-gray-100 text-gray-800 border-gray-300';
+    'bg-status-neutral text-status-neutral-foreground border-status-neutral-border';
 }
 
 /**

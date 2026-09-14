@@ -199,7 +199,7 @@ export function ContractManagementDialog({ open, onOpenChange, contract, vendor,
             {contract.title}
             <Badge variant="outline">{contract.contract_number}</Badge>
             {signatureStatus === 'signed' && <Badge variant="default" className="bg-green-600">Signed</Badge>}
-            {signatureStatus === 'sent' && <Badge variant="secondary" className="bg-blue-100 text-blue-800">Out for Signature</Badge>}
+            {signatureStatus === 'sent' && <Badge variant="secondary" className="bg-status-info text-status-info-foreground">Out for Signature</Badge>}
           </DialogTitle>
           <DialogDescription>
             Manage contract lifecycle, redlining, and execution.

@@ -18,16 +18,16 @@ function EnterpriseDashboardReference({ profile, emphasis, compactDensity, showA
   const kpis: EnterpriseKpi[] =
     profile === 'operations'
       ? [
-          { label: 'Active Shipments', value: '1,284', delta: '+8.2%', tone: 'text-emerald-600' },
-          { label: 'On-Time Delivery', value: '96.4%', delta: '+1.5%', tone: 'text-emerald-600' },
-          { label: 'Open Exceptions', value: '23', delta: '-14.8%', tone: 'text-amber-600' },
-          { label: 'Avg Handling Time', value: '2h 18m', delta: '-11.3%', tone: 'text-emerald-600' },
+          { label: 'Active Shipments', value: '1,284', delta: '+8.2%', tone: 'text-status-success-foreground' },
+          { label: 'On-Time Delivery', value: '96.4%', delta: '+1.5%', tone: 'text-status-success-foreground' },
+          { label: 'Open Exceptions', value: '23', delta: '-14.8%', tone: 'text-status-warning-foreground' },
+          { label: 'Avg Handling Time', value: '2h 18m', delta: '-11.3%', tone: 'text-status-success-foreground' },
         ]
       : [
-          { label: 'Revenue (MTD)', value: '$4.82M', delta: '+12.1%', tone: 'text-emerald-600' },
-          { label: 'Gross Margin', value: '24.7%', delta: '+1.9%', tone: 'text-emerald-600' },
-          { label: 'Quote Win Rate', value: '37.6%', delta: '+3.2%', tone: 'text-emerald-600' },
-          { label: 'Pipeline Coverage', value: '3.4x', delta: '+0.6x', tone: 'text-emerald-600' },
+          { label: 'Revenue (MTD)', value: '$4.82M', delta: '+12.1%', tone: 'text-status-success-foreground' },
+          { label: 'Gross Margin', value: '24.7%', delta: '+1.9%', tone: 'text-status-success-foreground' },
+          { label: 'Quote Win Rate', value: '37.6%', delta: '+3.2%', tone: 'text-status-success-foreground' },
+          { label: 'Pipeline Coverage', value: '3.4x', delta: '+0.6x', tone: 'text-status-success-foreground' },
         ];
 
   const lanes: EnterpriseLane[] =

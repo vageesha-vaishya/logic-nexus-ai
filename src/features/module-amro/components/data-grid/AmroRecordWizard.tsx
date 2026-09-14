@@ -163,7 +163,7 @@ function StepIndicator({
                   'w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium shrink-0',
                   isCompleted && 'bg-green-500 text-white',
                   isCurrent && 'bg-primary text-white',
-                  isFuture && 'bg-gray-200 text-gray-600'
+                  isFuture && 'bg-muted text-muted-foreground'
                 )}>
                   {isCompleted ? <Check className="h-3.5 w-3.5" /> : index + 1}
                 </div>

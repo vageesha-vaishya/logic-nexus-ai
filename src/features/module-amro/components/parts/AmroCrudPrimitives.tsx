@@ -16,8 +16,8 @@ export function AmroCrudMessageBanner({
       role="alert"
       className={cn(
         'mb-2 flex items-start gap-2 rounded-md border px-3 py-2 text-sm',
-        tone === 'error' ? 'border-red-300 bg-red-50 text-red-700' : '',
-        tone === 'warning' ? 'border-amber-300 bg-amber-50 text-amber-800' : '',
+        tone === 'error' ? 'border-status-danger-border bg-status-danger text-status-danger-foreground' : '',
+        tone === 'warning' ? 'border-status-warning-border bg-status-warning text-status-warning-foreground' : '',
         tone === 'info' ? 'border-sky-300 bg-sky-50 text-sky-800' : '',
       )}
     >

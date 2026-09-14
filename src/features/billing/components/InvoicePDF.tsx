@@ -237,7 +237,7 @@ export function InvoicePDF({ invoice, tenantName }: InvoicePDFProps) {
             <div className="font-mono text-sm">{invoice.invoice_number}</div>
             <div className="mt-1">
               <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${
-                invoice.status === "paid" ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"
+                invoice.status === "paid" ? "bg-status-success text-status-success-foreground" : "bg-status-info text-status-info-foreground"
               }`}>
                 {invoice.status.toUpperCase()}
               </span>

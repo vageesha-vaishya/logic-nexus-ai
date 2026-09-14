@@ -34,7 +34,7 @@ function yellowVariant(pct: number): BannerVariant {
       'This is normal for a long-term portfolio. No action needed.',
     action: 'Understood',
     classes:
-      'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100',
+      'border-status-warning-border bg-status-warning text-status-warning-foreground',
     Icon: AlertTriangle,
     eventType: 'yellow_alert',
     severity: 'info',
@@ -50,7 +50,7 @@ function orangeVariant(pct: number): BannerVariant {
       'Selling now locks in this loss permanently.',
     action: 'I understand, keep holding',
     classes:
-      'border-orange-400 bg-orange-50 text-orange-900 dark:border-orange-700 dark:bg-orange-950/40 dark:text-orange-100',
+      'border-status-warning-border bg-status-warning text-status-warning-foreground',
     Icon: TrendingDown,
     eventType: 'orange_alert',
     severity: 'warning',

@@ -191,7 +191,7 @@ export function QuoteDetailView({ quote, compact = false, defaultAnalysisView = 
                                 <span className="text-green-600 font-medium flex items-center gap-1">
                                     Margin: +{quote.price_breakdown?.currency} {quote.marginAmount.toLocaleString()}
                                     {quote.markupPercent !== undefined && (
-                                        <Badge variant="secondary" className="h-4 px-1 text-[10px] bg-green-100 text-green-800 hover:bg-green-100">
+                                        <Badge variant="secondary" className="h-4 px-1 text-[10px] bg-status-success text-status-success-foreground hover:bg-status-success/80">
                                             {quote.markupPercent}%
                                         </Badge>
                                     )}
@@ -218,7 +218,7 @@ export function QuoteDetailView({ quote, compact = false, defaultAnalysisView = 
                         <Card className="md:col-span-3 bg-muted/20 border-none shadow-none">
                             <CardContent className="p-4 flex flex-wrap gap-6 justify-between items-center">
                                 <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-blue-100 text-blue-700 rounded-full">
+                                    <div className="p-2 bg-primary/10 text-primary rounded-full">
                                         <Layers className="w-4 h-4" />
                                     </div>
                                     <div>
@@ -227,7 +227,7 @@ export function QuoteDetailView({ quote, compact = false, defaultAnalysisView = 
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-green-100 text-green-700 rounded-full">
+                                    <div className="p-2 bg-primary/10 text-primary rounded-full">
                                         <Globe className="w-4 h-4" />
                                     </div>
                                     <div>
@@ -236,7 +236,7 @@ export function QuoteDetailView({ quote, compact = false, defaultAnalysisView = 
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-purple-100 text-purple-700 rounded-full">
+                                    <div className="p-2 bg-primary/10 text-primary rounded-full">
                                         <CheckCircle2 className="w-4 h-4" />
                                     </div>
                                     <div>

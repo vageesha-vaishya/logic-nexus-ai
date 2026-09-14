@@ -8,10 +8,10 @@ import { logger } from "@/lib/logger";
 // Define status config for activities since it might not be exported
 const activityStages = ['planned', 'in_progress', 'completed', 'cancelled'];
 const activityStatusConfig: Record<string, { label: string; color: string }> = {
-  planned: { label: 'Planned', color: 'bg-blue-500/10 text-blue-700' },
-  in_progress: { label: 'In Progress', color: 'bg-purple-500/10 text-purple-700' },
-  completed: { label: 'Completed', color: 'bg-green-500/10 text-green-700' },
-  cancelled: { label: 'Cancelled', color: 'bg-red-500/10 text-red-700' },
+  planned: { label: 'Planned', color: 'bg-status-info text-status-info-foreground' },
+  in_progress: { label: 'In Progress', color: 'bg-status-special text-status-special-foreground' },
+  completed: { label: 'Completed', color: 'bg-status-success text-status-success-foreground' },
+  cancelled: { label: 'Cancelled', color: 'bg-status-danger text-status-danger-foreground' },
 };
 
 export function ActivitiesKanbanBoard() {

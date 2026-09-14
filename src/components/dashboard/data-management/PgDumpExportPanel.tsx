@@ -1165,14 +1165,14 @@ export function PgDumpExportPanel() {
                   <span
                     className={
                       fkDiagnostics.status === "passed"
-                        ? "text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700"
+                        ? "text-xs px-2 py-0.5 rounded-full bg-status-success text-status-success-foreground"
                         : fkDiagnostics.status === "failed"
-                        ? "text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700"
+                        ? "text-xs px-2 py-0.5 rounded-full bg-status-danger text-status-danger-foreground"
                         : fkDiagnostics.status === "running"
-                        ? "text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700"
+                        ? "text-xs px-2 py-0.5 rounded-full bg-status-warning text-status-warning-foreground"
                         : fkDiagnostics.status === "skipped"
-                        ? "text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-700"
-                        : "text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-700"
+                        ? "text-xs px-2 py-0.5 rounded-full bg-status-neutral text-status-neutral-foreground"
+                        : "text-xs px-2 py-0.5 rounded-full bg-status-neutral text-status-neutral-foreground"
                     }
                   >
                     {fkDiagnostics.status === "passed" && "No orphaned references detected"}

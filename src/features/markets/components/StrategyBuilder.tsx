@@ -65,10 +65,10 @@ function getStepSize(symbol: string): number {
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  bullish: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300 border-green-300 dark:border-green-700",
-  bearish: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300 border-red-300 dark:border-red-700",
-  neutral: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 border-blue-300 dark:border-blue-700",
-  volatile: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border-amber-300 dark:border-amber-700",
+  bullish: "bg-status-success text-status-success-foreground border-status-success-border",
+  bearish: "bg-status-danger text-status-danger-foreground border-status-danger-border",
+  neutral: "bg-status-info text-status-info-foreground border-status-info-border",
+  volatile: "bg-status-warning text-status-warning-foreground border-status-warning-border",
 };
 
 function legRowColor(leg: StrategyLeg): string {

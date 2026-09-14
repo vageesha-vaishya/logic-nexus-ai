@@ -46,9 +46,9 @@ interface ActivityBoardProps {
 }
 
 const STATUSES = [
-  { id: 'planned', label: 'Planned', color: 'bg-blue-100 text-blue-800' },
-  { id: 'in_progress', label: 'In Progress', color: 'bg-yellow-100 text-yellow-800' },
-  { id: 'completed', label: 'Completed', color: 'bg-green-100 text-green-800' },
+  { id: 'planned', label: 'Planned', color: 'bg-status-info text-status-info-foreground' },
+  { id: 'in_progress', label: 'In Progress', color: 'bg-status-warning text-status-warning-foreground' },
+  { id: 'completed', label: 'Completed', color: 'bg-status-success text-status-success-foreground' },
   { id: 'cancelled', label: 'Cancelled', color: 'bg-muted text-foreground' },
 ];
 

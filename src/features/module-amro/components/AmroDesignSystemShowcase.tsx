@@ -1069,7 +1069,7 @@ function WizardFormShowcase() {
                       'w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium',
                       step.completed && 'bg-green-500 text-white',
                       index === currentStep && 'bg-primary text-white',
-                      index > currentStep && 'bg-gray-200 text-gray-600'
+                      index > currentStep && 'bg-muted text-muted-foreground'
                     )}>
                       {step.completed ? '✓' : index + 1}
                     </div>

@@ -255,7 +255,7 @@ export default function ShipmentDetail() {
   };
 
   const getStatusColor = (status: ShipmentStatus) => {
-    return statusConfig[status]?.color || 'bg-gray-500/10 text-gray-500';
+    return statusConfig[status]?.color || 'bg-status-neutral text-status-neutral-foreground';
   };
 
   if (loading) {
@@ -296,12 +296,12 @@ export default function ShipmentDetail() {
               {shipment.status.replace('_', ' ')}
             </Badge>
             {shipment.pod_received ? (
-              <Badge className="bg-green-500/10 text-green-600 flex items-center gap-1">
+              <Badge className="bg-status-success text-status-success-foreground flex items-center gap-1">
                 <CheckCircle2 className="h-4 w-4" /> POD Received
               </Badge>
             ) : (
               shipment.status === 'delivered' && (
-                <Badge className="bg-red-500/10 text-red-600 flex items-center gap-1">
+                <Badge className="bg-status-danger text-status-danger-foreground flex items-center gap-1">
                   <AlertCircle className="h-4 w-4" /> POD Pending
                 </Badge>
               )

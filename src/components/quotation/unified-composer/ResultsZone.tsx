@@ -63,7 +63,7 @@ export const ResultsZone = memo(function ResultsZone({
         <Package className="w-12 h-12 mb-4 opacity-20" />
         <p className="text-base">Fill out the form above and click "Get Rates" to generate quotes</p>
         {smartMode && (
-          <div className="mt-4 p-3 bg-purple-50 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300 rounded-md text-xs max-w-sm text-center border border-purple-100 dark:border-purple-900">
+          <div className="mt-4 p-3 bg-status-special text-status-special-foreground rounded-md text-xs max-w-sm text-center border border-status-special-border">
             <Sparkles className="w-4 h-4 mx-auto mb-1" />
             AI Enhanced mode is active. System will generate multi-modal options and market analysis.
           </div>

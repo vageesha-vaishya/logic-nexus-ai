@@ -196,8 +196,8 @@ export default function TaxRules() {
                       </TableCell>
                       <TableCell>
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          rule.ruleType === 'STANDARD' ? 'bg-blue-100 text-blue-800' :
-                          rule.ruleType === 'REDUCED' ? 'bg-green-100 text-green-800' :
+                          rule.ruleType === 'STANDARD' ? 'bg-status-info text-status-info-foreground' :
+                          rule.ruleType === 'REDUCED' ? 'bg-status-success text-status-success-foreground' :
                           'bg-muted text-foreground'
                         }`}>
                           {rule.ruleType}

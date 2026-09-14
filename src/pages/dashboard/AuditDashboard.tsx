@@ -267,7 +267,7 @@ export function AuditDashboard() {
                       </td>
                       <td className="p-3 text-xs truncate">{log.user_id?.slice(0, 8) || 'system'}</td>
                       <td className="p-3">
-                        <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                        <span className="inline-block px-2 py-1 bg-status-info text-status-info-foreground rounded text-xs">
                           {log.action}
                         </span>
                       </td>

@@ -3754,9 +3754,9 @@ END $$;\n\n`;
                         </TableCell>
                         <TableCell>
                           <span className={`text-xs px-2 py-1 rounded-full ${
-                            t.table_type === 'BASE TABLE' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' :
-                            t.table_type === 'VIEW' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300' :
-                            'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
+                            t.table_type === 'BASE TABLE' ? 'bg-status-info text-status-info-foreground' :
+                            t.table_type === 'VIEW' ? 'bg-status-special text-status-special-foreground' :
+                            'bg-status-neutral text-status-neutral-foreground'
                           }`}>
                             {t.table_type}
                           </span>

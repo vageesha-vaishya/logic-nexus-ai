@@ -106,19 +106,19 @@ export function useEnterpriseDashboardData({ profile, emphasis }: UseEnterpriseD
       const shipmentsDelta = opportunitiesCount > 0 ? `${Math.round((shipmentsCount / opportunitiesCount) * 100)}%` : '0%';
       const quoteCoverage = opportunitiesCount > 0 ? (quotesCount / opportunitiesCount).toFixed(1) : '0.0';
       const conversion = leadsCount > 0 ? `${Math.round((opportunitiesCount / leadsCount) * 100)}%` : '0%';
-      const exceptionTone = exceptionsCount > 0 ? 'text-amber-600' : 'text-emerald-600';
+      const exceptionTone = exceptionsCount > 0 ? 'text-status-warning-foreground' : 'text-status-success-foreground';
       const sharedKpis =
         profile === 'operations'
           ? [
-              { label: 'Active Shipments', value: formatCount(shipmentsCount), delta: `${shipmentsDelta} flow ratio`, tone: 'text-emerald-600' },
+              { label: 'Active Shipments', value: formatCount(shipmentsCount), delta: `${shipmentsDelta} flow ratio`, tone: 'text-status-success-foreground' },
               { label: 'Open Exceptions', value: formatCount(exceptionsCount), delta: exceptionsCount > 0 ? 'Needs triage' : 'Within SLA', tone: exceptionTone },
-              { label: 'Open Quotes', value: formatCount(quotesCount), delta: `${quoteCoverage}x quote/opportunity`, tone: 'text-emerald-600' },
-              { label: 'Lead Conversion', value: conversion, delta: `${formatCount(opportunitiesCount)} active opportunities`, tone: 'text-emerald-600' },
+              { label: 'Open Quotes', value: formatCount(quotesCount), delta: `${quoteCoverage}x quote/opportunity`, tone: 'text-status-success-foreground' },
+              { label: 'Lead Conversion', value: conversion, delta: `${formatCount(opportunitiesCount)} active opportunities`, tone: 'text-status-success-foreground' },
             ]
           : [
-              { label: 'Pipeline Opportunities', value: formatCount(opportunitiesCount), delta: `${conversion} lead-to-opportunity`, tone: 'text-emerald-600' },
-              { label: 'Quotes in Motion', value: formatCount(quotesCount), delta: `${quoteCoverage}x coverage`, tone: 'text-emerald-600' },
-              { label: 'Shipment Footprint', value: formatCount(shipmentsCount), delta: `${shipmentsDelta} operational leverage`, tone: 'text-emerald-600' },
+              { label: 'Pipeline Opportunities', value: formatCount(opportunitiesCount), delta: `${conversion} lead-to-opportunity`, tone: 'text-status-success-foreground' },
+              { label: 'Quotes in Motion', value: formatCount(quotesCount), delta: `${quoteCoverage}x coverage`, tone: 'text-status-success-foreground' },
+              { label: 'Shipment Footprint', value: formatCount(shipmentsCount), delta: `${shipmentsDelta} operational leverage`, tone: 'text-status-success-foreground' },
               { label: 'Open Exceptions', value: formatCount(exceptionsCount), delta: exceptionsCount > 0 ? 'Risk watchlist' : 'Stable', tone: exceptionTone },
             ];
 
@@ -167,16 +167,16 @@ export function useEnterpriseDashboardData({ profile, emphasis }: UseEnterpriseD
       const fallbackKpis =
         profile === 'operations'
           ? [
-              { label: 'Active Shipments', value: '0', delta: 'No live data', tone: 'text-emerald-600' },
-              { label: 'On-Time Delivery', value: '0%', delta: 'No live data', tone: 'text-emerald-600' },
-              { label: 'Open Exceptions', value: '0', delta: 'No live data', tone: 'text-amber-600' },
-              { label: 'Avg Handling Time', value: '0m', delta: 'No live data', tone: 'text-emerald-600' },
+              { label: 'Active Shipments', value: '0', delta: 'No live data', tone: 'text-status-success-foreground' },
+              { label: 'On-Time Delivery', value: '0%', delta: 'No live data', tone: 'text-status-success-foreground' },
+              { label: 'Open Exceptions', value: '0', delta: 'No live data', tone: 'text-status-warning-foreground' },
+              { label: 'Avg Handling Time', value: '0m', delta: 'No live data', tone: 'text-status-success-foreground' },
             ]
           : [
-              { label: 'Revenue (MTD)', value: '$0', delta: 'No live data', tone: 'text-emerald-600' },
-              { label: 'Gross Margin', value: '0%', delta: 'No live data', tone: 'text-emerald-600' },
-              { label: 'Quote Win Rate', value: '0%', delta: 'No live data', tone: 'text-emerald-600' },
-              { label: 'Pipeline Coverage', value: '0x', delta: 'No live data', tone: 'text-emerald-600' },
+              { label: 'Revenue (MTD)', value: '$0', delta: 'No live data', tone: 'text-status-success-foreground' },
+              { label: 'Gross Margin', value: '0%', delta: 'No live data', tone: 'text-status-success-foreground' },
+              { label: 'Quote Win Rate', value: '0%', delta: 'No live data', tone: 'text-status-success-foreground' },
+              { label: 'Pipeline Coverage', value: '0x', delta: 'No live data', tone: 'text-status-success-foreground' },
             ];
 
       setState({

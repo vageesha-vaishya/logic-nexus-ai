@@ -69,14 +69,14 @@ export interface Carrier {
 }
 
 export const statusConfig: Record<ShipmentStatus, { label: string; color: string }> = {
-  draft: { label: "Draft", color: "bg-gray-500/10 text-gray-700 dark:text-gray-300" },
-  confirmed: { label: "Confirmed", color: "bg-blue-500/10 text-blue-700 dark:text-blue-300" },
-  in_transit: { label: "In Transit", color: "bg-purple-500/10 text-purple-700 dark:text-purple-300" },
-  out_for_delivery: { label: "Out for Delivery", color: "bg-yellow-500/10 text-yellow-700 dark:text-yellow-300" },
-  delivered: { label: "Delivered", color: "bg-green-500/10 text-green-700 dark:text-green-300" },
-  customs: { label: "Customs", color: "bg-orange-500/10 text-orange-700 dark:text-orange-300" },
-  cancelled: { label: "Cancelled", color: "bg-red-500/10 text-red-700 dark:text-red-300" },
-  on_hold: { label: "On Hold", color: "bg-amber-500/10 text-amber-700 dark:text-amber-300" },
+  draft: { label: "Draft", color: "bg-status-neutral text-status-neutral-foreground" },
+  confirmed: { label: "Confirmed", color: "bg-status-info text-status-info-foreground" },
+  in_transit: { label: "In Transit", color: "bg-status-special text-status-special-foreground" },
+  out_for_delivery: { label: "Out for Delivery", color: "bg-status-warning text-status-warning-foreground" },
+  delivered: { label: "Delivered", color: "bg-status-success text-status-success-foreground" },
+  customs: { label: "Customs", color: "bg-status-warning text-status-warning-foreground" },
+  cancelled: { label: "Cancelled", color: "bg-status-danger text-status-danger-foreground" },
+  on_hold: { label: "On Hold", color: "bg-status-warning text-status-warning-foreground" },
   returned: { label: "Returned", color: "bg-pink-500/10 text-pink-700 dark:text-pink-300" },
 };
 

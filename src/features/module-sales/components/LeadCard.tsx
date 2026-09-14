@@ -46,9 +46,9 @@ export const LeadCard = React.forwardRef<HTMLDivElement, LeadCardProps>(function
 
   const getScoreColor = (score: number | null) => {
     if (!score) return 'bg-muted text-muted-foreground';
-    if (score >= 70) return 'bg-green-100 text-green-700';
-    if (score >= 40) return 'bg-yellow-100 text-yellow-700';
-    return 'bg-red-100 text-red-700';
+    if (score >= 70) return 'bg-status-success text-status-success-foreground';
+    if (score >= 40) return 'bg-status-warning text-status-warning-foreground';
+    return 'bg-status-danger text-status-danger-foreground';
   };
 
   const fullName = `${lead.first_name || ''} ${lead.last_name || ''}`.trim() || 'Unnamed Lead';

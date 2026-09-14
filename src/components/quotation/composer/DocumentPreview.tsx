@@ -369,6 +369,7 @@ export const DocumentPreview = React.memo(function DocumentPreview({ quoteData, 
                       </h3>
                     )}
                     <table className="w-full text-sm border-collapse">
+                        {/* eslint-disable-next-line no-restricted-syntax -- printable document surface (white paper), not record state */}
                         <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
                             <tr>
                                 {columns.map((col: any, idx: number) => (
@@ -626,6 +627,7 @@ export const DocumentPreview = React.memo(function DocumentPreview({ quoteData, 
                 <div className="mb-8">
                     <h3 className="font-bold text-sm mb-3 text-slate-700">{props?.title || 'Cost Breakdown'}</h3>
                     <table className="w-full text-sm border-collapse">
+                        {/* eslint-disable-next-line no-restricted-syntax -- printable document surface (white paper), not record state */}
                         <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
                             <tr>
                                 <th className="p-3 text-left font-semibold">Description</th>

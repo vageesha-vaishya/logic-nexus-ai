@@ -220,10 +220,10 @@ export default function DocumentManager() {
                 <CardTitle className="text-sm font-medium flex items-center justify-between">
                   <span>Comparing v{latestVersion.version} (Latest) vs v{selectedVersion.version}</span>
                   <div className="flex items-center gap-2 text-muted-foreground">
-                    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                    <Badge variant="outline" className="bg-status-danger text-status-danger-foreground border-status-danger-border">
                       -{selectedVersion.diff_summary?.deletions || 0}
                     </Badge>
-                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                    <Badge variant="outline" className="bg-status-success text-status-success-foreground border-status-success-border">
                       +{selectedVersion.diff_summary?.additions || 0}
                     </Badge>
                   </div>

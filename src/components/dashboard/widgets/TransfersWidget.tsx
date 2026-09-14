@@ -60,10 +60,10 @@ export function TransfersWidget({ config }: WidgetProps) {
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
-      pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-950/50',
-      completed: 'bg-green-100 text-green-800 dark:bg-green-950/50',
-      rejected: 'bg-red-100 text-red-800 dark:bg-red-950/50',
-      failed: 'bg-orange-100 text-orange-800 dark:bg-orange-950/50',
+      pending: 'bg-status-warning text-status-warning-foreground',
+      completed: 'bg-status-success text-status-success-foreground',
+      rejected: 'bg-status-danger text-status-danger-foreground',
+      failed: 'bg-status-warning text-status-warning-foreground',
     };
     return <Badge variant="secondary" className={styles[status] || ''}>{status}</Badge>;
   };

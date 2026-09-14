@@ -164,8 +164,8 @@ export function PortfolioPanel() {
           className={cn(
             "text-[9px] px-1.5 py-0.5 rounded-full font-medium",
             activePortfolio.mode === "paper"
-              ? "bg-amber-500/15 text-amber-600"
-              : "bg-emerald-500/15 text-emerald-600",
+              ? "bg-status-warning text-status-warning-foreground"
+              : "bg-status-success text-status-success-foreground",
           )}
         >
           {activePortfolio.mode}

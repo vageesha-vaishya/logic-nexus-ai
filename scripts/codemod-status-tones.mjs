@@ -15,7 +15,10 @@ const HUE_TO_TONE = {
   purple: 'special', violet: 'special',
 };
 const HUES = Object.keys(HUE_TO_TONE).join('|');
-const PAIR = new RegExp(`\\bbg-(${HUES})-(\\d{2,3})(?:\\/\\d+)?\\s+text-(${HUES})-(\\d{2,3})\\b`, 'g');
+// `(?<![\w:-])` instead of `\b`: `\b` matches between `:` and `b`, so a variant-prefixed
+// `dark:bg-red-900/20 text-red-900` would otherwise be rewritten as if it were the base pair
+// (leaving `bg-red-100 dark:bg-status-danger …` behind). Only an unprefixed bg-* starts a pair.
+const PAIR = new RegExp(`(?<![\\w:-])bg-(${HUES})-(\\d{2,3})(?:\\/\\d+)?\\s+text-(${HUES})-(\\d{2,3})\\b`, 'g');
 
 export function rewriteClassString(input) {
   const manual = [];
@@ -26,15 +29,19 @@ export function rewriteClassString(input) {
     rewrittenHues.add(bgHue);
     return `bg-status-${tone} text-status-${tone}-foreground`;
   });
-  // Siblings of a rewritten pair: dark: overrides are dropped (tones carry dark mode); hover: surface → tone/80.
+  // Siblings of a rewritten pair: dark: overrides (incl. dark:hover:) are dropped (tones carry
+  // dark mode); hover: surface → tone/80 (any /opacity suffix consumed, so `hover:bg-green-500/20`
+  // becomes `hover:bg-status-success/80`, never the invalid `…/80/20`); a same-hue border →
+  // the tone's border token so the ring keeps contrast on the deep dark-mode tint.
   // Scoped strictly to the hue that was actually rewritten in *this* string — a sibling of a
   // different hue in the same tone family (e.g. dark:bg-emerald-* next to a rewritten
   // bg-green-*) must never be touched just because it shares a tone.
   for (const hue of rewrittenHues) {
     const tone = HUE_TO_TONE[hue];
     output = output
-      .replace(new RegExp(`\\s*dark:(?:bg|text|border)-${hue}-\\d{2,3}(?:\\/\\d+)?`, 'g'), '')
-      .replace(new RegExp(`\\bhover:bg-${hue}-\\d{2,3}\\b`, 'g'), `hover:bg-status-${tone}/80`);
+      .replace(new RegExp(`\\s*dark:(?:hover:)?(?:bg|text|border)-${hue}-\\d{2,3}(?:\\/\\d+)?`, 'g'), '')
+      .replace(new RegExp(`(?<![\\w:-])hover:bg-${hue}-\\d{2,3}(?:\\/\\d+)?`, 'g'), `hover:bg-status-${tone}/80`)
+      .replace(new RegExp(`(?<![\\w:-])border-${hue}-\\d{2,3}(?:\\/\\d+)?`, 'g'), `border-status-${tone}-border`);
   }
   return { output: output.replace(/\s{2,}/g, ' '), manual };
 }
@@ -47,17 +54,24 @@ export function rewriteFile(file, write) {
   if (/\.test\./.test(file)) return { file, skipped: 'test-file', changed: false, manual: [] };
   const src = fs.readFileSync(file, 'utf8');
   if (SUB_BRAND.test(src)) return { file, skipped: 'sub-brand', changed: false, manual: [] };
+  const { out, changed, manual } = rewriteSource(src);
+  if (changed && write) fs.writeFileSync(file, out);
+  return { file, changed, manual, skipped: null };
+}
+
+// Pure file-content transform (no fs): only string/template literals that look like class
+// lists are touched. Exported so a caller can run the codemod against content it obtained
+// elsewhere (e.g. `git show HEAD:path`) and compare.
+export function rewriteSource(src) {
   const manual = [];
   let changed = false;
-  // Only touch string/template literals that look like class lists.
   const out = src.replace(/(["'`])([^"'`\n]*\b(?:bg|text)-(?:[a-z]+)-\d{2,3}\b[^"'`\n]*)\1/g, (m, q, body) => {
     const r = rewriteClassString(body);
     manual.push(...r.manual);
     if (r.output !== body) changed = true;
     return `${q}${r.output}${q}`;
   });
-  if (changed && write) fs.writeFileSync(file, out);
-  return { file, changed, manual, skipped: null };
+  return { out, changed, manual };
 }
 
 // Shared eligibility filter — applied inside walk() for directory roots, and again below to

@@ -382,22 +382,22 @@ export default function Activities() {
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-      planned: 'bg-blue-500/10 text-blue-500',
-      in_progress: 'bg-yellow-500/10 text-yellow-500',
-      completed: 'bg-green-500/10 text-green-500',
-      cancelled: 'bg-red-500/10 text-red-500',
+      planned: 'bg-status-info text-status-info-foreground',
+      in_progress: 'bg-status-warning text-status-warning-foreground',
+      completed: 'bg-status-success text-status-success-foreground',
+      cancelled: 'bg-status-danger text-status-danger-foreground',
     };
-    return colors[status] || 'bg-gray-500/10 text-gray-500';
+    return colors[status] || 'bg-status-neutral text-status-neutral-foreground';
   };
 
   const getPriorityColor = (priority: string) => {
     const colors: Record<string, string> = {
-      urgent: 'bg-red-500/10 text-red-500',
-      high: 'bg-orange-500/10 text-orange-500',
-      medium: 'bg-blue-500/10 text-blue-500',
-      low: 'bg-gray-500/10 text-gray-500',
+      urgent: 'bg-status-danger text-status-danger-foreground',
+      high: 'bg-status-warning text-status-warning-foreground',
+      medium: 'bg-status-info text-status-info-foreground',
+      low: 'bg-status-neutral text-status-neutral-foreground',
     };
-    return colors[priority] || 'bg-gray-500/10 text-gray-500';
+    return colors[priority] || 'bg-status-neutral text-status-neutral-foreground';
   };
 
   return (

@@ -106,7 +106,7 @@ export function ShareQuoteDialog({ quoteId, quoteNumber }: ShareQuoteDialogProps
                   <div key={token.id} className="flex flex-col space-y-2 p-3 bg-muted/50 rounded-lg">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-[10px] bg-green-50 text-green-700 border-green-200">Active</Badge>
+                        <Badge variant="outline" className="text-[10px] bg-status-success text-status-success-foreground border-status-success-border">Active</Badge>
                         <span className="text-xs text-muted-foreground">Expires {new Date(token.expires_at).toLocaleDateString()}</span>
                       </div>
                       <Button 

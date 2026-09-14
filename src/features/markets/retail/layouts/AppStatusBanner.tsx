@@ -23,11 +23,11 @@ const STYLES: Record<
     Icon: Info,
   },
   warning: {
-    wrap: "bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-100",
+    wrap: "bg-status-warning text-status-warning-foreground",
     Icon: AlertTriangle,
   },
   error: {
-    wrap: "bg-red-100 text-red-900 dark:bg-red-950/60 dark:text-red-100",
+    wrap: "bg-status-danger text-status-danger-foreground",
     Icon: AlertOctagon,
   },
 };

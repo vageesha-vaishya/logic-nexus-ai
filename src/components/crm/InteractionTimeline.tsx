@@ -53,12 +53,12 @@ const getActivityIcon = (type: Activity['type']) => {
 
 const getActivityColor = (type: Activity['type']) => {
   switch (type) {
-    case 'call': return 'bg-blue-100 text-blue-600';
-    case 'email': return 'bg-yellow-100 text-yellow-600';
-    case 'meeting': return 'bg-purple-100 text-purple-600';
-    case 'note': return 'bg-gray-100 text-gray-600';
-    case 'status_change': return 'bg-green-100 text-green-600';
-    default: return 'bg-slate-100 text-slate-600';
+    case 'call': return 'bg-status-info text-status-info-foreground';
+    case 'email': return 'bg-status-warning text-status-warning-foreground';
+    case 'meeting': return 'bg-status-special text-status-special-foreground';
+    case 'note': return 'bg-status-neutral text-status-neutral-foreground';
+    case 'status_change': return 'bg-status-success text-status-success-foreground';
+    default: return 'bg-status-neutral text-status-neutral-foreground';
   }
 };
 

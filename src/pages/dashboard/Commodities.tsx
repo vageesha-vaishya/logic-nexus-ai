@@ -90,13 +90,13 @@ export default function Commodities() {
   const getStatusColor = (status: string | null) => {
     switch (status) {
       case 'approved':
-        return 'bg-green-500/10 text-green-500 hover:bg-green-500/20';
+        return 'bg-status-success text-status-success-foreground hover:bg-status-success/80';
       case 'rejected':
-        return 'bg-red-500/10 text-red-500 hover:bg-red-500/20';
+        return 'bg-status-danger text-status-danger-foreground hover:bg-status-danger/80';
       case 'pending_review':
-        return 'bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20';
+        return 'bg-status-warning text-status-warning-foreground hover:bg-status-warning/80';
       default:
-        return 'bg-gray-500/10 text-gray-500 hover:bg-gray-500/20';
+        return 'bg-status-neutral text-status-neutral-foreground hover:bg-status-neutral/80';
     }
   };
 

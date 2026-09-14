@@ -1490,7 +1490,7 @@ export default function DataImportExport({
                   ) : (
                     <div className="space-y-4">
                       <div className={`flex flex-col items-center gap-2 p-6 rounded-lg ${
-                        importResult?.failed === 0 ? 'bg-green-500/10 text-green-600' : 'bg-orange-500/10 text-orange-600'
+                        importResult?.failed === 0 ? 'bg-status-success text-status-success-foreground' : 'bg-status-warning text-status-warning-foreground'
                       }`}>
                          {importResult?.failed === 0 ? <CheckCircle2 className="h-12 w-12" /> : <AlertCircle className="h-12 w-12" />}
                          <h3 className="text-xl font-bold">Import Complete</h3>

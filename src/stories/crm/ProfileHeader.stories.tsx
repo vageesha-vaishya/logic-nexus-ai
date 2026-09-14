@@ -15,9 +15,9 @@ import { Lead } from '@/pages/dashboard/leads-data';
 const ProfileHeader = ({ lead, user }: { lead: Lead; user: { name: string; avatar: string } | null }) => {
   const initials = `${lead.first_name[0]}${lead.last_name[0]}`;
   const statusColor = 
-    lead.status === 'won' ? 'bg-green-100 text-green-700 border-green-200' :
-    lead.status === 'new' ? 'bg-blue-100 text-blue-700 border-blue-200' :
-    'bg-gray-100 text-gray-700 border-gray-200';
+    lead.status === 'won' ? 'bg-status-success text-status-success-foreground border-status-success-border' :
+    lead.status === 'new' ? 'bg-status-info text-status-info-foreground border-status-info-border' :
+    'bg-status-neutral text-status-neutral-foreground border-status-neutral-border';
 
   return (
     <Card className="w-full max-w-5xl mx-auto overflow-hidden border-t-4 border-t-primary">

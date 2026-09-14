@@ -37,6 +37,29 @@ describe('rewriteClassString', () => {
     expect(rewriteClassString('text-emerald-600').output).toBe('text-emerald-600');
   });
 
+  it('consumes an opacity suffix on a hover: sibling instead of producing an invalid /80/NN class', () => {
+    expect(rewriteClassString('bg-green-500/10 text-green-600 hover:bg-green-500/20').output)
+      .toBe('bg-status-success text-status-success-foreground hover:bg-status-success/80');
+  });
+
+  it('drops dark:hover: siblings of the rewritten hue', () => {
+    expect(rewriteClassString('bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-950/40 dark:text-green-300 dark:hover:bg-green-900/50').output)
+      .toBe('bg-status-success text-status-success-foreground hover:bg-status-success/80');
+  });
+
+  it('rewrites a same-hue border sibling to the tone border token, but not a variant-prefixed one', () => {
+    expect(rewriteClassString('bg-amber-50 text-amber-700 border-amber-200').output)
+      .toBe('bg-status-warning text-status-warning-foreground border-status-warning-border');
+    expect(rewriteClassString('bg-amber-50 text-amber-700 border-amber-500/20 hover:border-amber-400').output)
+      .toBe('bg-status-warning text-status-warning-foreground border-status-warning-border hover:border-amber-400');
+  });
+
+  it('does not treat a dark:-prefixed surface as the start of a pair', () => {
+    const r = rewriteClassString('bg-red-100 dark:bg-red-900/20 text-red-900 dark:text-red-100');
+    expect(r.output).toBe('bg-red-100 dark:bg-red-900/20 text-red-900 dark:text-red-100');
+    expect(r.manual).toEqual([]);
+  });
+
   it('is idempotent', () => {
     const once = rewriteClassString('bg-green-100 text-green-800').output;
     expect(rewriteClassString(once).output).toBe(once);

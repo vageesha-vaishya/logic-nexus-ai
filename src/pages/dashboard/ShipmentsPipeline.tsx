@@ -770,7 +770,7 @@ export default function ShipmentsPipeline() {
                                         <div className="font-medium text-sm">{shipment.shipment_number}</div>
                                         <div className="flex items-center gap-2">
                                           {!shipment.pod_received && shipment.status === 'delivered' && (
-                                            <Badge className="bg-red-500/10 text-red-600">POD Pending</Badge>
+                                            <Badge className="bg-status-danger text-status-danger-foreground">POD Pending</Badge>
                                           )}
                                           {shipment.priority_level && (
                                             <Badge

@@ -19,7 +19,7 @@ export function DiffViewer({ oldContent, newContent, splitView = true }: DiffVie
           <div className="p-4 min-w-full">
             {diff.map((part, index) => (
               part.removed ? (
-                <div key={index} className="bg-red-100 dark:bg-red-900/20 text-red-900 dark:text-red-100 whitespace-pre-wrap break-all">
+                <div key={index} className="bg-status-danger text-status-danger-foreground whitespace-pre-wrap break-all">
                   {part.value}
                 </div>
               ) : !part.added ? (
@@ -34,7 +34,7 @@ export function DiffViewer({ oldContent, newContent, splitView = true }: DiffVie
           <div className="p-4 min-w-full">
             {diff.map((part, index) => (
               part.added ? (
-                <div key={index} className="bg-green-100 dark:bg-green-900/20 text-green-900 dark:text-green-100 whitespace-pre-wrap break-all">
+                <div key={index} className="bg-status-success text-status-success-foreground whitespace-pre-wrap break-all">
                   {part.value}
                 </div>
               ) : !part.removed ? (
@@ -55,8 +55,8 @@ export function DiffViewer({ oldContent, newContent, splitView = true }: DiffVie
         <span
           key={index}
           className={cn(
-            part.added ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-100' :
-            part.removed ? 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-100' :
+            part.added ? 'bg-status-success text-status-success-foreground' :
+            part.removed ? 'bg-status-danger text-status-danger-foreground' :
             'text-muted-foreground'
           )}
         >

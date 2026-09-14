@@ -45,7 +45,7 @@ export function KanbanCard({ quote, isOverlay, isSelected, onSelect, onClick, bu
   };
 
   const isStale = new Date(quote.created_at).getTime() < Date.now() - 48 * 60 * 60 * 1000;
-  const status = statusConfig[quote.status] || { label: quote.status, color: "bg-gray-100 text-gray-800" };
+  const status = statusConfig[quote.status] || { label: quote.status, color: "bg-status-neutral text-status-neutral-foreground" };
 
   return (
     <Card

@@ -7759,7 +7759,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                               className={cn(
                                 'rounded-lg border px-3 py-2 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md',
                                 item.tone === 'warning'
-                                  ? 'border-amber-300/70 bg-amber-50/70 text-amber-950'
+                                  ? 'border-status-warning-border bg-status-warning text-status-warning-foreground'
                                   : 'border-[hsl(var(--mdm-template-border))] bg-muted/40'
                               )}
                             >

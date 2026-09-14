@@ -5,10 +5,10 @@ import { cn } from "@/lib/utils";
 export type RiskLevel = "low" | "medium" | "high";
 
 const TONE: Record<RiskLevel, string> = {
-  low: "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-200 dark:border-emerald-900",
+  low: "bg-status-success text-status-success-foreground border-status-success-border",
   medium:
-    "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950 dark:text-amber-200 dark:border-amber-900",
-  high: "bg-red-100 text-red-800 border-red-200 dark:bg-red-950 dark:text-red-200 dark:border-red-900",
+    "bg-status-warning text-status-warning-foreground border-status-warning-border",
+  high: "bg-status-danger text-status-danger-foreground border-status-danger-border",
 };
 
 const DOT_TONE: Record<RiskLevel, string> = {

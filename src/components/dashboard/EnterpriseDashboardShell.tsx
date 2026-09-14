@@ -92,7 +92,7 @@ export function EnterpriseDashboardShell({
           <CardContent className="space-y-3 text-sm">
             <div className="flex items-center justify-between rounded border p-3">
               <span>Escalation Response</span>
-              <span className="font-medium text-emerald-600">11m</span>
+              <span className="font-medium text-status-success-foreground">11m</span>
             </div>
             <div className="flex items-center justify-between rounded border p-3">
               <span>Billing Accuracy</span>

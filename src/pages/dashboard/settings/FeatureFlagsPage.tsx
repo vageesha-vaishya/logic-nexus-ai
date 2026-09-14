@@ -53,16 +53,18 @@ async function callFlags(action: string, body?: Record<string, unknown>) {
 
 // ── Tag badge ─────────────────────────────────────────────────────────────────
 
+/* eslint-disable no-restricted-syntax -- module-coloured tag chips, not record state (design-system README §4.5) */
 const TAG_COLORS: Record<string, string> = {
   markets:  "bg-blue-100 text-blue-700",
   billing:  "bg-violet-100 text-violet-700",
   platform: "bg-amber-100 text-amber-700",
   signals:  "bg-emerald-100 text-emerald-700",
 };
+/* eslint-enable no-restricted-syntax */
 
 function TagBadge({ tag }: { tag: string }) {
   return (
-    <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${TAG_COLORS[tag] ?? "bg-gray-100 text-gray-600"}`}>
+    <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${TAG_COLORS[tag] ?? "bg-status-neutral text-status-neutral-foreground"}`}>
       {tag}
     </span>
   );

@@ -11,7 +11,7 @@ const statusPillVariants = cva(
         success: "bg-success/10 text-success border border-success/20",
         warning: "bg-warning/10 text-warning border border-warning/20",
         error: "bg-destructive/10 text-destructive border border-destructive/20",
-        info: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20",
+        info: "bg-status-info text-status-info-foreground border border-status-info-border",
         neutral: "bg-muted text-muted-foreground border border-border",
       },
       size: {

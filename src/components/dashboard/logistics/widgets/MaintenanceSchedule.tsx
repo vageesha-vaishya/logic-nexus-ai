@@ -53,13 +53,13 @@ export function MaintenanceSchedule() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Overdue':
-        return 'bg-red-100 text-red-800';
+        return 'bg-status-danger text-status-danger-foreground';
       case 'Upcoming':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-status-warning text-status-warning-foreground';
       case 'Scheduled':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-status-info text-status-info-foreground';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-status-neutral text-status-neutral-foreground';
     }
   };
 

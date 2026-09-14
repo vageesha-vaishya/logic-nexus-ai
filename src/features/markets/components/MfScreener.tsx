@@ -215,15 +215,15 @@ function StarRating({ rating }: { rating: number | null }) {
 function CategoryBadge({ category }: { category: string | null }) {
   if (!category) return null;
   const colorMap: Record<string, string> = {
-    Equity:    "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 border-blue-200",
-    Debt:      "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border-amber-200",
-    Hybrid:    "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300 border-purple-200",
-    ELSS:      "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300 border-green-200",
-    Liquid:    "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300 border-cyan-200",
-    Index:     "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300 border-teal-200",
-    FoF:       "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300 border-orange-200",
-    Overnight: "bg-slate-100 text-slate-800 dark:bg-slate-900/40 dark:text-slate-300 border-slate-200",
-    Arbitrage: "bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300 border-violet-200",
+    Equity:    "bg-status-info text-status-info-foreground border-status-info-border",
+    Debt:      "bg-status-warning text-status-warning-foreground border-status-warning-border",
+    Hybrid:    "bg-status-special text-status-special-foreground border-status-special-border",
+    ELSS:      "bg-status-success text-status-success-foreground border-status-success-border",
+    Liquid:    "bg-status-info text-status-info-foreground border-status-info-border",
+    Index:     "bg-status-success text-status-success-foreground border-status-success-border",
+    FoF:       "bg-status-warning text-status-warning-foreground border-status-warning-border",
+    Overnight: "bg-status-neutral text-status-neutral-foreground border-status-neutral-border",
+    Arbitrage: "bg-status-special text-status-special-foreground border-status-special-border",
   };
   return (
     <Badge variant="outline" className={`text-xs ${colorMap[category] ?? ""}`}>

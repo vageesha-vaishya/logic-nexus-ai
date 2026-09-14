@@ -50,12 +50,12 @@ export const stages: LeadStatus[] = [
 ];
 
 export const statusConfig: Record<LeadStatus, { label: string; color: string }> = {
-  new: { label: 'New Lead', color: 'bg-blue-500/10 text-blue-700 dark:text-blue-300' },
-  contacted: { label: 'Contacted', color: 'bg-purple-500/10 text-purple-700 dark:text-purple-300' },
-  qualified: { label: 'Qualified', color: 'bg-teal-500/10 text-teal-700 dark:text-teal-300' },
-  proposal: { label: 'Proposal Sent', color: 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-300' },
-  negotiation: { label: 'Negotiation', color: 'bg-orange-500/10 text-orange-700 dark:text-orange-300' },
-  won: { label: 'Won', color: 'bg-green-500/10 text-green-700 dark:text-green-300' },
-  lost: { label: 'Lost', color: 'bg-red-500/10 text-red-700 dark:text-red-300' },
-  converted: { label: 'Converted', color: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300' },
+  new: { label: 'New Lead', color: 'bg-status-info text-status-info-foreground' },
+  contacted: { label: 'Contacted', color: 'bg-status-special text-status-special-foreground' },
+  qualified: { label: 'Qualified', color: 'bg-status-success text-status-success-foreground' },
+  proposal: { label: 'Proposal Sent', color: 'bg-status-warning text-status-warning-foreground' },
+  negotiation: { label: 'Negotiation', color: 'bg-status-warning text-status-warning-foreground' },
+  won: { label: 'Won', color: 'bg-status-success text-status-success-foreground' },
+  lost: { label: 'Lost', color: 'bg-status-danger text-status-danger-foreground' },
+  converted: { label: 'Converted', color: 'bg-status-info text-status-info-foreground' },
 };

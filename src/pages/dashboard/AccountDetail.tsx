@@ -239,7 +239,7 @@ export default function AccountDetail() {
             title={account.name}
             subtitle={
                 <div className="flex flex-wrap items-center gap-2">
-                    {account.account_type && <Badge variant="secondary" className="rounded-full px-2 font-normal bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-950/40 dark:text-green-300 dark:hover:bg-green-900/50">{account.account_type}</Badge>}
+                    {account.account_type && <Badge variant="secondary" className="rounded-full px-2 font-normal bg-status-success text-status-success-foreground hover:bg-status-success/80">{account.account_type}</Badge>}
                     {account.status && <Badge variant="outline" className="rounded-full px-2 font-normal">{account.status}</Badge>}
                 </div>
             }
@@ -338,7 +338,7 @@ export default function AccountDetail() {
                                             } />
                                             <EnterpriseField label="Tags" value={
                                                 <div className="flex gap-1 flex-wrap">
-                                                    {account.account_type && <Badge variant="secondary" className="rounded-full px-2 font-normal bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-950/40 dark:text-green-300 dark:hover:bg-green-900/50">{account.account_type}</Badge>}
+                                                    {account.account_type && <Badge variant="secondary" className="rounded-full px-2 font-normal bg-status-success text-status-success-foreground hover:bg-status-success/80">{account.account_type}</Badge>}
                                                     {account.status && <Badge variant="outline" className="rounded-full px-2 font-normal">{account.status}</Badge>}
                                                 </div>
                                             } />

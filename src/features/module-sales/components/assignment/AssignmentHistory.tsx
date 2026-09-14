@@ -79,12 +79,12 @@ export function AssignmentHistory() {
 
   const getMethodColor = (method: string) => {
     const colors: Record<string, string> = {
-      manual: 'bg-blue-500/10 text-blue-500',
-      round_robin: 'bg-purple-500/10 text-purple-500',
-      rule_based: 'bg-green-500/10 text-green-500',
-      territory: 'bg-yellow-500/10 text-yellow-500',
+      manual: 'bg-status-info text-status-info-foreground',
+      round_robin: 'bg-status-special text-status-special-foreground',
+      rule_based: 'bg-status-success text-status-success-foreground',
+      territory: 'bg-status-warning text-status-warning-foreground',
     };
-    return colors[method] || 'bg-gray-500/10 text-gray-500';
+    return colors[method] || 'bg-status-neutral text-status-neutral-foreground';
   };
 
   if (loading) {

@@ -309,7 +309,7 @@ export function EmailDelegationDialog({ open, onOpenChange, account }: EmailDele
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <span>{delegate.user.email}</span>
                           {delegate.requires_mfa && (
-                            <Badge variant="outline" className="h-5 gap-1 bg-yellow-50 text-yellow-700 border-yellow-200">
+                            <Badge variant="outline" className="h-5 gap-1 bg-status-warning text-status-warning-foreground border-status-warning-border">
                               <ShieldAlert className="h-3 w-3" /> MFA
                             </Badge>
                           )}

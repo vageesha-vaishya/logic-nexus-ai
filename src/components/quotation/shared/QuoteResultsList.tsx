@@ -162,7 +162,7 @@ const OptionSourceBadge = ({ option }: { option: RateOption }) => {
             <TooltipProvider>
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <Badge variant="secondary" className="bg-green-100 text-green-700 hover:bg-green-100 text-[10px] px-1.5 h-5 whitespace-nowrap border-0 flex items-center gap-1 cursor-help">
+                        <Badge variant="secondary" className="bg-status-success text-status-success-foreground hover:bg-status-success/80 text-[10px] px-1.5 h-5 whitespace-nowrap border-0 flex items-center gap-1 cursor-help">
                             <Sparkles className="w-3 h-3" /> AI Generated
                         </Badge>
                     </TooltipTrigger>
@@ -179,7 +179,7 @@ const OptionSourceBadge = ({ option }: { option: RateOption }) => {
             <TooltipProvider>
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <Badge variant="secondary" className="bg-orange-100 text-orange-700 hover:bg-orange-100 text-[10px] px-1.5 h-5 whitespace-nowrap border-0 flex items-center gap-1 cursor-help">
+                        <Badge variant="secondary" className="bg-status-warning text-status-warning-foreground hover:bg-status-warning/80 text-[10px] px-1.5 h-5 whitespace-nowrap border-0 flex items-center gap-1 cursor-help">
                             <Pencil className="w-3 h-3" /> Manual
                         </Badge>
                     </TooltipTrigger>
@@ -200,7 +200,7 @@ const OptionSourceBadge = ({ option }: { option: RateOption }) => {
             <TooltipProvider>
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <Badge variant="secondary" className="bg-amber-100 text-amber-700 hover:bg-amber-100 text-[10px] px-1.5 h-5 whitespace-nowrap border-0 flex items-center gap-1 cursor-help">
+                        <Badge variant="secondary" className="bg-status-warning text-status-warning-foreground hover:bg-status-warning/80 text-[10px] px-1.5 h-5 whitespace-nowrap border-0 flex items-center gap-1 cursor-help">
                             <AlertTriangle className="w-3 h-3" /> Estimated Rate
                         </Badge>
                     </TooltipTrigger>
@@ -216,7 +216,7 @@ const OptionSourceBadge = ({ option }: { option: RateOption }) => {
         <TooltipProvider>
             <Tooltip>
                 <TooltipTrigger asChild>
-                    <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-100 text-[10px] px-1.5 h-5 whitespace-nowrap border-0 flex items-center gap-1 cursor-help">
+                    <Badge variant="secondary" className="bg-status-info text-status-info-foreground hover:bg-status-info/80 text-[10px] px-1.5 h-5 whitespace-nowrap border-0 flex items-center gap-1 cursor-help">
                         <ShieldCheck className="w-3 h-3" /> Market Rate
                     </Badge>
                 </TooltipTrigger>
@@ -394,7 +394,7 @@ export function QuoteResultsList({
                                     </div>
                                 )}
                                 {(option.co2_kg || option.environmental?.co2_emissions) && (
-                                    <div className="px-2 py-1 rounded text-xs font-medium bg-green-50 text-green-700 border border-green-200 flex items-center justify-between">
+                                    <div className="px-2 py-1 rounded text-xs font-medium bg-status-success text-status-success-foreground border border-status-success-border flex items-center justify-between">
                                         <span className="flex items-center gap-1"><Leaf className="h-3 w-3" /> CO2</span>
                                         <span>{option.co2_kg ? `${option.co2_kg} kg` : option.environmental?.co2_emissions}</span>
                                     </div>

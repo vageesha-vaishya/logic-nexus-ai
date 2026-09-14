@@ -296,7 +296,7 @@ export function ExportDialog({
             <div
               className={`p-3 rounded-md ${
                 exportResult.success
-                  ? 'bg-green-50 text-green-700 border border-green-200'
+                  ? 'bg-status-success text-status-success-foreground border border-status-success-border'
                   : 'bg-destructive/10 text-destructive border border-destructive/20'
               }`}
             >
@@ -318,7 +318,7 @@ export function ExportDialog({
 
           {/* Warning for PDF */}
           {format === 'pdf' && templates.length > 500 && (
-            <div className="p-3 rounded-md bg-amber-50 text-amber-700 border border-amber-200">
+            <div className="p-3 rounded-md bg-status-warning text-status-warning-foreground border border-status-warning-border">
               <p className="text-sm">
                 ⚠️ Exporting {templates.length} templates to PDF may take a while.
                 Consider using CSV or Excel for large datasets.

@@ -264,10 +264,10 @@ function NewsCard({
 function SentimentChip({ score }: { score: number }) {
   const tone =
     score > 0.2
-      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+      ? "bg-up-soft text-up"
       : score < -0.2
-        ? "bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300"
-        : "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300";
+        ? "bg-down-soft text-down"
+        : "bg-muted text-muted-foreground";
   return (
     <span className={`shrink-0 rounded px-2 py-0.5 font-mono text-xs ${tone}`}>
       {score >= 0 ? "+" : ""}

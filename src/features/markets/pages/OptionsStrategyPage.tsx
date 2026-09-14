@@ -93,17 +93,17 @@ function fmtYAxis(v: number): string {
 // ── Preset category colors ────────────────────────────────────────────────────
 
 const PRESET_CATEGORY_COLORS: Record<string, string> = {
-  'Long Call':       'bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700',
-  'Long Put':        'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700',
-  'Bull Call Spread':'bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700',
-  'Bear Put Spread': 'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700',
-  'Long Straddle':   'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700',
-  'Short Straddle':  'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700',
-  'Long Strangle':   'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700',
-  'Iron Condor':     'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700',
-  'Iron Butterfly':  'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700',
-  'Covered Call':    'bg-violet-100 text-violet-800 border-violet-300 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-700',
-  'Protective Put':  'bg-violet-100 text-violet-800 border-violet-300 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-700',
+  'Long Call':       'bg-status-success text-status-success-foreground border-status-success-border',
+  'Long Put':        'bg-status-warning text-status-warning-foreground border-status-warning-border',
+  'Bull Call Spread':'bg-status-success text-status-success-foreground border-status-success-border',
+  'Bear Put Spread': 'bg-status-warning text-status-warning-foreground border-status-warning-border',
+  'Long Straddle':   'bg-status-warning text-status-warning-foreground border-status-warning-border',
+  'Short Straddle':  'bg-status-info text-status-info-foreground border-status-info-border',
+  'Long Strangle':   'bg-status-warning text-status-warning-foreground border-status-warning-border',
+  'Iron Condor':     'bg-status-info text-status-info-foreground border-status-info-border',
+  'Iron Butterfly':  'bg-status-info text-status-info-foreground border-status-info-border',
+  'Covered Call':    'bg-status-special text-status-special-foreground border-status-special-border',
+  'Protective Put':  'bg-status-special text-status-special-foreground border-status-special-border',
 };
 
 // ── Custom Recharts Tooltip ───────────────────────────────────────────────────

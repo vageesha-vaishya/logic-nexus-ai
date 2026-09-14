@@ -175,7 +175,7 @@ export function QuoteOptionsOverview({
             {anomalies && anomalies.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-2">
                 {anomalies.map((anomaly: any, i: number) => (
-                  <Badge key={i} variant="outline" className="border-yellow-200 bg-yellow-50 text-yellow-800 text-xs">
+                  <Badge key={i} variant="outline" className="border-status-warning-border bg-status-warning text-status-warning-foreground text-xs">
                     Alert: {typeof anomaly === 'string' ? anomaly : anomaly.description || 'Route anomaly detected'}
                   </Badge>
                 ))}
@@ -256,7 +256,7 @@ export function QuoteOptionsOverview({
                         <h4 className="font-bold text-lg mr-1">{getSafeName(opt.carrier_name, 'Unknown Carrier')}</h4>
                         {getTierBadge(opt.tier)}
                         {opt.ai_generated && (
-                          <Badge variant="secondary" className="bg-purple-100 text-purple-700 hover:bg-purple-100 text-[10px] px-1 h-5">
+                          <Badge variant="secondary" className="bg-status-special text-status-special-foreground hover:bg-status-special/80 text-[10px] px-1 h-5">
                             AI Generated
                           </Badge>
                         )}
@@ -310,7 +310,7 @@ export function QuoteOptionsOverview({
                       </div>
                     )}
                     {opt.total_co2_kg > 0 && (
-                      <div className="px-2 py-1 rounded text-xs font-medium bg-green-50 text-green-700 border border-green-200 flex items-center justify-between">
+                      <div className="px-2 py-1 rounded text-xs font-medium bg-status-success text-status-success-foreground border border-status-success-border flex items-center justify-between">
                         <span className="flex items-center gap-1"><Leaf className="h-3 w-3" /> CO2</span>
                         <span>{opt.total_co2_kg} kg</span>
                       </div>

@@ -59,14 +59,14 @@ const stageLabels: Record<CustomsStage, string> = {
 };
 
 const stageColors: Record<CustomsStage, string> = {
-  documents_pending: 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-300',
-  documents_received: 'bg-blue-500/10 text-blue-700 dark:text-blue-300',
-  review_entry_prep: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300',
-  filed_with_customs: 'bg-purple-500/10 text-purple-700 dark:text-purple-300',
-  awaiting_clearance: 'bg-orange-500/10 text-orange-700 dark:text-orange-300',
-  examination_required: 'bg-red-500/10 text-red-700 dark:text-red-300',
-  cleared: 'bg-green-500/10 text-green-700 dark:text-green-300',
-  released_for_delivery: 'bg-teal-500/10 text-teal-700 dark:text-teal-300',
+  documents_pending: 'bg-status-warning text-status-warning-foreground',
+  documents_received: 'bg-status-info text-status-info-foreground',
+  review_entry_prep: 'bg-status-info text-status-info-foreground',
+  filed_with_customs: 'bg-status-special text-status-special-foreground',
+  awaiting_clearance: 'bg-status-warning text-status-warning-foreground',
+  examination_required: 'bg-status-danger text-status-danger-foreground',
+  cleared: 'bg-status-success text-status-success-foreground',
+  released_for_delivery: 'bg-status-success text-status-success-foreground',
 };
 
 const stages: CustomsStage[] = [

@@ -920,16 +920,16 @@ function HoldingsTable({ holdings, currency, transactions, grouping, onBuy, onSe
 // ─── Transactions table ────────────────────────────────────────────────────
 
 const TXN_TYPE_COLOR: Partial<Record<TransactionType, string>> = {
-  buy:          "bg-blue-100 text-blue-800",
-  sip:          "bg-blue-100 text-blue-800",
-  sell:         "bg-amber-100 text-amber-800",
-  redemption:   "bg-amber-100 text-amber-800",
-  dividend:     "bg-emerald-100 text-emerald-800",
-  interest:     "bg-emerald-100 text-emerald-800",
-  fd_maturity:  "bg-emerald-100 text-emerald-800",
-  bonus:        "bg-purple-100 text-purple-800",
-  split:        "bg-purple-100 text-purple-800",
-  fee:          "bg-red-100 text-red-800",
+  buy:          "bg-status-info text-status-info-foreground",
+  sip:          "bg-status-info text-status-info-foreground",
+  sell:         "bg-status-warning text-status-warning-foreground",
+  redemption:   "bg-status-warning text-status-warning-foreground",
+  dividend:     "bg-status-success text-status-success-foreground",
+  interest:     "bg-status-success text-status-success-foreground",
+  fd_maturity:  "bg-status-success text-status-success-foreground",
+  bonus:        "bg-status-special text-status-special-foreground",
+  split:        "bg-status-special text-status-special-foreground",
+  fee:          "bg-status-danger text-status-danger-foreground",
 };
 
 function TransactionsTable({
@@ -964,7 +964,7 @@ function TransactionsTable({
                 {new Date(t.txn_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
               </TableCell>
               <TableCell>
-                <span className={`inline-flex rounded px-1.5 py-0.5 text-xs font-medium ${TXN_TYPE_COLOR[t.txn_type] ?? "bg-gray-100 text-gray-700"}`}>
+                <span className={`inline-flex rounded px-1.5 py-0.5 text-xs font-medium ${TXN_TYPE_COLOR[t.txn_type] ?? "bg-status-neutral text-status-neutral-foreground"}`}>
                   {TTL[t.txn_type] ?? t.txn_type}
                 </span>
               </TableCell>

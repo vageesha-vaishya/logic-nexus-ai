@@ -42,13 +42,13 @@ export function MyAccounts() {
   const getStatusColor = (status?: string) => {
     switch (status?.toLowerCase()) {
       case 'active':
-        return 'bg-green-100 text-green-800';
+        return 'bg-status-success text-status-success-foreground';
       case 'at risk':
-        return 'bg-red-100 text-red-800';
+        return 'bg-status-danger text-status-danger-foreground';
       case 'inactive':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-status-neutral text-status-neutral-foreground';
       default:
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-status-info text-status-info-foreground';
     }
   };
 

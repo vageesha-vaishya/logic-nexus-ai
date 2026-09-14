@@ -54,13 +54,13 @@ const stageLabels: Record<AccountStage, string> = {
 };
 
 const stageColors: Record<AccountStage, string> = {
-  new_account: 'bg-blue-500/10 text-blue-700 dark:text-blue-300',
-  kyc_pending: 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-300',
-  active: 'bg-green-500/10 text-green-700 dark:text-green-300',
-  vip: 'bg-purple-500/10 text-purple-700 dark:text-purple-300',
-  payment_issues: 'bg-orange-500/10 text-orange-700 dark:text-orange-300',
-  inactive: 'bg-gray-500/10 text-gray-700 dark:text-gray-300',
-  blocked: 'bg-red-500/10 text-red-700 dark:text-red-300',
+  new_account: 'bg-status-info text-status-info-foreground',
+  kyc_pending: 'bg-status-warning text-status-warning-foreground',
+  active: 'bg-status-success text-status-success-foreground',
+  vip: 'bg-status-special text-status-special-foreground',
+  payment_issues: 'bg-status-warning text-status-warning-foreground',
+  inactive: 'bg-status-neutral text-status-neutral-foreground',
+  blocked: 'bg-status-danger text-status-danger-foreground',
 };
 
 const stages: AccountStage[] = ['new_account','kyc_pending','active','vip','payment_issues','inactive','blocked'];

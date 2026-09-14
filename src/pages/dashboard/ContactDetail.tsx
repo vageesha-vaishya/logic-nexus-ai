@@ -241,7 +241,7 @@ export default function ContactDetail() {
                                         <EnterpriseField label="Tags" value={
                                             <div className="flex gap-1 flex-wrap">
                                                 {contact.lead_source && <Badge variant="outline" className="rounded-full px-2 font-normal">{contact.lead_source}</Badge>}
-                                                {contact.lifecycle_stage && <Badge variant="secondary" className="rounded-full px-2 font-normal bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-950/40 dark:text-green-300 dark:hover:bg-green-900/50">{contact.lifecycle_stage}</Badge>}
+                                                {contact.lifecycle_stage && <Badge variant="secondary" className="rounded-full px-2 font-normal bg-status-success text-status-success-foreground hover:bg-status-success/80">{contact.lifecycle_stage}</Badge>}
                                             </div>
                                         } />
                                     </div>

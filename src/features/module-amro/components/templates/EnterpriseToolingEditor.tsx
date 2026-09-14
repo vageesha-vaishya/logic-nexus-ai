@@ -161,13 +161,13 @@ export function EnterpriseToolingEditor({
 
   const getCategoryColor = (category: string) => {
     const colors: Record<string, string> = {
-      hand_tool: 'bg-gray-100 text-gray-800',
-      power_tool: 'bg-blue-100 text-blue-800',
-      test_equipment: 'bg-purple-100 text-purple-800',
-      ground_support: 'bg-orange-100 text-orange-800',
-      special_tool: 'bg-red-100 text-red-800',
+      hand_tool: 'bg-status-neutral text-status-neutral-foreground',
+      power_tool: 'bg-status-info text-status-info-foreground',
+      test_equipment: 'bg-status-special text-status-special-foreground',
+      ground_support: 'bg-status-warning text-status-warning-foreground',
+      special_tool: 'bg-status-danger text-status-danger-foreground',
     };
-    return colors[category] || 'bg-gray-100 text-gray-800';
+    return colors[category] || 'bg-status-neutral text-status-neutral-foreground';
   };
 
   return (

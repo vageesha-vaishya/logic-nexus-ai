@@ -455,8 +455,8 @@ export default function ScannerPage() {
                       onClick={() => toggleFilter(f.key)}
                       className={`rounded-full border px-3 py-1 text-xs font-semibold transition-all ${
                         active
-                          ? "border-emerald-500 bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400"
-                          : "border-muted-foreground/30 text-muted-foreground hover:border-emerald-400 hover:text-emerald-600 dark:hover:border-emerald-700 dark:hover:text-emerald-400"
+                          ? "border-up bg-up-soft text-up"
+                          : "border-muted-foreground/30 text-muted-foreground hover:border-up hover:text-up"
                       }`}
                     >
                       {f.label}
@@ -482,8 +482,8 @@ export default function ScannerPage() {
                       onClick={() => toggleFilter(f.key)}
                       className={`rounded-full border px-3 py-1 text-xs font-semibold transition-all ${
                         active
-                          ? "border-rose-500 bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-400"
-                          : "border-muted-foreground/30 text-muted-foreground hover:border-rose-400 hover:text-rose-600 dark:hover:border-rose-700 dark:hover:text-rose-400"
+                          ? "border-down bg-down-soft text-down"
+                          : "border-muted-foreground/30 text-muted-foreground hover:border-down hover:text-down"
                       }`}
                     >
                       {f.label}

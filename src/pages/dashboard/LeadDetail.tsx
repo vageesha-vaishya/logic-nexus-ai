@@ -748,7 +748,7 @@ export default function LeadDetail() {
                 <Badge className={stage.color}>{stage.label}</Badge>
                 <Badge className={`${priority.bg} ${priority.color}`}>{priority.label}</Badge>
                 {lead.converted_at && (
-                  <Badge className="bg-green-500/10 text-green-700 dark:text-green-300">
+                  <Badge className="bg-status-success text-status-success-foreground">
                     Converted {format(new Date(lead.converted_at), 'PPP')}
                   </Badge>
                 )}

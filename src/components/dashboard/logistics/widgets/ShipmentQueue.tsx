@@ -48,13 +48,13 @@ export function ShipmentQueue() {
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'High':
-        return 'bg-red-100 text-red-800';
+        return 'bg-status-danger text-status-danger-foreground';
       case 'Normal':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-status-info text-status-info-foreground';
       case 'Low':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-status-neutral text-status-neutral-foreground';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-status-neutral text-status-neutral-foreground';
     }
   };
 

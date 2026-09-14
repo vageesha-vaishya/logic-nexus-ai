@@ -48,13 +48,13 @@ export function LiveRouteMap() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'In Progress':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-status-info text-status-info-foreground';
       case 'Planning':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-status-warning text-status-warning-foreground';
       case 'Completed':
-        return 'bg-green-100 text-green-800';
+        return 'bg-status-success text-status-success-foreground';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-status-neutral text-status-neutral-foreground';
     }
   };
 

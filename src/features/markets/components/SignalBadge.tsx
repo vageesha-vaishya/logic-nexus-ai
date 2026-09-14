@@ -36,14 +36,14 @@ const DIR_CONFIG = {
     label:   "BUY",
     dot:     "bg-emerald-500",
     text:    "text-emerald-700 dark:text-emerald-400",
-    badge:   "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
+    badge:   "bg-up-soft text-up",
     icon:    TrendingUp,
   },
   sell: {
     dot:     "bg-rose-500",
     label:   "SELL",
     text:    "text-rose-700 dark:text-rose-400",
-    badge:   "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300",
+    badge:   "bg-down-soft text-down",
     icon:    TrendingDown,
   },
   neutral: {

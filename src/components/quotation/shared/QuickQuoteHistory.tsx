@@ -100,7 +100,7 @@ export function QuickQuoteHistory({ onSelect, className }: QuickQuoteHistoryProp
   const getStatusBadge = (status: string) => {
       switch (status) {
           case 'generated':
-              return <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-200">Generated</Badge>;
+              return <Badge variant="secondary" className="bg-status-info text-status-info-foreground hover:bg-status-info/80">Generated</Badge>;
           case 'converted':
               return <Badge variant="default" className="bg-green-600 hover:bg-green-700">Converted</Badge>;
           case 'confirmed':

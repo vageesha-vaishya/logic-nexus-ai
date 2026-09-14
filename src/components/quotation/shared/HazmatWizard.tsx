@@ -329,7 +329,7 @@ export function HazmatWizard({ open, onOpenChange, onComplete, initialData }: Ha
                             </div>
                         </div>
 
-                        <div className="flex items-start gap-3 p-3 bg-green-50 text-green-800 border border-green-200 rounded-md">
+                        <div className="flex items-start gap-3 p-3 bg-status-success text-status-success-foreground border border-status-success-border rounded-md">
                             <CheckCircle2 className="w-5 h-5 mt-0.5" />
                             <div className="space-y-1">
                                 <h4 className="text-sm font-medium">Compliance Check Passed</h4>

@@ -170,19 +170,19 @@ export default function Accounts() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'bg-green-500/10 text-green-500';
+      case 'active': return 'bg-status-success text-status-success-foreground';
       case 'inactive': return 'bg-muted/50 text-muted-foreground';
-      case 'pending': return 'bg-yellow-500/10 text-yellow-500';
+      case 'pending': return 'bg-status-warning text-status-warning-foreground';
       default: return 'bg-muted/50 text-muted-foreground';
     }
   };
 
   const getTypeColor = (type: string) => {
     switch (type) {
-      case 'customer': return 'bg-blue-500/10 text-blue-500';
-      case 'prospect': return 'bg-purple-500/10 text-purple-500';
-      case 'partner': return 'bg-teal-500/10 text-teal-500';
-      case 'vendor': return 'bg-orange-500/10 text-orange-500';
+      case 'customer': return 'bg-status-info text-status-info-foreground';
+      case 'prospect': return 'bg-status-special text-status-special-foreground';
+      case 'partner': return 'bg-status-success text-status-success-foreground';
+      case 'vendor': return 'bg-status-warning text-status-warning-foreground';
       default: return 'bg-muted/50 text-muted-foreground';
     }
   };

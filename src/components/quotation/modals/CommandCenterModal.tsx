@@ -25,10 +25,10 @@ export function CommandCenterModal() {
   const { showCommandCenter, setShowCommandCenter, handleNavigation } = useSalesDashboard();
 
   const quickActions = [
-    { label: 'New Quote', icon: Plus, action: '/dashboard/quotes/new', color: 'bg-purple-100 text-purple-600' },
-    { label: 'New Lead', icon: Users, action: '/dashboard/leads/new', color: 'bg-blue-100 text-blue-600' },
-    { label: 'Create Order', icon: FileText, action: '/dashboard/orders/new', color: 'bg-green-100 text-green-600' },
-    { label: 'Sales Report', icon: BarChart3, action: '/dashboard/reports/sales', color: 'bg-orange-100 text-orange-600' },
+    { label: 'New Quote', icon: Plus, action: '/dashboard/quotes/new', color: 'bg-primary/10 text-primary' },
+    { label: 'New Lead', icon: Users, action: '/dashboard/leads/new', color: 'bg-primary/10 text-primary' },
+    { label: 'Create Order', icon: FileText, action: '/dashboard/orders/new', color: 'bg-primary/10 text-primary' },
+    { label: 'Sales Report', icon: BarChart3, action: '/dashboard/reports/sales', color: 'bg-primary/10 text-primary' },
   ];
 
   const recentActivities = [

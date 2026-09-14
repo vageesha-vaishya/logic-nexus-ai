@@ -308,8 +308,8 @@ function IndexCard({ label, quote }: { label: string; quote: LTPQuote | undefine
           <span
             className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
               positive
-                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400"
-                : "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-400"
+                ? "bg-up-soft text-up"
+                : "bg-down-soft text-down"
             }`}
           >
             {fmtPct(changePct)}
@@ -520,8 +520,8 @@ function MoverRow({ quote, positive }: { quote: LTPQuote; positive: boolean }) {
       <span
         className={`rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums ${
           positive
-            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400"
-            : "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-400"
+            ? "bg-up-soft text-up"
+            : "bg-down-soft text-down"
         }`}
       >
         {fmtPct(quote.change_pct)}

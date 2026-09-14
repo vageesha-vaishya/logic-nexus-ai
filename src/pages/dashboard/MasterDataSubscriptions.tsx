@@ -393,13 +393,13 @@ export default function MasterDataSubscriptions() {
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-      active: 'bg-green-500/10 text-green-500',
-      trial: 'bg-blue-500/10 text-blue-500',
-      past_due: 'bg-red-500/10 text-red-500',
-      canceled: 'bg-gray-500/10 text-gray-500',
-      expired: 'bg-gray-600/10 text-gray-600',
+      active: 'bg-status-success text-status-success-foreground',
+      trial: 'bg-status-info text-status-info-foreground',
+      past_due: 'bg-status-danger text-status-danger-foreground',
+      canceled: 'bg-status-neutral text-status-neutral-foreground',
+      expired: 'bg-status-neutral text-status-neutral-foreground',
     };
-    return colors[status] || 'bg-gray-500/10 text-gray-500';
+    return colors[status] || 'bg-status-neutral text-status-neutral-foreground';
   };
 
   return (
@@ -573,7 +573,7 @@ export default function MasterDataSubscriptions() {
                         </TableCell>
                         <TableCell>
                           {plan.is_active ? (
-                            <Badge className="bg-green-500/10 text-green-500">Active</Badge>
+                            <Badge className="bg-status-success text-status-success-foreground">Active</Badge>
                           ) : (
                             <Badge variant="outline">Inactive</Badge>
                           )}

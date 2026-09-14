@@ -188,7 +188,7 @@ export default function SystemLogs() {
     switch (level) {
       case 'CRITICAL': return <Badge variant="destructive" className="animate-pulse">{level}</Badge>;
       case 'ERROR': return <Badge variant="destructive">{level}</Badge>;
-      case 'WARNING': return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border-yellow-200">{level}</Badge>;
+      case 'WARNING': return <Badge variant="outline" className="bg-status-warning text-status-warning-foreground hover:bg-status-warning/80 border-status-warning-border">{level}</Badge>;
       case 'INFO': return <Badge variant="secondary">{level}</Badge>;
       default: return <Badge variant="outline">{level}</Badge>;
     }

@@ -48,13 +48,13 @@ export function PerformanceVsTarget() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Exceeding':
-        return 'bg-green-100 text-green-800';
+        return 'bg-status-success text-status-success-foreground';
       case 'Close':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-status-warning text-status-warning-foreground';
       case 'Slight Over':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-status-warning text-status-warning-foreground';
       default:
-        return 'bg-red-100 text-red-800';
+        return 'bg-status-danger text-status-danger-foreground';
     }
   };
 

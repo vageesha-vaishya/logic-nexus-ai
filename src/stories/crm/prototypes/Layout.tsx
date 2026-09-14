@@ -64,11 +64,11 @@ export type ThemeTokens = {
 
 
 const columns: ColumnType[] = [
-  { id: 'new', title: 'New', color: 'bg-blue-500/10 text-blue-700' },
-  { id: 'contacted', title: 'Contacted', color: 'bg-purple-500/10 text-purple-700' },
-  { id: 'negotiation', title: 'Negotiation', color: 'bg-orange-500/10 text-orange-700' },
-  { id: 'won', title: 'Won', color: 'bg-green-500/10 text-green-700' },
-  { id: 'lost', title: 'Lost', color: 'bg-red-500/10 text-red-700' },
+  { id: 'new', title: 'New', color: 'bg-status-info text-status-info-foreground' },
+  { id: 'contacted', title: 'Contacted', color: 'bg-status-special text-status-special-foreground' },
+  { id: 'negotiation', title: 'Negotiation', color: 'bg-status-warning text-status-warning-foreground' },
+  { id: 'won', title: 'Won', color: 'bg-status-success text-status-success-foreground' },
+  { id: 'lost', title: 'Lost', color: 'bg-status-danger text-status-danger-foreground' },
 ];
 
 function buildKanbanItems(leads: WorkspaceLeadLike[], users: WorkspaceUserLike[]): KanbanItem[] {

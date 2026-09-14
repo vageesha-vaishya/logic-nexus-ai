@@ -29,12 +29,12 @@ export function PlanCard({ plan, isCurrentPlan, onSelect, showActions = true }: 
 
   const getTierColor = (tier: string | null) => {
     const colors: Record<string, string> = {
-      starter: 'bg-blue-500/10 text-blue-500',
-      professional: 'bg-purple-500/10 text-purple-500',
-      business: 'bg-orange-500/10 text-orange-500',
-      enterprise: 'bg-green-500/10 text-green-500',
+      starter: 'bg-status-info text-status-info-foreground',
+      professional: 'bg-status-special text-status-special-foreground',
+      business: 'bg-status-warning text-status-warning-foreground',
+      enterprise: 'bg-status-success text-status-success-foreground',
     };
-    return tier ? colors[tier.toLowerCase()] || 'bg-gray-500/10 text-gray-500' : 'bg-gray-500/10 text-gray-500';
+    return tier ? colors[tier.toLowerCase()] || 'bg-status-neutral text-status-neutral-foreground' : 'bg-status-neutral text-status-neutral-foreground';
   };
 
   return (

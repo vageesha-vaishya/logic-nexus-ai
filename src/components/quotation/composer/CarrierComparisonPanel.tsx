@@ -95,7 +95,7 @@ export function CarrierComparisonPanel({ leg }: CarrierComparisonPanelProps) {
                   <TableRow key={rate.id} className={selectedRate === rate.id ? 'bg-blue-50' : ''}>
                     <TableCell className="font-medium text-xs">
                       {rate.carrier}
-                      {rate.carrier === 'GREEN' && <Badge variant="secondary" className="ml-2 text-[9px] bg-green-100 text-green-800">Eco</Badge>}
+                      {rate.carrier === 'GREEN' && <Badge variant="secondary" className="ml-2 text-[9px] bg-status-success text-status-success-foreground">Eco</Badge>}
                     </TableCell>
                     <TableCell className="text-right text-xs">${rate.baseFreight}</TableCell>
                     <TableCell className="text-right text-xs text-muted-foreground">${rate.baf + rate.thc}</TableCell>

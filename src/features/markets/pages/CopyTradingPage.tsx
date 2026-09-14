@@ -79,13 +79,13 @@ function avatarColors(userId: string): string {
 function StatusBadge({ status }: { status: CopyTrade["status"] }) {
   if (status === "active")
     return (
-      <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20">
+      <Badge className="bg-status-success text-status-success-foreground border-status-success-border hover:bg-status-success/80">
         Active
       </Badge>
     );
   if (status === "paused")
     return (
-      <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20">
+      <Badge className="bg-status-warning text-status-warning-foreground border-status-warning-border hover:bg-status-warning/80">
         Paused
       </Badge>
     );
@@ -582,12 +582,12 @@ function ExecutionsTab() {
                 </TableCell>
                 <TableCell>
                   {exec.side === "BUY" ? (
-                    <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 gap-1">
+                    <Badge className="bg-up-soft text-up border-up/30 gap-1">
                       <TrendingUp className="h-3 w-3" />
                       BUY
                     </Badge>
                   ) : (
-                    <Badge className="bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30 gap-1">
+                    <Badge className="bg-down-soft text-down border-down/30 gap-1">
                       <TrendingDown className="h-3 w-3" />
                       SELL
                     </Badge>

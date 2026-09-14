@@ -140,7 +140,7 @@ export default function LogisticsManager() {
                           {item.commodity_description}
                         </div>
                         {item.hazmat && (
-                          <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full ml-2">
+                          <span className="text-xs bg-status-danger text-status-danger-foreground px-2 py-0.5 rounded-full ml-2">
                             HAZMAT {item.hazmat_class}
                           </span>
                         )}

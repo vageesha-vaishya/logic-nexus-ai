@@ -18,10 +18,10 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { downloadCSV } from '@/utils/csvExport';
 
 const ACTION_COLORS = {
-  INSERT: 'bg-green-100 text-green-800 border-green-200',
-  UPDATE: 'bg-blue-100 text-blue-800 border-blue-200',
-  DELETE: 'bg-red-100 text-red-800 border-red-200',
-  DEFAULT: 'bg-gray-100 text-gray-800 border-gray-200'
+  INSERT: 'bg-status-success text-status-success-foreground border-status-success-border',
+  UPDATE: 'bg-status-info text-status-info-foreground border-status-info-border',
+  DELETE: 'bg-status-danger text-status-danger-foreground border-status-danger-border',
+  DEFAULT: 'bg-status-neutral text-status-neutral-foreground border-status-neutral-border'
 };
 
 const maskSensitiveData = (data: any): any => {

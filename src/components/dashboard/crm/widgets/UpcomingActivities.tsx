@@ -56,7 +56,7 @@ export function UpcomingActivities() {
       {activities.length > 0 ? activities.map((activity) => (
         <div key={activity.id} className="flex items-center justify-between p-3 bg-white border rounded-lg shadow-sm">
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-full ${activity.status === 'completed' ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}`}>
+            <div className={`p-2 rounded-full ${activity.status === 'completed' ? 'bg-status-success text-status-success-foreground' : 'bg-status-info text-status-info-foreground'}`}>
               {activity.status === 'completed' ? <CheckCircle2 className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
             </div>
             <div>

@@ -99,10 +99,10 @@ function ConnectionStatusBadge({ status }: { status: BrokerConnection["status"] 
     string,
     { label: string; className: string }
   > = {
-    active:  { label: "Active",  className: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400" },
-    expired: { label: "Expired", className: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" },
-    error:   { label: "Error",   className: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" },
-    pending: { label: "Pending", className: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400" },
+    active:  { label: "Active",  className: "bg-status-success text-status-success-foreground" },
+    expired: { label: "Expired", className: "bg-status-warning text-status-warning-foreground" },
+    error:   { label: "Error",   className: "bg-status-danger text-status-danger-foreground" },
+    pending: { label: "Pending", className: "bg-status-info text-status-info-foreground" },
     revoked: { label: "Revoked", className: "bg-muted text-muted-foreground" },
   };
   const { label, className } = map[status] ?? { label: status, className: "bg-muted text-muted-foreground" };
@@ -121,7 +121,7 @@ function OrderStatusBadge({ status }: { status: string }) {
     return <Badge variant="default" className="text-xs bg-emerald-600 hover:bg-emerald-600">Complete</Badge>;
   }
   if (s === "open" || s === "trigger pending") {
-    return <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800 hover:bg-amber-100">{status}</Badge>;
+    return <Badge variant="secondary" className="text-xs bg-status-warning text-status-warning-foreground hover:bg-status-warning/80">{status}</Badge>;
   }
   if (s === "rejected") {
     return <Badge variant="destructive" className="text-xs">{status}</Badge>;
@@ -541,7 +541,7 @@ function GttStatusBadge({ status }: { status: GTTOrder["status"] }) {
     return <Badge variant="default" className="text-xs bg-emerald-600 hover:bg-emerald-600">Active</Badge>;
   }
   if (status === "triggered") {
-    return <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800 hover:bg-blue-100">Triggered</Badge>;
+    return <Badge variant="secondary" className="text-xs bg-status-info text-status-info-foreground hover:bg-status-info/80">Triggered</Badge>;
   }
   if (status === "expired") {
     return <Badge variant="destructive" className="text-xs">Expired</Badge>;
@@ -641,8 +641,8 @@ function GttTab({
                     <TableCell className="text-muted-foreground text-xs">{g.exchange}</TableCell>
                     <TableCell>
                       {isSingle
-                        ? <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800 hover:bg-blue-100">Single</Badge>
-                        : <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-800 hover:bg-purple-100">OCO</Badge>
+                        ? <Badge variant="secondary" className="text-xs bg-status-info text-status-info-foreground hover:bg-status-info/80">Single</Badge>
+                        : <Badge variant="secondary" className="text-xs bg-status-special text-status-special-foreground hover:bg-status-special/80">OCO</Badge>
                       }
                     </TableCell>
                     <TableCell className="text-right font-mono text-xs">

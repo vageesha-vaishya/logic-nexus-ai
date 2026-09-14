@@ -498,11 +498,11 @@ export default function LeadRouting() {
                             Priority: {rule.priority}
                           </span>
                           {!rule.is_active && (
-                            <span className="text-xs bg-yellow-500/10 text-yellow-600 px-2 py-1 rounded">
+                            <span className="text-xs bg-status-warning text-status-warning-foreground px-2 py-1 rounded">
                               Inactive
                             </span>
                           )}
-                          <span className="text-xs bg-blue-500/10 text-blue-600 px-2 py-1 rounded capitalize">
+                          <span className="text-xs bg-status-info text-status-info-foreground px-2 py-1 rounded capitalize">
                             {rule.assignment_type?.replace(/_/g, ' ')}
                           </span>
                         </div>

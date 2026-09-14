@@ -174,10 +174,10 @@ export function EnterpriseComplianceEditor({
 
   const getSeverityBadge = (severity: string) => {
     const colors: Record<string, string> = {
-      critical: 'bg-red-100 text-red-800',
-      high: 'bg-orange-100 text-orange-800',
-      medium: 'bg-yellow-100 text-yellow-800',
-      low: 'bg-green-100 text-green-800',
+      critical: 'bg-status-danger text-status-danger-foreground',
+      high: 'bg-status-warning text-status-warning-foreground',
+      medium: 'bg-status-warning text-status-warning-foreground',
+      low: 'bg-status-success text-status-success-foreground',
     };
     return <Badge className={colors[severity] || 'bg-gray-100'}>{severity}</Badge>;
   };

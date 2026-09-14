@@ -36,9 +36,9 @@ function shortUserId(userId: string): string {
 
 function DirectionBadge({ direction }: { direction: IdeaItem["direction"] }) {
   if (direction === "bullish")
-    return <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20">BULLISH</Badge>;
+    return <Badge className="bg-up-soft text-up border-up/30 hover:bg-up-soft/80">BULLISH</Badge>;
   if (direction === "bearish")
-    return <Badge className="bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30 hover:bg-rose-500/20">BEARISH</Badge>;
+    return <Badge className="bg-down-soft text-down border-down/30 hover:bg-down-soft/80">BEARISH</Badge>;
   return <Badge variant="secondary">NEUTRAL</Badge>;
 }
 

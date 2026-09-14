@@ -890,9 +890,9 @@ export default function PlatformDomainDetail() {
                           </td>
                           <td className="px-4 py-2">
                             {service.is_active ? (
-                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Active</Badge>
+                              <Badge variant="outline" className="bg-status-success text-status-success-foreground border-status-success-border">Active</Badge>
                             ) : (
-                              <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200">Inactive</Badge>
+                              <Badge variant="outline" className="bg-status-neutral text-status-neutral-foreground border-status-neutral-border">Inactive</Badge>
                             )}
                           </td>
                           <td className="px-4 py-2 text-right">

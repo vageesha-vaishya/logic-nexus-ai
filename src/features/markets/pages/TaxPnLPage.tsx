@@ -300,8 +300,8 @@ function RealizedTradesTable({ trades }: { trades: RealizedTrade[] }) {
                         variant="outline"
                         className={
                           t.gain_type === "STCG"
-                            ? "border-amber-400 bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
-                            : "border-green-400 bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-300"
+                            ? "border-status-warning-border bg-status-warning text-status-warning-foreground"
+                            : "border-status-success-border bg-status-success text-status-success-foreground"
                         }
                       >
                         {t.gain_type}
@@ -393,8 +393,8 @@ function UnrealizedPositionsTable({ positions }: { positions: UnrealizedPosition
                       variant="outline"
                       className={
                         pos.gain_type === "STCG"
-                          ? "border-amber-400 bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
-                          : "border-green-400 bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-300"
+                          ? "border-status-warning-border bg-status-warning text-status-warning-foreground"
+                          : "border-status-success-border bg-status-success text-status-success-foreground"
                       }
                     >
                       {pos.gain_type}

@@ -247,7 +247,7 @@ export function MarginRulesManager() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge className={rule.adjustment_type === 'percent' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}>
+                    <Badge className={rule.adjustment_type === 'percent' ? 'bg-status-info text-status-info-foreground' : 'bg-status-success text-status-success-foreground'}>
                         {rule.adjustment_type === 'percent' ? '+' : ''}{rule.adjustment_value}
                         {rule.adjustment_type === 'percent' ? '%' : ''}
                     </Badge>

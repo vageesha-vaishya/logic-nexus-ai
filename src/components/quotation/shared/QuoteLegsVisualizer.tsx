@@ -59,7 +59,7 @@ export function QuoteLegsVisualizer({ legs }: QuoteLegsVisualizerProps) {
                                     <div className="text-[10px] text-muted-foreground">{leg.transit_time}</div>
                                     
                                     {leg.border_crossing && (
-                                        <div className="absolute -top-2 right-0 bg-red-100 text-red-600 text-[9px] px-1 rounded border border-red-200">
+                                        <div className="absolute -top-2 right-0 bg-status-danger text-status-danger-foreground text-[9px] px-1 rounded border border-status-danger-border">
                                             CUSTOMS
                                         </div>
                                     )}

@@ -66,7 +66,7 @@ export function KeyAccounts() {
         {accounts.length > 0 ? accounts.map((account) => (
           <div key={account.id} className="p-3 bg-white border rounded-lg shadow-sm flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-full bg-blue-50 text-blue-600">
+              <div className="p-2 rounded-full bg-primary/10 text-primary">
                 <Globe className="h-4 w-4" />
               </div>
               <div>

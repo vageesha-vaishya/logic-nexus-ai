@@ -606,7 +606,7 @@ export default function OpportunityDetail() {
                               </div>
                               <div className="flex items-center gap-2">
                                 {(q as unknown as { is_primary?: boolean }).is_primary ? (
-                                  <span className="text-xs px-2 py-1 rounded bg-green-100 text-green-700">Primary</span>
+                                  <span className="text-xs px-2 py-1 rounded bg-status-success text-status-success-foreground">Primary</span>
                                 ) : (
                                   <Button size="sm" variant="outline" onClick={() => makePrimary(q.id)}>Make Primary</Button>
                                 )}

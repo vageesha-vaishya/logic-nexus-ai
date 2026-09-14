@@ -17,13 +17,13 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { downloadCSV } from '@/utils/csvExport';
 
 const LEVEL_COLORS = {
-  INFO: 'bg-blue-100 text-blue-800 border-blue-200',
-  WARNING: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  ERROR: 'bg-red-100 text-red-800 border-red-200',
-  CRITICAL: 'bg-red-200 text-red-900 border-red-300',
-  FATAL: 'bg-red-200 text-red-900 border-red-300',
-  DEBUG: 'bg-gray-100 text-gray-800 border-gray-200',
-  DEFAULT: 'bg-gray-100 text-gray-800 border-gray-200'
+  INFO: 'bg-status-info text-status-info-foreground border-status-info-border',
+  WARNING: 'bg-status-warning text-status-warning-foreground border-status-warning-border',
+  ERROR: 'bg-status-danger text-status-danger-foreground border-status-danger-border',
+  CRITICAL: 'bg-status-danger text-status-danger-foreground border-status-danger-border',
+  FATAL: 'bg-status-danger text-status-danger-foreground border-status-danger-border',
+  DEBUG: 'bg-status-neutral text-status-neutral-foreground border-status-neutral-border',
+  DEFAULT: 'bg-status-neutral text-status-neutral-foreground border-status-neutral-border'
 };
 
 const maskSensitiveData = (data: any): any => {

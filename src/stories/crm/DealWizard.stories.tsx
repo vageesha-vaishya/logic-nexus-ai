@@ -156,7 +156,7 @@ const WizardDemo = () => {
                   </div>
                 </dl>
               </div>
-              <div className="flex items-center gap-2 p-4 bg-blue-50 text-blue-700 rounded-lg text-sm">
+              <div className="flex items-center gap-2 p-4 bg-status-info text-status-info-foreground rounded-lg text-sm">
                 <span>⚠️ Please verify all financial details before submitting for approval.</span>
               </div>
             </div>

@@ -36,7 +36,7 @@ export function SalesPipelineWaterfall() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <p className="text-sm font-medium text-gray-900">{stage.name}</p>
-                <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
+                <span className="text-xs bg-status-neutral text-status-neutral-foreground px-2 py-0.5 rounded">
                   {stage.count} deals
                 </span>
               </div>

@@ -52,12 +52,12 @@ const stageLabels: Record<ContactStage, string> = {
 };
 
 const stageColors: Record<ContactStage, string> = {
-  new_contact: 'bg-blue-500/10 text-blue-700 dark:text-blue-300',
-  verified: 'bg-green-500/10 text-green-700 dark:text-green-300',
-  key_decision_maker: 'bg-purple-500/10 text-purple-700 dark:text-purple-300',
-  active: 'bg-teal-500/10 text-teal-700 dark:text-teal-300',
-  inactive: 'bg-gray-500/10 text-gray-700 dark:text-gray-300',
-  bounced_invalid: 'bg-red-500/10 text-red-700 dark:text-red-300',
+  new_contact: 'bg-status-info text-status-info-foreground',
+  verified: 'bg-status-success text-status-success-foreground',
+  key_decision_maker: 'bg-status-special text-status-special-foreground',
+  active: 'bg-status-success text-status-success-foreground',
+  inactive: 'bg-status-neutral text-status-neutral-foreground',
+  bounced_invalid: 'bg-status-danger text-status-danger-foreground',
 };
 
 const stages: ContactStage[] = ['new_contact','verified','key_decision_maker','active','inactive','bounced_invalid'];

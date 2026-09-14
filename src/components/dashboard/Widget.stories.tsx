@@ -75,7 +75,7 @@ export const WithActions: Story = {
         <button className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600">
           Action 1
         </button>
-        <button className="px-3 py-1 text-sm bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+        <button className="px-3 py-1 text-sm bg-secondary text-secondary-foreground rounded hover:bg-secondary/80">
           Action 2
         </button>
       </div>

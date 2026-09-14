@@ -72,7 +72,7 @@ export function ConnectionConfigForm({ onValidate, validationResult, onConfigCha
       case 'validating':
         return <Badge variant="secondary">Validating...</Badge>;
       case 'success':
-        return <Badge className="bg-green-500/10 text-green-600 border-green-500/20">Connected</Badge>;
+        return <Badge className="bg-status-success text-status-success-foreground border-status-success-border">Connected</Badge>;
       case 'error':
         return <Badge variant="destructive">Connection Failed</Badge>;
       default:

@@ -40,7 +40,7 @@ export function AiMarketAnalysis({ analysis, confidenceScore, anomalies }: AiMar
         {anomalies && anomalies.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
             {anomalies.map((anomaly: any, i: number) => (
-              <Badge key={i} variant="outline" className="border-yellow-200 bg-yellow-50 text-yellow-800 text-xs">
+              <Badge key={i} variant="outline" className="border-status-warning-border bg-status-warning text-status-warning-foreground text-xs">
                 Alert: {typeof anomaly === 'string' ? anomaly : anomaly.description || 'Route anomaly detected'}
               </Badge>
             ))}

@@ -168,7 +168,7 @@ export function EnterpriseMaterialsEditor({
       );
     } else if (available <= 10) {
       return (
-        <Badge variant="secondary" className="flex items-center gap-1 bg-yellow-100 text-yellow-800">
+        <Badge variant="secondary" className="flex items-center gap-1 bg-status-warning text-status-warning-foreground">
           <AlertTriangle className="h-3 w-3" />
           Low ({available})
         </Badge>

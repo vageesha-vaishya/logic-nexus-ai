@@ -54,14 +54,14 @@ export interface OpportunityHistory {
 }
 
 export const stageColors: Record<OpportunityStage, string> = {
-  prospecting: 'bg-slate-500/10 text-slate-700 dark:text-slate-300',
-  qualification: 'bg-blue-500/10 text-blue-700 dark:text-blue-300',
-  needs_analysis: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300',
-  value_proposition: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300',
-  proposal: 'bg-purple-500/10 text-purple-700 dark:text-purple-300',
-  negotiation: 'bg-orange-500/10 text-orange-700 dark:text-orange-300',
-  closed_won: 'bg-green-500/10 text-green-700 dark:text-green-300',
-  closed_lost: 'bg-red-500/10 text-red-700 dark:text-red-300',
+  prospecting: 'bg-status-neutral text-status-neutral-foreground',
+  qualification: 'bg-status-info text-status-info-foreground',
+  needs_analysis: 'bg-status-info text-status-info-foreground',
+  value_proposition: 'bg-status-info text-status-info-foreground',
+  proposal: 'bg-status-special text-status-special-foreground',
+  negotiation: 'bg-status-warning text-status-warning-foreground',
+  closed_won: 'bg-status-success text-status-success-foreground',
+  closed_lost: 'bg-status-danger text-status-danger-foreground',
 };
 
 export const stageLabels: Record<OpportunityStage, string> = {

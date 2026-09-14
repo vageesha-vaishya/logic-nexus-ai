@@ -369,7 +369,7 @@ export function ImportVerificationPanel({
                             </td>
                             <td className="p-3 text-center">
                               {res.match ? (
-                                <Badge variant="outline" className="bg-green-500/10 text-green-500 hover:bg-green-500/20 border-green-500/20">
+                                <Badge variant="outline" className="bg-status-success text-status-success-foreground hover:bg-status-success/80 border-status-success-border">
                                   Match
                                 </Badge>
                               ) : res.actual === -1 ? (

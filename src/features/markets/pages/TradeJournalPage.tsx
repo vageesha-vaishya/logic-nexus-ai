@@ -93,10 +93,10 @@ function fmtDate(d: string | null | undefined): string {
 function OutcomeBadge({ outcome }: { outcome: TradeOutcome | null }) {
   if (!outcome) return null;
   const map: Record<TradeOutcome, { label: string; cls: string }> = {
-    win:       { label: "Win",       cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400" },
-    loss:      { label: "Loss",      cls: "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-400" },
-    breakeven: { label: "Breakeven", cls: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400" },
-    open:      { label: "Open",      cls: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400" },
+    win:       { label: "Win",       cls: "bg-status-success text-status-success-foreground" },
+    loss:      { label: "Loss",      cls: "bg-status-danger text-status-danger-foreground" },
+    breakeven: { label: "Breakeven", cls: "bg-status-warning text-status-warning-foreground" },
+    open:      { label: "Open",      cls: "bg-status-info text-status-info-foreground" },
   };
   const m = map[outcome];
   return (
@@ -404,8 +404,8 @@ function NewTradeSheet({ open, onClose }: NewTradeFormProps) {
             <div
               className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-bold ${
                 indicativePnl >= 0
-                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
-                  : "bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400"
+                  ? "bg-up-soft text-up"
+                  : "bg-down-soft text-down"
               }`}
             >
               {indicativePnl >= 0

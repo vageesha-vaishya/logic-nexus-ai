@@ -159,7 +159,7 @@ function EmailMessage({
   return (
     <div className="w-full">
       {email.threat_level && email.threat_level !== 'safe' && (
-        <Alert variant={email.threat_level === 'malicious' ? "destructive" : "default"} className={cn("mb-4", email.threat_level === 'suspicious' && "border-yellow-500 bg-yellow-50 text-yellow-900")}>
+        <Alert variant={email.threat_level === 'malicious' ? "destructive" : "default"} className={cn("mb-4", email.threat_level === 'suspicious' && "border-status-warning-border bg-status-warning text-status-warning-foreground")}>
           <ShieldAlert className="h-4 w-4" />
           <AlertTitle className="capitalize">{email.threat_level} Email Detected</AlertTitle>
           <AlertDescription>

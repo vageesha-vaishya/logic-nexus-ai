@@ -76,10 +76,10 @@ const fmtUnits = (value: number | null | undefined): string => {
 
 function categoryBadge(instrumentType: string): JSX.Element {
   const map: Record<string, { label: string; cls: string }> = {
-    mf_equity: { label: "Equity",  cls: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 border-blue-200" },
-    mf_debt:   { label: "Debt",    cls: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border-amber-200" },
-    mf_hybrid: { label: "Hybrid",  cls: "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300 border-purple-200" },
-    mf_index:  { label: "Index",   cls: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300 border-green-200" },
+    mf_equity: { label: "Equity",  cls: "bg-status-info text-status-info-foreground border-status-info-border" },
+    mf_debt:   { label: "Debt",    cls: "bg-status-warning text-status-warning-foreground border-status-warning-border" },
+    mf_hybrid: { label: "Hybrid",  cls: "bg-status-special text-status-special-foreground border-status-special-border" },
+    mf_index:  { label: "Index",   cls: "bg-status-success text-status-success-foreground border-status-success-border" },
   };
   const entry = map[instrumentType] ?? { label: instrumentType, cls: "" };
   return (

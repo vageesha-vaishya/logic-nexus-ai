@@ -89,12 +89,12 @@ export default function Vehicles() {
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-      available: 'bg-green-500/10 text-green-500',
-      in_use: 'bg-blue-500/10 text-blue-500',
-      maintenance: 'bg-yellow-500/10 text-yellow-500',
-      out_of_service: 'bg-red-500/10 text-red-500',
+      available: 'bg-status-success text-status-success-foreground',
+      in_use: 'bg-status-info text-status-info-foreground',
+      maintenance: 'bg-status-warning text-status-warning-foreground',
+      out_of_service: 'bg-status-danger text-status-danger-foreground',
     };
-    return colors[status] || 'bg-gray-500/10 text-gray-500';
+    return colors[status] || 'bg-status-neutral text-status-neutral-foreground';
   };
 
   return (

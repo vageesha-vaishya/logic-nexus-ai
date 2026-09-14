@@ -111,11 +111,11 @@ export function TransferDetailDialog({
 
   const getStatusBadge = (status: string) => {
     const variants: any = {
-      pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-950/50 dark:text-yellow-400',
-      approved: 'bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-400',
-      completed: 'bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-400',
-      rejected: 'bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-400',
-      failed: 'bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-400',
+      pending: 'bg-status-warning text-status-warning-foreground',
+      approved: 'bg-status-info text-status-info-foreground',
+      completed: 'bg-status-success text-status-success-foreground',
+      rejected: 'bg-status-danger text-status-danger-foreground',
+      failed: 'bg-status-warning text-status-warning-foreground',
     };
     return (
       <Badge variant="secondary" className={variants[status] || ''}>

@@ -88,19 +88,19 @@ function statusBadge(status: PositionAnalysis["status"]) {
   switch (status) {
     case "on_target":
       return (
-        <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 text-[10px] px-1.5 py-0">
+        <Badge className="bg-status-success text-status-success-foreground border-status-success-border text-[10px] px-1.5 py-0">
           ON TARGET
         </Badge>
       );
     case "overweight":
       return (
-        <Badge className="bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 text-[10px] px-1.5 py-0">
+        <Badge className="bg-status-danger text-status-danger-foreground border-status-danger-border text-[10px] px-1.5 py-0">
           OVERWEIGHT
         </Badge>
       );
     case "underweight":
       return (
-        <Badge className="bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 text-[10px] px-1.5 py-0">
+        <Badge className="bg-status-warning text-status-warning-foreground border-status-warning-border text-[10px] px-1.5 py-0">
           UNDERWEIGHT
         </Badge>
       );
@@ -120,8 +120,8 @@ function tradePill(pos: PositionAnalysis) {
     <span
       className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
         isBuy
-          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
-          : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+          ? "bg-up-soft text-up"
+          : "bg-down-soft text-down"
       }`}
     >
       {isBuy ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
@@ -612,7 +612,7 @@ function AlertsPanel({ alerts, portfolioId, onAcknowledge }: AlertsPanelProps) {
           <CardTitle className="text-sm font-semibold flex items-center gap-2">
             <Bell className="h-4 w-4 text-amber-500" />
             Triggered Alerts
-            <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 text-xs">
+            <Badge className="bg-status-warning text-status-warning-foreground text-xs">
               {alerts.length}
             </Badge>
           </CardTitle>

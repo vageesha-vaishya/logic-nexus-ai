@@ -48,7 +48,7 @@ interface TeamAssignmentProps {
 const getAccessBadge = (level: TeamMember['accessLevel']) => {
   switch (level) {
     case 'owner': return <Badge variant="default" className="bg-primary/90 hover:bg-primary">Owner</Badge>;
-    case 'editor': return <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-200">Editor</Badge>;
+    case 'editor': return <Badge variant="secondary" className="bg-status-info text-status-info-foreground hover:bg-status-info/80">Editor</Badge>;
     case 'viewer': return <Badge variant="outline" className="text-slate-500">Viewer</Badge>;
   }
 };

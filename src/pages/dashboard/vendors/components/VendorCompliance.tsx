@@ -121,11 +121,11 @@ export function VendorCompliance({ vendorId, vendorName, vendorCountry }: Vendor
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'PASSED':
-        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200"><ShieldCheck className="w-3 h-3 mr-1" /> Passed</Badge>;
+        return <Badge variant="outline" className="bg-status-success text-status-success-foreground border-status-success-border"><ShieldCheck className="w-3 h-3 mr-1" /> Passed</Badge>;
       case 'FAILED':
         return <Badge variant="destructive"><ShieldAlert className="w-3 h-3 mr-1" /> Failed</Badge>;
       case 'WARNING':
-        return <Badge variant="secondary" className="bg-yellow-50 text-yellow-700 border-yellow-200"><AlertTriangle className="w-3 h-3 mr-1" /> Warning</Badge>;
+        return <Badge variant="secondary" className="bg-status-warning text-status-warning-foreground border-status-warning-border"><AlertTriangle className="w-3 h-3 mr-1" /> Warning</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }

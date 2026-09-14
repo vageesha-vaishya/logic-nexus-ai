@@ -51,9 +51,9 @@ export function CapacityVsDemand() {
   const maxValue = 7000;
 
   const getHeadroomColor = (headroom: number) => {
-    if (headroom > 800) return 'bg-green-100 text-green-800';
-    if (headroom > 300) return 'bg-yellow-100 text-yellow-800';
-    return 'bg-red-100 text-red-800';
+    if (headroom > 800) return 'bg-status-success text-status-success-foreground';
+    if (headroom > 300) return 'bg-status-warning text-status-warning-foreground';
+    return 'bg-status-danger text-status-danger-foreground';
   };
 
   return (

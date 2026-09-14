@@ -20,15 +20,15 @@ export function MyPendingQuotes() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Draft':
-        return 'bg-yellow-50 text-yellow-700 border-yellow-200';
+        return 'bg-status-warning text-status-warning-foreground border-status-warning-border';
       case 'In Progress':
-        return 'bg-blue-50 text-blue-700 border-blue-200';
+        return 'bg-status-info text-status-info-foreground border-status-info-border';
       case 'Sent':
-        return 'bg-green-50 text-green-700 border-green-200';
+        return 'bg-status-success text-status-success-foreground border-status-success-border';
       case 'Awaiting Review':
-        return 'bg-orange-50 text-orange-700 border-orange-200';
+        return 'bg-status-warning text-status-warning-foreground border-status-warning-border';
       default:
-        return 'bg-gray-50 text-gray-700 border-gray-200';
+        return 'bg-status-neutral text-status-neutral-foreground border-status-neutral-border';
     }
   };
 
@@ -39,7 +39,7 @@ export function MyPendingQuotes() {
           <Clock className="h-5 w-5 text-blue-600" />
           <h4 className="font-semibold text-gray-900">My Pending Quotes</h4>
         </div>
-        <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-sm font-semibold">
+        <span className="bg-primary/10 text-primary px-2 py-1 rounded text-sm font-semibold">
           {quoteData.totalPending}
         </span>
       </div>

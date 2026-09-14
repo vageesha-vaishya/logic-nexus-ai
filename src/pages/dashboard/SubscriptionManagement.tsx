@@ -31,25 +31,25 @@ function fmtINR(n: number | string | null | undefined): string {
 }
 
 const TIER_COLORS: Record<string, string> = {
-  starter:      "bg-blue-500/10 text-blue-600 border-blue-200",
-  professional: "bg-violet-500/10 text-violet-600 border-violet-200",
-  enterprise:   "bg-amber-500/10 text-amber-600 border-amber-200",
+  starter:      "bg-status-info text-status-info-foreground border-status-info-border",
+  professional: "bg-status-special text-status-special-foreground border-status-special-border",
+  enterprise:   "bg-status-warning text-status-warning-foreground border-status-warning-border",
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  active:   "bg-emerald-500/10 text-emerald-600",
-  trial:    "bg-blue-500/10 text-blue-600",
-  past_due: "bg-red-500/10 text-red-500",
-  canceled: "bg-gray-500/10 text-gray-500",
-  paused:   "bg-amber-500/10 text-amber-600",
+  active:   "bg-status-success text-status-success-foreground",
+  trial:    "bg-status-info text-status-info-foreground",
+  past_due: "bg-status-danger text-status-danger-foreground",
+  canceled: "bg-status-neutral text-status-neutral-foreground",
+  paused:   "bg-status-warning text-status-warning-foreground",
 };
 
 const INVOICE_STATUS: Record<string, string> = {
-  paid:    "bg-emerald-100 text-emerald-700",
-  issued:  "bg-blue-100 text-blue-700",
-  overdue: "bg-red-100 text-red-600",
-  draft:   "bg-gray-100 text-gray-600",
-  void:    "bg-gray-100 text-gray-400 line-through",
+  paid:    "bg-status-success text-status-success-foreground",
+  issued:  "bg-status-info text-status-info-foreground",
+  overdue: "bg-status-danger text-status-danger-foreground",
+  draft:   "bg-status-neutral text-status-neutral-foreground",
+  void:    "bg-status-neutral text-status-neutral-foreground line-through",
 };
 
 // ── Plan card ─────────────────────────────────────────────────────────────────
@@ -330,7 +330,7 @@ export default function SubscriptionManagement() {
                       Annual
                     </span>
                     {annual && (
-                      <Badge className="bg-emerald-100 text-emerald-700 text-xs px-1.5 py-0 h-4">
+                      <Badge className="bg-status-success text-status-success-foreground text-xs px-1.5 py-0 h-4">
                         Save 2 months
                       </Badge>
                     )}
