@@ -37,11 +37,9 @@ export const LeadCard = React.forwardRef<HTMLDivElement, LeadCardProps>(function
     action?.(e);
   };
 
-  const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      onClick?.();
-    }
+  const handleOpen = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onClick?.();
   };
 
   const getScoreColor = (score: number | null) => {
@@ -63,14 +61,11 @@ export const LeadCard = React.forwardRef<HTMLDivElement, LeadCardProps>(function
   const scoreValue = lead.lead_score ?? 0;
 
   return (
-    <Card 
+    <Card
       ref={ref}
-      tabIndex={0}
       data-lead-id={lead.id}
-      role="button"
-      aria-label={`${fullName}, ${statusLabel}, score ${scoreValue}`}
       className={cn(
-        "group relative flex min-h-[300px] flex-col overflow-hidden border-muted transition-all hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+        "group relative flex min-h-[300px] flex-col overflow-hidden border-muted transition-all hover:shadow-md",
         selected && "ring-2 ring-primary border-primary",
         highlighted && "border-primary/40 bg-primary/5",
         activeMatch && "ring-2 ring-amber-500/80 border-amber-500 bg-amber-500/10",
@@ -78,7 +73,6 @@ export const LeadCard = React.forwardRef<HTMLDivElement, LeadCardProps>(function
       )}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
-      onKeyDown={handleCardKeyDown}
     >
       <div className="absolute top-3 left-3 z-10">
         <Checkbox 
@@ -97,7 +91,14 @@ export const LeadCard = React.forwardRef<HTMLDivElement, LeadCardProps>(function
         <div className="flex items-start justify-between gap-3 pl-8">
           <div className="space-y-1 min-w-0">
             <h3 className="truncate text-base font-semibold leading-tight" title={fullName}>
-              {fullName}
+              <button
+                type="button"
+                onClick={handleOpen}
+                className="text-left font-semibold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                aria-label={`Open ${fullName}`}
+              >
+                {fullName}
+              </button>
             </h3>
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <Building2 className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />

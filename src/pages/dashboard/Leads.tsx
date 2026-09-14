@@ -1642,18 +1642,19 @@ export default function Leads() {
         )}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold">{t('leads.title', 'Leads Workspace')}</h1>
+            <h2 className="text-2xl font-semibold">{t('leads.title', 'Leads Workspace')}</h2>
             <p className="text-sm text-muted-foreground">
               {t('leads.subtitle', 'Tenant-scoped lead lifecycle management with list, card, and pipeline workflows.')}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary">Tenant: {context?.tenantId || 'unscoped'}</Badge>
-            <Button variant="outline" onClick={refreshLeads} disabled={loading}>
+          <div className="flex flex-wrap items-center gap-2 min-w-0">
+            <Badge variant="secondary" className="shrink min-w-0 truncate">Tenant: {context?.tenantId || 'unscoped'}</Badge>
+            <Button variant="outline" className="shrink-0" onClick={refreshLeads} disabled={loading}>
               {loading ? t('leads.actions.refreshing', 'Refreshing...') : t('leads.actions.refresh', 'Refresh')}
             </Button>
             <Button
               variant="outline"
+              className="shrink-0"
               onClick={() => {
                 const params = buildLeadsImportExportParams({
                   viewMode,

@@ -118,7 +118,7 @@ export function LeadsFilterToolbar({
           )}
 
           <Select value={statusFilter} onValueChange={onStatusFilterChange}>
-            <SelectTrigger className="h-7 w-[160px] shrink-0 bg-background px-1">
+            <SelectTrigger className="h-7 w-[160px] shrink-0 bg-background px-1" aria-label="Filter by status">
               <Filter className="mr-0.5 h-4 w-4 text-muted-foreground" />
               <SelectValue placeholder={t('leads.filters.status', 'Stage')} />
             </SelectTrigger>
@@ -135,7 +135,7 @@ export function LeadsFilterToolbar({
           </Select>
 
           <Select value={ownerFilter} onValueChange={(v) => onOwnerFilterChange(v as 'any' | 'unassigned' | 'me')}>
-            <SelectTrigger className="h-7 w-[160px] shrink-0 bg-background px-1">
+            <SelectTrigger className="h-7 w-[160px] shrink-0 bg-background px-1" aria-label="Filter by owner">
               <UsersIcon className="mr-0.5 h-4 w-4 text-muted-foreground" />
               <SelectValue placeholder={t('leads.filters.owner', 'Owner')} />
             </SelectTrigger>
@@ -147,7 +147,7 @@ export function LeadsFilterToolbar({
           </Select>
 
           <Select value={scoreFilter} onValueChange={onScoreFilterChange}>
-            <SelectTrigger className="h-7 w-[160px] shrink-0 bg-background px-1">
+            <SelectTrigger className="h-7 w-[160px] shrink-0 bg-background px-1" aria-label="Filter by score">
               <TrendingUp className="mr-0.5 h-4 w-4 text-muted-foreground" />
               <SelectValue placeholder={t('leads.filters.score', 'Score')} />
             </SelectTrigger>
@@ -193,7 +193,7 @@ export function LeadsFilterToolbar({
 
           <div className="flex flex-nowrap items-center gap-0.5 shrink-0">
             <Select value={nameOp} onValueChange={(v) => onNameOpChange(v as TextOp)}>
-              <SelectTrigger className="h-7 w-[130px] bg-background px-1">
+              <SelectTrigger className="h-7 w-[130px] bg-background px-1" aria-label="Name match type">
                 <SelectValue placeholder={t('leads.filters.nameMatch', 'Name Match')} />
               </SelectTrigger>
               <SelectContent>
