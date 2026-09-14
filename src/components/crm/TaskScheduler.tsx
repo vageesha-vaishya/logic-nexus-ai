@@ -100,12 +100,34 @@ const TaskItem = ({ task, onComplete }: { task: Task; onComplete?: (id: string) 
   </div>
 );
 
+type TaskTabValue = 'upcoming' | 'overdue' | 'completed';
+
+const TASK_TAB_VALUES: TaskTabValue[] = ['upcoming', 'overdue', 'completed'];
+
 export function TaskScheduler({ tasks: initialTasks, onAddTask, onCompleteTask, className }: TaskSchedulerProps) {
-  const [activeTab, setActiveTab] = useState('upcoming');
-  
+  const [activeTab, setActiveTab] = useState<TaskTabValue>('upcoming');
+
   const upcomingTasks = initialTasks.filter(t => t.status !== 'completed' && !isPast(new Date(t.due_date)));
   const overdueTasks = initialTasks.filter(t => t.status === 'overdue' || (t.status !== 'completed' && isPast(new Date(t.due_date)) && !isToday(new Date(t.due_date))));
   const completedTasks = initialTasks.filter(t => t.status === 'completed');
+
+  const renderTaskList = () => {
+    if (activeTab === 'upcoming') {
+      return upcomingTasks.length > 0 ? (
+        upcomingTasks.map(task => <TaskItem key={task.id} task={task} onComplete={onCompleteTask} />)
+      ) : <div className="text-center py-8 text-muted-foreground">No upcoming tasks</div>;
+    }
+
+    if (activeTab === 'overdue') {
+      return overdueTasks.length > 0 ? (
+        overdueTasks.map(task => <TaskItem key={task.id} task={task} onComplete={onCompleteTask} />)
+      ) : <div className="text-center py-8 text-muted-foreground">No overdue tasks</div>;
+    }
+
+    return completedTasks.length > 0 ? (
+      completedTasks.map(task => <TaskItem key={task.id} task={task} />)
+    ) : <div className="text-center py-8 text-muted-foreground">No completed tasks</div>;
+  };
 
   return (
     <Card className={cn("h-full flex flex-col", className)}>
@@ -119,9 +141,13 @@ export function TaskScheduler({ tasks: initialTasks, onAddTask, onCompleteTask, 
           New Task
         </Button>
       </CardHeader>
-      
-      <div className="px-6">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => setActiveTab(value as TaskTabValue)}
+        className="flex-1 flex flex-col min-h-0"
+      >
+        <div className="px-6">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="upcoming">
               Upcoming
@@ -135,32 +161,20 @@ export function TaskScheduler({ tasks: initialTasks, onAddTask, onCompleteTask, 
             </TabsTrigger>
             <TabsTrigger value="completed">Completed</TabsTrigger>
           </TabsList>
-        </Tabs>
-      </div>
+        </div>
 
-      <CardContent className="flex-1 pt-4 min-h-0">
-        <ScrollArea className="h-[400px] pr-4">
-          <div className="space-y-3">
-            {activeTab === 'upcoming' && (
-              upcomingTasks.length > 0 ? (
-                upcomingTasks.map(task => <TaskItem key={task.id} task={task} onComplete={onCompleteTask} />)
-              ) : <div className="text-center py-8 text-muted-foreground">No upcoming tasks</div>
-            )}
-            
-            {activeTab === 'overdue' && (
-              overdueTasks.length > 0 ? (
-                overdueTasks.map(task => <TaskItem key={task.id} task={task} onComplete={onCompleteTask} />)
-              ) : <div className="text-center py-8 text-muted-foreground">No overdue tasks</div>
-            )}
-            
-            {activeTab === 'completed' && (
-              completedTasks.length > 0 ? (
-                completedTasks.map(task => <TaskItem key={task.id} task={task} />)
-              ) : <div className="text-center py-8 text-muted-foreground">No completed tasks</div>
-            )}
-          </div>
-        </ScrollArea>
-      </CardContent>
+        <CardContent className="flex-1 pt-4 min-h-0">
+          <ScrollArea className="h-[400px] pr-4">
+            <div className="space-y-3">
+              {TASK_TAB_VALUES.map((value) => (
+                <TabsContent key={value} value={value} className="mt-0 space-y-3">
+                  {value === activeTab ? renderTaskList() : null}
+                </TabsContent>
+              ))}
+            </div>
+          </ScrollArea>
+        </CardContent>
+      </Tabs>
     </Card>
   );
 }

@@ -4,7 +4,7 @@ import { useMemo, useEffect, useRef } from "react";
 import { KanbanCard, KanbanItem } from "./KanbanCard";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import { GripVertical, MoreHorizontal, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AnimatePresence, motion } from "framer-motion";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -100,6 +100,7 @@ export function KanbanColumn({
 }: KanbanColumnProps) {
   const {
     setNodeRef,
+    setActivatorNodeRef,
     attributes,
     listeners,
     transform,
@@ -196,11 +197,9 @@ export function KanbanColumn({
       data-testid={`kanban-column-${column.id}`}
       data-column-id={column.id}
     >
-      <div 
-        {...attributes} 
-        {...listeners}
+      <div
         className={cn(
-          "flex items-center justify-between p-2 cursor-grab active:cursor-grabbing relative group",
+          "flex items-center justify-between p-2 relative group",
           themeVariant === "reference"
             ? "rounded-md bg-white border border-[#e4e8f0] shadow-none pt-2.5"
             : "rounded-lg bg-card border shadow-sm",
@@ -211,18 +210,28 @@ export function KanbanColumn({
           <div className={cn("absolute inset-x-0 top-0 h-0.5 rounded-t-md", accentColorClass)} />
         )}
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            ref={setActivatorNodeRef}
+            {...attributes}
+            {...listeners}
+            aria-label={`Drag ${column.title} to reorder`}
+            className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground cursor-grab active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-ring -ml-1"
+          >
+            <GripVertical className="h-4 w-4" />
+          </button>
           <h3 className="font-semibold text-sm" data-testid={`kanban-column-title-${column.id}`}>{column.title}</h3>
           <Badge variant="secondary" className={cn("text-xs px-1.5 py-0 h-4", themeVariant === "reference" && "bg-[#f4f7fb] text-[#344054]")}>
             {column.items.length}
           </Badge>
         </div>
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Button variant="ghost" size="icon" className="h-6 w-6">
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+          <Button variant="ghost" size="icon" aria-label={`Add card to ${column.title}`} className="h-6 w-6">
             <Plus className="h-4 w-4 text-muted-foreground" />
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-6 w-6">
+              <Button variant="ghost" size="icon" aria-label={`Column options for ${column.title}`} className="h-6 w-6">
                 <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
               </Button>
             </DropdownMenuTrigger>

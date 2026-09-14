@@ -9,7 +9,7 @@ import { motion, useMotionValue } from "framer-motion";
 import { memo } from "react";
 import { EditableText } from "@/components/ui/editable-text";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { ExternalLink, MoreHorizontal, Trash2 } from "lucide-react";
+import { ExternalLink, GripVertical, MoreHorizontal, Trash2 } from "lucide-react";
 import { UrgencyDot, computeUrgency } from "@/components/urgency-dot";
 
 export interface KanbanItem {
@@ -51,6 +51,7 @@ interface KanbanCardProps {
 export const KanbanCard = memo(function KanbanCard({ item, isOverlay, onUpdate, onView, onDelete, themeVariant = "default" }: KanbanCardProps) {
   const {
     setNodeRef,
+    setActivatorNodeRef,
     attributes,
     listeners,
     transform,
@@ -110,15 +111,23 @@ export const KanbanCard = memo(function KanbanCard({ item, isOverlay, onUpdate, 
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
       className={cn(
-        "touch-none group relative",
-        isOverlay ? "cursor-grabbing rotate-2 scale-105 z-50" : "cursor-grab",
-        "focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-lg"
+        "group relative",
+        isOverlay ? "cursor-grabbing rotate-2 scale-105 z-50" : "",
+        "focus-within:ring-2 focus-within:ring-primary/50 rounded-lg"
       )}
     >
-      <Card 
+      <button
+        type="button"
+        ref={setActivatorNodeRef}
+        {...attributes}
+        {...listeners}
+        aria-label={`Drag ${item.title} to another column`}
+        className="absolute left-1 top-1 z-10 flex h-5 w-5 touch-none items-center justify-center rounded text-muted-foreground cursor-grab active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+      <Card
         className={cn(
           "relative overflow-hidden transition-all duration-300 ease-in-out border-l-4 transform-gpu",
           priorityBorderColors[item.priority || "low"],
@@ -169,6 +178,7 @@ export const KanbanCard = memo(function KanbanCard({ item, isOverlay, onUpdate, 
                   <Button
                     variant="ghost"
                     size="icon"
+                    aria-label={`View ${item.title}`}
                     className="h-6 w-6 -mr-1 -mt-1 text-muted-foreground hover:text-foreground"
                     onClick={(e) => {
                       e.stopPropagation();
@@ -185,6 +195,7 @@ export const KanbanCard = memo(function KanbanCard({ item, isOverlay, onUpdate, 
                       <Button
                         variant="ghost"
                         size="icon"
+                        aria-label={`Actions for ${item.title}`}
                         className="h-6 w-6 -mr-1 -mt-1 text-muted-foreground hover:text-foreground"
                         onPointerDown={(e) => e.stopPropagation()}
                       >
