@@ -27,7 +27,7 @@ const cellPassed = c => (c.layout?.passed ?? true) && (c.axe?.passed ?? true) &&
 const cell = s => String(s ?? '').replace(/\|/g, '\\|').replace(/\s*\n\s*/g, ' ');
 
 /** Playwright error messages carry ANSI colour codes; REPORT.md is plain Markdown. */
-const ANSI = new RegExp(String.fromCharCode(27) + '?\\[[0-9;]*m', 'g');
+const ANSI = new RegExp(String.fromCharCode(27) + '\\[[0-9;]*m', 'g'); // ESC [ digits ; m — ESC is mandatory; built from char code so no raw escape sits in this source
 export const stripAnsi = s => String(s ?? '').replace(ANSI, '');
 
 /** One-line summary of an `error`: an `expect(` header plus the first non-empty line after it, else the first line. */
@@ -53,7 +53,7 @@ export function buildReport(cells, meta) {
   const matrix = cells.filter(c => c.kind === 'matrix');
   const keyboard = cells.filter(c => c.kind === 'keyboard');
   const aria = cells.filter(c => c.kind === 'aria');
-  const pages = [...new Set(cells.map(c => c.page))];
+  const pages = [...new Set(matrix.map(c => c.page))]; // keyboard-only rows (dashboard-onboarding) stay out of the matrix tables
   const L = [];
 
   L.push('# Design System Verification Report');
@@ -144,11 +144,11 @@ export function buildReport(cells, meta) {
 
   L.push('## Keyboard walk (1280, light)');
   L.push('');
-  L.push('| Page | Engine | Stops | Result | First failure |');
+  L.push('| Page | Engine | Stops (visited/focusable) | Result | First failure |');
   L.push('|---|---|---|---|---|');
   for (const c of keyboard) {
     const k = c.keyboard;
-    L.push(`| ${cell(c.page)} | ${cell(c.engine)} | ${k?.stops.length ?? 0} | ${k?.passed ? '✅' : '❌'} | ${cell(k?.failures[0] ?? errorSummary(c.error))} |`);
+    L.push(`| ${cell(c.page)} | ${cell(c.engine)} | ${k ? `${k.stops.length}${k.focusableCount != null ? `/${k.focusableCount}` : ''}` : 0} | ${k?.passed ? '✅' : '❌'} | ${cell(k?.failures[0] ?? errorSummary(c.error))} |`);
   }
   L.push('');
   for (const c of keyboard) {

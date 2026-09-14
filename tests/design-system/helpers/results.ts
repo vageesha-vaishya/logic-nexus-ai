@@ -35,7 +35,7 @@ export interface CellResult {
   scrollHeight?: number;
   layout?: { passed: boolean; offenders: string[] };
   axe?: { passed: boolean; violations: AxeViolationSummary[]; disabledRules: { id: string; reason: string }[] };
-  keyboard?: { passed: boolean; stops: FocusStop[]; failures: string[] };
+  keyboard?: { passed: boolean; stops: FocusStop[]; failures: string[]; focusableCount?: number };
   aria?: { passed: boolean; failures: string[]; snapshot: string };
   error?: string;
 }

@@ -5,19 +5,34 @@ import type { FocusStop } from './results';
  * Spec §3.4. Presses Tab up to `max` times from <body>. Each stop must be
  * visible, show a visible focus indicator (outline, or a box-shadow that
  * differs from its unfocused value), and not sit inside aria-hidden. A repeat
- * visit to a non-first element before the sequence wraps is a focus trap.
+ * visit to a non-first element before the sequence wraps is a focus trap; a
+ * wrap after visiting only a small fraction of the page's focusable elements
+ * (an overlay such as the onboarding tour) is reported as confinement.
  */
 export async function walkTabOrder(
   page: Page,
   max = 40,
-): Promise<{ stops: FocusStop[]; failures: string[]; passed: boolean }> {
-  await page.evaluate(() => {
+): Promise<{ stops: FocusStop[]; failures: string[]; passed: boolean; focusableCount: number }> {
+  const focusableCount = await page.evaluate(() => {
     (document.activeElement as HTMLElement | null)?.blur?.();
     document.querySelectorAll('[data-ds-walk]').forEach(el => el.removeAttribute('data-ds-walk'));
+    const candidates = document.querySelectorAll<HTMLElement>(
+      'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
+    let n = 0;
+    for (const el of candidates) {
+      if ((el as HTMLButtonElement).disabled || el.getAttribute('aria-disabled') === 'true') continue;
+      if (el.closest('[aria-hidden="true"]')) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0) continue;
+      n++;
+    }
+    return n;
   });
 
   const stops: FocusStop[] = [];
   const failures: string[] = [];
+  let wrappedToFirst = false;
 
   for (let i = 0; i < max; i++) {
     await page.keyboard.press('Tab');
@@ -62,7 +77,7 @@ export async function walkTabOrder(
 
     if ('wrapped' in stop) break;
     if ('repeat' in stop) {
-      if (stop.repeat === 0) break; // wrapped back to the first stop — sequence complete
+      if (stop.repeat === 0) { wrappedToFirst = true; break; } // wrapped back to the first stop
       failures.push(`focus trap: returned to stop #${stop.repeat} at press ${i + 1}`);
       break;
     }
@@ -74,5 +89,9 @@ export async function walkTabOrder(
   }
 
   if (stops.length === 0) failures.push('no element received focus');
-  return { stops, failures, passed: failures.length === 0 };
+  // A short cycle through a fraction of the focusable elements is an overlay/trap, not a complete sequence.
+  if (wrappedToFirst && stops.length < max && stops.length <= Math.max(2, Math.floor(focusableCount * 0.5))) {
+    failures.push(`focus confined to ${stops.length} of ${focusableCount} focusable elements (possible trap/overlay)`);
+  }
+  return { stops, failures, passed: failures.length === 0, focusableCount };
 }

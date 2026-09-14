@@ -51,6 +51,10 @@ export default defineConfig({
       use: {
         ...devices['Desktop Firefox'],
         storageState: AUTH_STATE,
+        // Playwright's trace snapshotter throws RangeError: Invalid string length on
+        // contacts-list under Firefox and every later locator check returns undefined;
+        // with tracing off the same cells complete.
+        trace: 'off',
         ...(firefoxNoSandbox
           ? {
               launchOptions: {

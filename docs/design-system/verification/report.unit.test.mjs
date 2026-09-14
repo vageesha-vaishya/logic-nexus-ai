@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildReport, expectedCellIds } from './generate-report.mjs';
+import { buildReport, expectedCellIds, stripAnsi } from './generate-report.mjs';
 
 const meta = { date: '2026-09-13', commit: 'abc1234', engines: { chromium: '142.0', firefox: '145.0', webkit: '26.0', msedge: '142.0' } };
 
@@ -17,7 +17,7 @@ const cells = [
     layout: { passed: true, offenders: [] },
     axe: { passed: true, violations: [], disabledRules: [] } },
   { kind: 'keyboard', page: 'leads-list', route: '/dashboard/leads', engine: 'chromium', width: 1280, height: 800, mode: 'light',
-    keyboard: { passed: false, stops: [{ index: 0, tag: 'a', role: null, name: 'Skip to content', visibleFocus: true, visible: true, inAriaHidden: false }], failures: ['stop #3 <button> "Filter" has no visible focus indicator'] } },
+    keyboard: { passed: false, focusableCount: 47, stops: [{ index: 0, tag: 'a', role: null, name: 'Skip to content', visibleFocus: true, visible: true, inAriaHidden: false }], failures: ['stop #3 <button> "Filter" has no visible focus indicator'] } },
   { kind: 'aria', page: 'leads-list', route: '/dashboard/leads', engine: 'chromium', width: 1280, height: 800, mode: 'light',
     aria: { passed: true, failures: [], snapshot: 'aria/leads-list-chromium.yaml' } },
 ];
@@ -46,6 +46,16 @@ describe('buildReport', () => {
     expect(md).toContain('div.toolbar right=412 > 360');
     expect(md).toContain('has no visible focus indicator');
     expect(md).toContain('aria/leads-list-chromium.yaml');
+    expect(md).toContain('| leads-list | chromium | 1/47 | ❌ |');
+  });
+
+  it('keeps keyboard-only rows out of the matrix tables', () => {
+    const withTour = [...cells, { kind: 'keyboard', page: 'dashboard-onboarding', route: '/dashboard', engine: 'chromium', width: 1280, height: 800, mode: 'light',
+      keyboard: { passed: false, focusableCount: 40, stops: [], failures: ['focus confined to 2 of 40 focusable elements (possible trap/overlay)'] } }];
+    const out = buildReport(withTour, meta);
+    const matrixLight = out.split('## Matrix — light mode')[1].split('## Matrix — dark mode')[0];
+    expect(matrixLight).not.toContain('dashboard-onboarding');
+    expect(out).toMatch(/\| dashboard-onboarding \| chromium \| 0\/40 \| ❌ \|/);
   });
 
   it('highlights engine divergence when a gate passes in one engine and fails in another', () => {
@@ -89,6 +99,7 @@ describe('buildReport error rendering and completeness', () => {
     const md = buildReport(errCells, meta);
     expect(md).not.toContain(ESC);
     expect(md).not.toMatch(/\[\d+m/);
+    expect(stripAnsi('[2m literal brackets stay')).toBe('[2m literal brackets stay'); // ESC is mandatory
     expect(md).toContain("aria themes/webkit/1280/light: `expect(locator).toBeVisible() failed — Locator: locator('#main-content')`");
   });
 

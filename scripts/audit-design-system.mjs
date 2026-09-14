@@ -44,6 +44,13 @@ async function isServing() {
   }
 }
 
+/** A server not started with DS_HARNESS=1 still emits `upgrade-insecure-requests`, which blanks WebKit. */
+async function servesHarnessCsp() {
+  const res = await fetch(SERVER_URL, { signal: AbortSignal.timeout(5_000) });
+  const csp = res.headers.get('content-security-policy') ?? '';
+  return !/upgrade-insecure-requests/i.test(csp);
+}
+
 async function waitForServer(timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -123,7 +130,12 @@ async function main() {
 
   let vite = null;
   if (await isServing()) {
-    console.log(`[audit] reusing the server already on ${SERVER_URL} (make sure it was started with DS_HARNESS=1)`);
+    if (!(await servesHarnessCsp())) {
+      throw new Error(
+        `a server on ${SERVER_URL} sends a CSP with upgrade-insecure-requests, i.e. it was not started with DS_HARNESS=1 — WebKit would render blank. Stop it (or restart it with DS_HARNESS=1) and re-run.`,
+      );
+    }
+    console.log(`[audit] reusing the server already on ${SERVER_URL} (CSP verified: no upgrade-insecure-requests)`);
   } else {
     vite = startVite();
     await waitForServer(180_000);

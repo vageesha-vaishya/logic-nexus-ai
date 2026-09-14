@@ -35,9 +35,10 @@ export async function applyModeInitScript(
  * empty list. Observed request: `<supabase>/rest/v1/ui_themes?select=…&scope=eq.user&user_id=eq.…`.
  */
 export async function stubSavedTheme(page: Page): Promise<void> {
-  await page.route(/\/rest\/v1\/ui_themes(\?|$)/, route =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }),
-  );
+  await page.route(/\/rest\/v1\/ui_themes(\?|$)/, route => {
+    if (route.request().method() !== 'GET') return route.continue();
+    return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+  });
 }
 
 /**
