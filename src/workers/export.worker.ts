@@ -54,8 +54,12 @@ self.onmessage = async (event: MessageEvent<IncomingMessage>) => {
         }
         break;
 
-      default:
-        throw new Error(`Unknown message type: ${type}`);
+      default: {
+        // `msg` is narrowed to `never` here; the cast keeps the runtime
+        // message useful if an unknown type ever arrives.
+        const unknown: never = msg;
+        throw new Error(`Unknown message type: ${(unknown as { type?: string }).type}`);
+      }
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

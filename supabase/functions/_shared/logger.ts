@@ -56,11 +56,14 @@ export class Logger {
   private maskObject(obj: any): any {
     if (!obj) return obj;
     if (obj instanceof Error) {
+      // Error.cause is ES2022; the app tsconfig's lib is ES2020, so type it
+      // explicitly rather than widening compiler settings for one field.
+      const cause = (obj as Error & { cause?: unknown }).cause;
       return {
         message: this.maskPII(obj.message),
         name: obj.name,
         stack: obj.stack,
-        cause: obj.cause ? this.maskObject(obj.cause) : undefined
+        cause: cause ? this.maskObject(cause) : undefined
       };
     }
     if (typeof obj === 'string') return this.maskPII(obj);

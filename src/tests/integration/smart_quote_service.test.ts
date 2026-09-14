@@ -76,20 +76,30 @@ describe('Smart Quote Integration (Service Layer)', () => {
 
   it('should persist AI-generated quote options with correct attribution', async () => {
     // Simulate AI Advisor Response
+    // Shaped to what QuoteOptionService actually reads (string carrier,
+    // transitTime, tier, reliability object) -- the service declares its own
+    // loose RateOption, so the shared types/quote-breakdown one is not the
+    // contract here. The previous nested-object carrier / snake_case
+    // transit_time shape was stale: the service reads rate.carrier as a string
+    // and rate.transitTime, so it would have persisted an object as carrier_name.
     const mockAiRate = {
-      carrier: { name: 'AI Air Lines', id: 'carrier-ai-123' },
+      id: 'rate-ai-123',
+      name: 'AI Air Lines Express',
+      carrier: 'AI Air Lines',
       price: 1500.00,
       currency: 'USD',
-      transit_time: '12 hours',
+      transitTime: '12 hours',
+      tier: 'spot',
       service_type: 'Express',
-      reliability_score: 0.95,
+      reliability: { score: 0.95, on_time_performance: '95%' },
       ai_explanation: 'Based on historical data and current market rates.',
       source_attribution: 'AI Smart Engine',
       legs: [
         {
+          id: 'leg-1',
           origin: 'JFK',
           destination: 'LHR',
-          mode: 'AIR',
+          mode: 'air',
           carrier: 'AI Air Lines'
         }
       ],

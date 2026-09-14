@@ -58,9 +58,12 @@ runTests('Enhanced Container Logic Integration', () => {
   
   // Data
   const shortSuffix = String(timestamp).slice(-6);
-  const testType = { 
-    code: `TL${shortSuffix}`, 
-    name: `Test Logic Type ${timestamp}`
+  const testType = {
+    code: `TL${shortSuffix}`,
+    name: `Test Logic Type ${timestamp}`,
+    // Required (NOT NULL) on container_types; the row shape in the generated
+    // Supabase types rejects the insert without it.
+    category: 'dry',
   };
   
   // public.container_sizes has no name/code/teu_factor/iso_code/type_id
@@ -184,8 +187,11 @@ runTests('Enhanced Container Logic Integration', () => {
     // below are pre-existing, out-of-scope breakage unrelated to the
     // container_sizes column fix above; flagging rather than changing
     // behavior here.
-    // View query
-    const { data: rawViewData, error: viewError } = await supabase
+    // View query. The view is absent from the generated Supabase types (and,
+    // per the note above, from the production DB), so the relation name is
+    // cast: this keeps typecheck honest about the rest of the file without
+    // pretending the view is typed.
+    const { data: rawViewData, error: viewError } = await (supabase as any)
       .from('view_container_inventory_summary')
       .select('*')
       .eq('size_id', sizeId);

@@ -9,7 +9,7 @@ interface Breadcrumb {
   to?: string;
 }
 
-interface EnterpriseFormLayoutProps {
+export interface EnterpriseFormLayoutProps {
   breadcrumbs: Breadcrumb[];
   title: string;
   actions?: React.ReactNode;
