@@ -935,6 +935,20 @@ Append a row to the disposition table:
 - §8 change log: one row per Task 2–11 (area, change, files).
 - Appendix B: remove the stale `EnterpriseButton/Form/Header/Modal/ActivityFeed` line (those components do not exist; the live `enterprise/` files are `EnterpriseCard/Components/FormLayout/Table/Tabs`, all imported), remove "Status/priority badge palettes … not tuned per mode", keep `LeadDetail/QuoteDetail`, "New" shells, real Safari/devices/screen reader, `lead-detail` unmeasured, WebKit link tabbing, and add "server-side pagination for Accounts (client-side Load more shipped)".
 
+- [ ] **Step 2b: Financial delta tokens — audit pairs + retune (ruling 2026-09-14)**
+
+The Task 5 review measured `text-up` on `bg-up-soft` at ~3.3:1 in light mode (`--up: 142 60% 38%` on `--up-soft: 142 60% 95%`); the sweep widened that pattern to ~9 markets files. Add to `PAIRS` in `docs/design-system/contrast-audit.mjs`:
+```js
+  // Financial delta pills (text-up on bg-up-soft etc.) — Task 5 review measured ~3.3:1 in light mode.
+  ['up on up-soft', 'up', 'up-soft', 4.5],
+  ['down on down-soft', 'down', 'down-soft', 4.5],
+  ['up on background', 'up', 'background', 4.5],
+  ['down on background', 'down', 'background', 4.5],
+  ['up-foreground on up', 'up-foreground', 'up', 4.5],
+  ['down-foreground on down', 'down-foreground', 'down', 4.5],
+```
+Run `npm run audit:contrast`; for every FAIL adjust **lightness only** of `--up` / `--down` (light block ≈ lines 159-164; dark block ≈ 351-356 of `src/index.css`) 2 points at a time until green (expect light `--up` to land near `142 60% 30%` and `--down` near `0 70% 40%`; if `*-foreground on *` (white on the solid) then fails, that pair is the solid-button case — lower the solid's lightness until both pass, or switch that foreground to ink the way `--success-foreground` does). Record every final ratio; the README §3.2 gets an "Up / Down" row from them.
+
 - [ ] **Step 3: Re-run the harness (services up if possible)**
 
 ```bash
