@@ -30,12 +30,13 @@ const cell = s => String(s ?? '').replace(/\|/g, '\\|').replace(/\s*\n\s*/g, ' '
 const ANSI = new RegExp(String.fromCharCode(27) + '?\\[[0-9;]*m', 'g');
 export const stripAnsi = s => String(s ?? '').replace(ANSI, '');
 
-/** One-line summary of an `error`: the first non-empty line after an `expect(` header, else the first line. */
+/** One-line summary of an `error`: an `expect(` header plus the first non-empty line after it, else the first line. */
 export function errorSummary(error) {
   const lines = stripAnsi(error).split('\n').map(l => l.trim()).filter(Boolean);
   if (!lines.length) return '';
   const header = lines.findIndex(l => /expect\(/.test(l));
-  return (header >= 0 && lines[header + 1]) || lines[0];
+  if (header < 0) return lines[0];
+  return lines[header + 1] ? `${lines[header]} — ${lines[header + 1]}` : lines[header];
 }
 
 /** Every cell id the full run should have produced: `${kind}-${page}-${engine}-${width}-${mode}`. */

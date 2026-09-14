@@ -89,7 +89,7 @@ describe('buildReport error rendering and completeness', () => {
     const md = buildReport(errCells, meta);
     expect(md).not.toContain(ESC);
     expect(md).not.toMatch(/\[\d+m/);
-    expect(md).toContain('aria themes/webkit/1280/light: `Locator: locator(\'#main-content\')`');
+    expect(md).toContain("aria themes/webkit/1280/light: `expect(locator).toBeVisible() failed — Locator: locator('#main-content')`");
   });
 
   it('lists every expected cell that produced no result file', () => {

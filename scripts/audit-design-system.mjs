@@ -11,6 +11,7 @@
 //   node scripts/audit-design-system.mjs                 # chromium, firefox, webkit, msedge
 //   node scripts/audit-design-system.mjs --quick         # chromium only
 //   node scripts/audit-design-system.mjs --engines=webkit,msedge
+//   node scripts/audit-design-system.mjs --workers=1        # halve browser memory on a busy machine
 import { spawn, spawnSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -90,7 +91,8 @@ async function backendServicesNote() {
   }
   const up = [];
   const down = [];
-  for (const s of services) {
+  // Entries without a `command` (remote Supabase, tenant branding) are not started by services:start.
+  for (const s of services.filter(s => s.command)) {
     const base = (s.urlEnv && process.env[s.urlEnv]) || s.defaultUrl;
     try {
       const res = await fetch(new URL(s.healthPath || '/', base), { signal: AbortSignal.timeout(3_000) });
@@ -102,11 +104,11 @@ async function backendServicesNote() {
   return `Backend services (npm run services:start) up: ${up.join(', ') || 'none'}; down: ${down.join(', ') || 'none'}.`;
 }
 
-function runEngine(engine) {
+function runEngine(engine, workers) {
   console.log(`\n[audit] === ${engine} (with fresh setup login) ===\n`);
   const res = spawnSync(
     'npx',
-    ['playwright', 'test', '-c', CONFIG, '--project=setup', `--project=${engine}`],
+    ['playwright', 'test', '-c', CONFIG, '--project=setup', `--project=${engine}`, ...(workers ? [`--workers=${workers}`] : [])],
     { cwd: REPO_ROOT, shell: true, stdio: 'inherit', env: { ...process.env, PLAYWRIGHT_REUSE_EXISTING_SERVER: 'true' } },
   );
   const status = res.status ?? 1;
@@ -116,7 +118,8 @@ function runEngine(engine) {
 
 async function main() {
   const engines = parseEngines(process.argv.slice(2));
-  console.log(`[audit] engines: ${engines.join(', ')}`);
+  const workers = process.argv.find(a => a.startsWith('--workers='))?.slice('--workers='.length);
+  console.log(`[audit] engines: ${engines.join(', ')}${workers ? `; workers: ${workers}` : ''}`);
 
   let vite = null;
   if (await isServing()) {
@@ -132,7 +135,7 @@ async function main() {
   console.log(`[audit] ${servicesNote}`);
   const statuses = {};
   try {
-    for (const engine of engines) statuses[engine] = runEngine(engine);
+    for (const engine of engines) statuses[engine] = runEngine(engine, workers);
   } finally {
     if (vite) killTree(vite);
   }
