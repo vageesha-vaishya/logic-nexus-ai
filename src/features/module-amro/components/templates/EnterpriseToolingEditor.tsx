@@ -58,6 +58,14 @@ interface EnterpriseToolingEditorProps {
   readOnly?: boolean;
 }
 
+const KNOWN_TOOL_CATEGORIES = new Set([
+  'hand_tool',
+  'power_tool',
+  'test_equipment',
+  'ground_support',
+  'special_tool',
+]);
+
 export function EnterpriseToolingEditor({
   tools,
   onChange,
@@ -159,16 +167,14 @@ export function EnterpriseToolingEditor({
     onChange(tools.filter((tool) => tool.id !== id));
   }, [tools, onChange]);
 
-  const getCategoryColor = (category: string) => {
-    const colors: Record<string, string> = {
-      hand_tool: 'bg-primary/10 text-primary',
-      power_tool: 'bg-primary/10 text-primary',
-      test_equipment: 'bg-primary/10 text-primary',
-      ground_support: 'bg-primary/10 text-primary',
-      special_tool: 'bg-primary/10 text-primary',
-    };
-    return colors[category] || 'bg-status-neutral text-status-neutral-foreground';
-  };
+  // Recognized tool categories all render the same non-alert chip; a
+  // category outside the known set (tool_category is a free-text DB column)
+  // still falls back to a neutral chip rather than being silently styled
+  // as a known category.
+  const getCategoryColor = (category: string) =>
+    KNOWN_TOOL_CATEGORIES.has(category)
+      ? 'bg-primary/10 text-primary'
+      : 'bg-status-neutral text-status-neutral-foreground';
 
   return (
     <div className="space-y-4">

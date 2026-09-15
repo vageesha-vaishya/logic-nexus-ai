@@ -27,15 +27,14 @@ export function PlanCard({ plan, isCurrentPlan, onSelect, showActions = true }: 
     ? plan.price_annual 
     : plan.price_monthly;
 
-  const getTierColor = (tier: string | null) => {
-    const colors: Record<string, string> = {
-      starter: 'bg-primary/10 text-primary',
-      professional: 'bg-primary/10 text-primary',
-      business: 'bg-primary/10 text-primary',
-      enterprise: 'bg-primary/10 text-primary',
-    };
-    return tier ? colors[tier.toLowerCase()] || 'bg-status-neutral text-status-neutral-foreground' : 'bg-status-neutral text-status-neutral-foreground';
-  };
+  // Recognized tiers all render the same non-alert chip; an unrecognized
+  // tier value (e.g. a stale/legacy plan) still falls back to a neutral
+  // chip so it doesn't read as a normal, current tier.
+  const KNOWN_TIERS = new Set(['starter', 'professional', 'business', 'enterprise']);
+  const getTierColor = (tier: string | null) =>
+    tier && KNOWN_TIERS.has(tier.toLowerCase())
+      ? 'bg-primary/10 text-primary'
+      : 'bg-status-neutral text-status-neutral-foreground';
 
   return (
     <Card className={`relative ${isCurrentPlan ? 'border-primary shadow-lg' : ''}`}>

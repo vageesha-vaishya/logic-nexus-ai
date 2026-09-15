@@ -10,7 +10,7 @@ Generated 2026-09-14 at commit `8ee3fca8` by `npm run audit:design-system`. **Do
 - **Viewports** are emulated at 360/768/1280/1920; no real devices.
 - Gates: layout integrity (no page-level horizontal scroll, no unscrolled overflow), axe-core WCAG 2.1 A/AA `serious`+`critical`, keyboard visible-focus/no-trap (1280 light), ARIA structure (1280 light). axe `moderate`/`minor` are reported, not gated.
 - **WebKit's Tab skips links by default** (Safari reaches them with Option+Tab; Playwright's WebKit does not honour Alt+Tab); link focus visibility is not gated on WebKit, and links are not counted as Tab-reachable there.
-- **`lead-detail` was measured with the CRM API down**: the page renders only "Lead not found" and a "Failed to load lead" toast, so its keyboard/ARIA cells fail the content-readiness gate and are listed under "Cells that did not complete" rather than scored.
+- **`lead-detail`'s cells fail the content-readiness gate**: the page renders only "Lead not found" and a "Failed to load lead" toast, so its keyboard/ARIA cells are listed under "Cells that did not complete" rather than scored. This is a known harness bug, not backend availability — `resolveFirstLead` resolves a lead the current user's tenant scope can't open (see README Appendix B).
 
 ## Running
 

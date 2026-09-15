@@ -102,16 +102,16 @@ describe('buildReport', () => {
     expect(rowKeys(out.split('## ARIA structure')[1].split('## Engine')[0])).toEqual(['auth/firefox', 'auth/webkit', 'themes/msedge']);
   });
 
-  it('states the WebKit link-tabbing caveat, and the lead-detail API caveat only when the toast was a stop', () => {
+  it('states the WebKit link-tabbing caveat, and the lead-detail harness-bug caveat only when the toast was a stop', () => {
     expect(md).toMatch(/WebKit's Tab skips links/);
-    expect(md).not.toContain('CRM API down');
+    expect(md).not.toContain('content-readiness gate');
     const withToast = [...cells, { kind: 'keyboard', page: 'lead-detail', engine: 'chromium', width: 1280, height: 800, mode: 'light',
       keyboard: { passed: false, stops: [{ index: 0, tag: 'li', role: null, name: 'Failed to load leadUnknown error', visibleFocus: false, visible: true, inAriaHidden: false }], failures: ['x'] } }];
-    expect(buildReport(withToast, meta)).toContain('`lead-detail` was measured with the CRM API down');
+    expect(buildReport(withToast, meta)).toContain("`lead-detail`'s cells fail the content-readiness gate");
     const gateRefused = [...cells, { kind: 'aria', page: 'lead-detail', engine: 'webkit', width: 1280, height: 800, mode: 'light',
       error: ['expect(received).toBeGreaterThan(expected)', '', 'Expected: > 50', 'Received: 14'].join(String.fromCharCode(10)) }];
     const out = buildReport(gateRefused, meta);
-    expect(out).toContain('`lead-detail` was measured with the CRM API down');
+    expect(out).toContain("`lead-detail`'s cells fail the content-readiness gate");
     expect(out).toContain('aria lead-detail/webkit/1280/light: `expect(received).toBeGreaterThan(expected) — Expected: > 50 — Received: 14`');
   });
 

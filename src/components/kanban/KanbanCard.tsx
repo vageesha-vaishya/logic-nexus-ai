@@ -135,7 +135,7 @@ export const KanbanCard = memo(function KanbanCard({ item, isOverlay, onUpdate, 
           isOverlay ? "shadow-xl ring-2 ring-primary/20" : themeVariant === "reference" ? "shadow-none" : "shadow-sm"
         )}
       >
-        <CardHeader className="p-2.5 space-y-1.5">
+        <CardHeader className="pt-2.5 pr-2.5 pb-2.5 pl-7 space-y-1.5">
             <div className="flex justify-between items-start gap-2">
               <div className="space-y-1 flex-1">
                 <div className="flex items-center gap-2">

@@ -51,16 +51,10 @@ const getActivityIcon = (type: Activity['type']) => {
   }
 };
 
-const getActivityColor = (type: Activity['type']) => {
-  switch (type) {
-    case 'call': return 'bg-primary/10 text-primary';
-    case 'email': return 'bg-primary/10 text-primary';
-    case 'meeting': return 'bg-primary/10 text-primary';
-    case 'note': return 'bg-primary/10 text-primary';
-    case 'status_change': return 'bg-primary/10 text-primary';
-    default: return 'bg-status-neutral text-status-neutral-foreground';
-  }
-};
+// `Activity['type']` is a closed union — every member renders the same
+// non-alert chip (the icon already differentiates activity types), so this
+// is a constant rather than a per-type map.
+const ACTIVITY_BADGE_CLASS = 'bg-primary/10 text-primary';
 
 export function InteractionTimeline({ activities, onAddActivity, className }: InteractionTimelineProps) {
   return (
@@ -77,7 +71,7 @@ export function InteractionTimeline({ activities, onAddActivity, className }: In
           <div className="relative space-y-6 before:absolute before:inset-0 before:ml-5 before:-translate-x-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-200 before:to-transparent">
             {activities.map((activity) => (
               <div key={activity.id} className="relative flex items-start group">
-                <div className={`absolute left-0 flex items-center justify-center w-10 h-10 rounded-full ring-8 ring-white ${getActivityColor(activity.type)}`}>
+                <div className={`absolute left-0 flex items-center justify-center w-10 h-10 rounded-full ring-8 ring-white ${ACTIVITY_BADGE_CLASS}`}>
                   {getActivityIcon(activity.type)}
                 </div>
                 

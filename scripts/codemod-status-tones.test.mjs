@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest';
-import { rewriteClassString } from './codemod-status-tones.mjs';
+import { describe, expect, it, afterEach } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { rewriteClassString, rewriteFile } from './codemod-status-tones.mjs';
 
 describe('rewriteClassString', () => {
   it('rewrites a same-hue surface/text pair and drops its dark: siblings', () => {
@@ -63,5 +66,72 @@ describe('rewriteClassString', () => {
   it('is idempotent', () => {
     const once = rewriteClassString('bg-green-100 text-green-800').output;
     expect(rewriteClassString(once).output).toBe(once);
+  });
+});
+
+// `rewriteFile` is the file-level layer (reads from disk via `file`, writes back when
+// `write` is true) — two bugs were fixed here during Task 4's fix round (explicit CLI paths
+// bypassing the test-file skip, and sub-brand files not being skipped) with no regression
+// coverage until now. Real temp files under the OS temp dir, since rewriteFile reads from disk.
+describe('rewriteFile', () => {
+  const tmpFiles = [];
+
+  afterEach(() => {
+    for (const file of tmpFiles.splice(0)) {
+      fs.rmSync(file, { force: true });
+    }
+  });
+
+  function writeTempFile(name, content) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'codemod-status-tones-'));
+    const file = path.join(dir, name);
+    fs.writeFileSync(file, content);
+    tmpFiles.push(file);
+    return file;
+  }
+
+  it('skips a file whose name matches the test-file pattern, even when passed as an explicit path, and does not rewrite it', () => {
+    const file = writeTempFile('Widget.test.tsx', '<div className="bg-green-100 text-green-800" />');
+    const original = fs.readFileSync(file, 'utf8');
+
+    const result = rewriteFile(file, /* write */ true);
+
+    expect(result).toEqual({ file, skipped: 'test-file', changed: false, manual: [] });
+    expect(fs.readFileSync(file, 'utf8')).toBe(original);
+  });
+
+  it('skips a file containing a --sq- sub-brand token even though it also contains a rewritable pair', () => {
+    const file = writeTempFile(
+      'SubBrandWidget.tsx',
+      ':root { --sq-accent: 220 90% 50%; }\n<div className="bg-green-100 text-green-800" />'
+    );
+    const original = fs.readFileSync(file, 'utf8');
+
+    const result = rewriteFile(file, /* write */ true);
+
+    expect(result).toMatchObject({ file, skipped: 'sub-brand', changed: false, manual: [] });
+    expect(fs.readFileSync(file, 'utf8')).toBe(original);
+  });
+
+  it('skips a file containing a --sthira- sub-brand token even though it also contains a rewritable pair', () => {
+    const file = writeTempFile(
+      'SthiraWidget.tsx',
+      ':root { --sthira-accent: 220 90% 50%; }\n<div className="bg-green-100 text-green-800" />'
+    );
+
+    const result = rewriteFile(file, /* write */ true);
+
+    expect(result.skipped).toBe('sub-brand');
+    expect(result.changed).toBe(false);
+  });
+
+  it('rewrites and writes an eligible, non-sub-brand, non-test file (control case)', () => {
+    const file = writeTempFile('Widget.tsx', '<div className="bg-green-100 text-green-800" />');
+
+    const result = rewriteFile(file, /* write */ true);
+
+    expect(result.skipped).toBeNull();
+    expect(result.changed).toBe(true);
+    expect(fs.readFileSync(file, 'utf8')).toContain('bg-status-success text-status-success-foreground');
   });
 });

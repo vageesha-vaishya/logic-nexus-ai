@@ -65,9 +65,12 @@ export function expectedCellIds() {
 const cellId = c => `${c.kind}-${c.page}-${c.engine}-${c.width}-${c.mode}`;
 
 /**
- * True when lead-detail could not be measured as a real page: with the CRM API down it renders only
- * "Lead not found" plus a "Failed to load lead" toast, so its cells either fail the content gate
- * (error) or, before that gate existed, walked onto the toast.
+ * True when lead-detail could not be measured as a real page: it renders only "Lead not found" plus
+ * a "Failed to load lead" toast, so its cells either fail the content gate (error) or, before that
+ * gate existed, walked onto the toast. This is a harness bug, not a backend-availability issue: the
+ * Task 12 re-run had crm-api up and lead-detail still failed this way — the real cause is
+ * `resolveFirstLead` (tests/design-system/pages.ts) resolving a lead via the E2E admin's raw REST
+ * token, which the app's tenant-scoped `ScopedDataAccess` then can't find/open. See README Appendix B.
  */
 const leadDetailApiDown = cells =>
   cells.some(c => c.page === 'lead-detail' && (
@@ -95,7 +98,7 @@ export function buildReport(cells, meta) {
   L.push('- Gates: layout integrity (no page-level horizontal scroll, no unscrolled overflow), axe-core WCAG 2.1 A/AA `serious`+`critical`, keyboard visible-focus/no-trap (1280 light), ARIA structure (1280 light). axe `moderate`/`minor` are reported, not gated.');
   L.push("- **WebKit's Tab skips links by default** (Safari reaches them with Option+Tab; Playwright's WebKit does not honour Alt+Tab); link focus visibility is not gated on WebKit, and links are not counted as Tab-reachable there.");
   if (leadDetailApiDown(cells)) {
-    L.push('- **`lead-detail` was measured with the CRM API down**: the page renders only "Lead not found" and a "Failed to load lead" toast, so its keyboard/ARIA cells fail the content-readiness gate and are listed under "Cells that did not complete" rather than scored.');
+    L.push('- **`lead-detail`\'s cells fail the content-readiness gate**: the page renders only "Lead not found" and a "Failed to load lead" toast, so its keyboard/ARIA cells are listed under "Cells that did not complete" rather than scored. This is a known harness bug, not backend availability — `resolveFirstLead` resolves a lead the current user\'s tenant scope can\'t open (see README Appendix B).');
   }
   L.push('');
   L.push('## Running');
