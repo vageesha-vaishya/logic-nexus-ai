@@ -49,7 +49,7 @@ export default function LeadDetail() {
   const { isDark } = useTheme();
   const { state: viewState, setTheme, setView, setPipeline } = useLeadsViewState();
   const currentTheme = viewState.theme;
-  const threeSectionLeadWorkspace = useAppFeatureFlag(FEATURE_FLAGS.LEAD_THREE_SECTION_LAYOUT);
+  const { enabled: threeSectionLeadWorkspace } = useAppFeatureFlag(FEATURE_FLAGS.LEAD_THREE_SECTION_LAYOUT);
   const [lead, setLead] = useState<Lead | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);

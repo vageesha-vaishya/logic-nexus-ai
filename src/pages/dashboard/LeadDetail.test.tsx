@@ -22,12 +22,26 @@ vi.mock('@/features/module-sales/components/LeadForm', () => ({
   LeadForm: () => <div data-testid="lead-form" />,
 }));
 
+vi.mock('@/features/module-sales/components/LeadWorkspaceSections', () => ({
+  LeadWorkspaceSections: () => <div data-testid="lead-workspace-sections" />,
+}));
+
+const mockUseAppFeatureFlag = vi.fn();
+vi.mock('@/lib/feature-flags', () => ({
+  FEATURE_FLAGS: { LEAD_THREE_SECTION_LAYOUT: 'lead_three_section_layout' },
+  useAppFeatureFlag: () => mockUseAppFeatureFlag(),
+}));
+
 vi.mock('@/features/module-communications/components/email/EmailHistoryPanel', () => ({
   EmailHistoryPanel: () => <div data-testid="email-history-panel" />,
 }));
 
 vi.mock('@/features/module-sales/components/LeadConversionDialog', () => ({
   LeadConversionDialog: () => null,
+}));
+
+vi.mock('@/components/crm/audit/CRMAuditHistoryPanel', () => ({
+  CRMAuditHistoryPanel: () => <div data-testid="crm-audit-history-panel" />,
 }));
 
 vi.mock('@/components/layout/StickyActionsContext', () => ({
@@ -40,6 +54,10 @@ vi.mock('@/components/layout/StickyActionsContext', () => ({
 
 vi.mock('@/features/module-sales/components/assignment/ManualAssignment', () => ({
   ManualAssignment: () => <div data-testid="manual-assignment" />,
+}));
+
+vi.mock('@/hooks/useTheme', () => ({
+  useTheme: () => ({ isDark: false }),
 }));
 
 vi.mock('@/hooks/useLeadsViewState', () => ({
@@ -191,6 +209,7 @@ vi.mock('@/hooks/useCRM', () => {
 
 describe('LeadDetail', () => {
   beforeEach(() => {
+    mockUseAppFeatureFlag.mockReturnValue({ enabled: false, isLoading: false, error: null });
     locationState = {};
     fetchMock.mockReset();
     fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -259,5 +278,33 @@ describe('LeadDetail', () => {
     );
 
     expect(await screen.findByTestId('lead-form')).toBeInTheDocument();
+  });
+
+  it('renders LeadWorkspaceSections in edit mode when the flag is enabled', async () => {
+    mockUseAppFeatureFlag.mockReturnValue({ enabled: true, isLoading: false, error: null });
+    locationState = { openEdit: true, returnTo: '/dashboard/leads' };
+
+    render(
+      <BrowserRouter>
+        <LeadDetail />
+      </BrowserRouter>,
+    );
+
+    expect(await screen.findByTestId('lead-workspace-sections')).toBeInTheDocument();
+    expect(screen.queryByTestId('lead-form')).not.toBeInTheDocument();
+  });
+
+  it('renders the legacy LeadForm in edit mode when the flag is disabled', async () => {
+    mockUseAppFeatureFlag.mockReturnValue({ enabled: false, isLoading: false, error: null });
+    locationState = { openEdit: true, returnTo: '/dashboard/leads' };
+
+    render(
+      <BrowserRouter>
+        <LeadDetail />
+      </BrowserRouter>,
+    );
+
+    expect(await screen.findByTestId('lead-form')).toBeInTheDocument();
+    expect(screen.queryByTestId('lead-workspace-sections')).not.toBeInTheDocument();
   });
 });

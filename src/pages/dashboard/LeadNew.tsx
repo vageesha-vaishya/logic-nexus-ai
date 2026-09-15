@@ -22,7 +22,7 @@ export default function LeadNew() {
   const getCrmApiHeaders = useCrmApiHeaders();
   const { state: viewState, setTheme, setView, setPipeline } = useLeadsViewState();
   const currentTheme = viewState.theme;
-  const threeSectionLeadWorkspace = useAppFeatureFlag(FEATURE_FLAGS.LEAD_THREE_SECTION_LAYOUT);
+  const { enabled: threeSectionLeadWorkspace } = useAppFeatureFlag(FEATURE_FLAGS.LEAD_THREE_SECTION_LAYOUT);
 
   const handleThemeChange = (val: string) => {
     setTheme(val);
