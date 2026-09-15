@@ -318,14 +318,21 @@ export function EmailAccounts() {
                       >
                         {account.provider.replace("_", " ").toUpperCase()}
                       </Badge>
-                      <Badge 
+                      <Badge
                         variant="outline"
-                        className={account.is_active 
-                          ? "bg-status-success text-status-success-foreground border-status-success-border" 
-                          : "bg-muted/50 text-muted-foreground border-border"
+                        className={
+                          !account.is_active
+                            ? "bg-muted/50 text-muted-foreground border-border"
+                            : !connectedAccountIds.has(account.id) && (account.provider === 'gmail' || account.provider === 'office365')
+                              ? "bg-status-warning text-status-warning-foreground border-status-warning-border"
+                              : "bg-status-success text-status-success-foreground border-status-success-border"
                         }
                       >
-                        {account.is_active ? "Active" : "Inactive"}
+                        {!account.is_active
+                          ? "Inactive"
+                          : !connectedAccountIds.has(account.id) && (account.provider === 'gmail' || account.provider === 'office365')
+                            ? "Needs Re-auth"
+                            : "Active"}
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground truncate">
@@ -336,8 +343,8 @@ export function EmailAccounts() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {!connectedAccountIds.has(account.id) && (account.provider === 'gmail' || account.provider === 'office365') && (
-                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-md p-3 mb-2">
-                    <p className="text-xs text-yellow-600 dark:text-yellow-500 font-medium">
+                  <div className="bg-status-warning/10 border border-status-warning-border/30 rounded-md p-3 mb-2">
+                    <p className="text-xs text-status-warning-foreground font-medium">
                       ⚠️ Authorization Required: Click 'Re-authorize' to complete OAuth setup
                     </p>
                   </div>
