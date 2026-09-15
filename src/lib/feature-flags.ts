@@ -37,7 +37,7 @@ export const FEATURE_FLAGS = {
 export type FeatureFlagKey = (typeof FEATURE_FLAGS)[keyof typeof FEATURE_FLAGS];
 
 export function useAppFeatureFlag(key: FeatureFlagKey, defaultValue: boolean = false) {
-  const { isEnabled, isLoading, error } = useFeatureFlags();
+  const { isEnabled, isLoading, error } = useFeatureFlags([key]);
   const envOverride = resolveFeatureFlagEnvOverride(key);
   const enabled = envOverride ?? isEnabled(key, defaultValue);
   return { enabled, isLoading, error };

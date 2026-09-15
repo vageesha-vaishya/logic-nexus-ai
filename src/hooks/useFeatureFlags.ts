@@ -45,8 +45,12 @@ async function fetchFlagsFromEdge(
     const body = await res.json();
     return (body?.data?.flags ?? {}) as Record<string, boolean>;
   } catch {
-    // Graceful degradation: default all to false
-    return Object.fromEntries(keys.map(k => [k, false]));
+    // Fail-safe, not fail-false: an empty result means every key is
+    // ABSENT from resolvedFlags, so isEnabled(key, defaultValue) falls
+    // back to each caller's own default instead of forcing false. A
+    // transient failure (cold start, timeout, 5xx) must never override a
+    // call site whose default is `true`.
+    return {};
   }
 }
 
