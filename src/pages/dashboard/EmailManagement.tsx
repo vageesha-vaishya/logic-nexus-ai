@@ -116,7 +116,7 @@ export default function EmailManagement() {
                   className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-6 py-3"
                 >
                   <GitBranch className="w-4 h-4" />
-                  <span className="font-medium">Routing Rules</span>
+                  <span className="font-medium">Queue Rules</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="oauth" 
@@ -132,14 +132,14 @@ export default function EmailManagement() {
                   <Filter className="w-4 h-4" />
                   <span className="font-medium">Filters</span>
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="templates" 
+                <TabsTrigger
+                  value="clients"
                   className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-6 py-3"
                 >
-                  <FileText className="w-4 h-4" />
-                  <span className="font-medium">Templates</span>
+                  <Server className="w-4 h-4" />
+                  <span className="font-medium">Email Client</span>
                 </TabsTrigger>
-                <TabsTrigger 
+                <TabsTrigger
                   value="integrations" 
                   className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-6 py-3"
                 >
