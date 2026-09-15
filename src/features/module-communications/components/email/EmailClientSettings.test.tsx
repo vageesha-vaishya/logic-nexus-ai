@@ -50,26 +50,12 @@ vi.mock('@/integrations/supabase/client', () => ({
 import { EmailClientSettings } from './EmailClientSettings';
 import { toast } from '@/components/ui/use-toast';
 
-// The `Label` components in this form are plain sibling elements next to
-// their `Input` (no `htmlFor`/`id` association, no wrapping), so
-// `screen.getByLabelText` cannot resolve them per testing-library's
-// accessible-name rules. Locate the input via its label's sibling
-// container instead, matching the actual rendered DOM structure.
-function getInputByLabelText(text: string): HTMLInputElement {
-  const label = screen.getByText(text);
-  const input = label.parentElement?.querySelector('input');
-  if (!input) {
-    throw new Error(`No input found next to label "${text}"`);
-  }
-  return input as HTMLInputElement;
-}
-
 async function fillMinimalForm(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(getInputByLabelText('Email address'), 'test@example.com');
-  await user.type(getInputByLabelText('SMTP username'), 'test@example.com');
-  await user.type(getInputByLabelText('SMTP password'), 'smtp-secret');
-  await user.type(getInputByLabelText('IMAP username'), 'test@example.com');
-  await user.type(getInputByLabelText('IMAP password'), 'imap-secret');
+  await user.type(screen.getByLabelText('Email address'), 'test@example.com');
+  await user.type(screen.getByLabelText('SMTP username'), 'test@example.com');
+  await user.type(screen.getByLabelText('SMTP password'), 'smtp-secret');
+  await user.type(screen.getByLabelText('IMAP username'), 'test@example.com');
+  await user.type(screen.getByLabelText('IMAP password'), 'imap-secret');
 }
 
 describe('EmailClientSettings save form', () => {
@@ -112,7 +98,7 @@ describe('EmailClientSettings save form', () => {
         expect.objectContaining({ title: 'Email account saved' }),
       ),
     );
-    expect(getInputByLabelText('Email address').value).toBe('');
+    expect((screen.getByLabelText('Email address') as HTMLInputElement).value).toBe('');
   });
 
   it('shows a failure toast and does not reset the form when the function errors', async () => {
@@ -128,6 +114,6 @@ describe('EmailClientSettings save form', () => {
         expect.objectContaining({ title: 'Failed to save account', description: 'boom' }),
       ),
     );
-    expect(getInputByLabelText('Email address').value).toBe('test@example.com');
+    expect((screen.getByLabelText('Email address') as HTMLInputElement).value).toBe('test@example.com');
   });
 });

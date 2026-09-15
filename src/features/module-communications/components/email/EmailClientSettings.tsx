@@ -72,24 +72,6 @@ const PRESETS: Record<ProviderPreset, { smtp: Partial<SMTPSettings>; imap: Parti
   },
 };
 
-type DBEmailAccount = {
-  id: string;
-  provider: "smtp_imap" | "gmail" | "office365" | "other";
-  email_address: string;
-  display_name: string | null;
-  is_primary: boolean | null;
-  smtp_host: string | null;
-  smtp_port: number | null;
-  smtp_username: string | null;
-  smtp_password: string | null;
-  smtp_use_tls: boolean | null;
-  imap_host: string | null;
-  imap_port: number | null;
-  imap_username: string | null;
-  imap_password: string | null;
-  imap_use_ssl: boolean | null;
-};
-
 function emptyForm(): EmailAccountForm {
   return {
     display_name: "",
@@ -189,21 +171,19 @@ export const EmailClientSettings: React.FC = () => {
         settings: { preset: form.preset },
       },
     });
-    setSaving(false);
 
     if (error || !(data as any)?.success) {
+      setSaving(false);
       toast({ title: "Failed to save account", description: error?.message ?? "Failed to save account", variant: "destructive" });
       return;
     }
     toast({ title: "Email account saved", description: "SMTP/IMAP settings stored successfully." });
     setForm(emptyForm());
-    // refresh list
-    const { data: accountsData } = await scopedDb
-      .from("email_accounts")
-      .select("*")
-      .eq("is_active", true)
-      .order("created_at", { ascending: false });
-    setAccounts((accountsData as EmailAccountRow[]) || []);
+    // Reuse the full load-accounts effect (accounts, targetAccountId, and
+    // clientSettings all need to stay in sync) instead of a partial,
+    // divergent inline refetch.
+    setRefreshTrigger((t) => t + 1);
+    setSaving(false);
   };
 
   const sendTestEmail = async (account: EmailAccountRow) => {
@@ -297,8 +277,9 @@ export const EmailClientSettings: React.FC = () => {
               </div>
 
               <div className="space-y-2">
-                <Label>Email address</Label>
+                <Label htmlFor="smtp-email-address">Email address</Label>
                 <Input
+                  id="smtp-email-address"
                   type="email"
                   value={form.email_address}
                   onChange={(e) => setForm((f) => ({ ...f, email_address: e.target.value }))}
@@ -330,12 +311,12 @@ export const EmailClientSettings: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label>SMTP username</Label>
-                  <Input value={form.smtp.username} onChange={(e) => setForm((f) => ({ ...f, smtp: { ...f.smtp, username: e.target.value } }))} />
+                  <Label htmlFor="smtp-username">SMTP username</Label>
+                  <Input id="smtp-username" value={form.smtp.username} onChange={(e) => setForm((f) => ({ ...f, smtp: { ...f.smtp, username: e.target.value } }))} />
                 </div>
                 <div className="space-y-2">
-                  <Label>SMTP password</Label>
-                  <Input type="password" value={form.smtp.password} onChange={(e) => setForm((f) => ({ ...f, smtp: { ...f.smtp, password: e.target.value } }))} />
+                  <Label htmlFor="smtp-password">SMTP password</Label>
+                  <Input id="smtp-password" type="password" value={form.smtp.password} onChange={(e) => setForm((f) => ({ ...f, smtp: { ...f.smtp, password: e.target.value } }))} />
                 </div>
               </div>
 
@@ -357,12 +338,12 @@ export const EmailClientSettings: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label>IMAP username</Label>
-                  <Input value={form.imap.username} onChange={(e) => setForm((f) => ({ ...f, imap: { ...f.imap, username: e.target.value } }))} />
+                  <Label htmlFor="imap-username">IMAP username</Label>
+                  <Input id="imap-username" value={form.imap.username} onChange={(e) => setForm((f) => ({ ...f, imap: { ...f.imap, username: e.target.value } }))} />
                 </div>
                 <div className="space-y-2">
-                  <Label>IMAP password</Label>
-                  <Input type="password" value={form.imap.password} onChange={(e) => setForm((f) => ({ ...f, imap: { ...f.imap, password: e.target.value } }))} />
+                  <Label htmlFor="imap-password">IMAP password</Label>
+                  <Input id="imap-password" type="password" value={form.imap.password} onChange={(e) => setForm((f) => ({ ...f, imap: { ...f.imap, password: e.target.value } }))} />
                 </div>
               </div>
 
