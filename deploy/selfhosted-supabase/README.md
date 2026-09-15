@@ -1296,9 +1296,26 @@ own `{"error":"Function '<name>' not found or failed to load"}` 404 body).
 - **Pending — later batches:** every function needing a third-party secret
   not yet provisioned on the self-hosted VPS (email/SMS/payment provider
   keys, etc.), to be grouped and deployed once each secret is available.
+- **Deployed — individual (2026-09-15):** `feature-flags` — this note
+  previously listed it under "Permanently excluded" because no local
+  source existed; that was true until
+  `docs/superpowers/plans/2026-09-15-feature-flags-read-path-fix.md` built
+  it (Task 2, commit `54570d5c`). Deployed via the standard reseed
+  procedure above (all 109 already-deployed functions re-staged alongside
+  it, since the reseed wipes the whole bind-mount), plus a
+  `"feature-flags"` entry added to both `main/function_importers.ts` and
+  `main/verify_jwt_map.ts` (`false`, matching `supabase/config.toml`).
+  Confirmed live: the four standard health-check curls all passed
+  (including the `aviation` co-tenant canary, unaffected), an
+  unauthenticated GET resolved real seeded values
+  (`{"data":{"flags":{"domain_grouped_nav":false,"amro_rbac_fix_enabled":true,"lead_three_section_layout":true}}}`),
+  and an unauthenticated POST correctly returned `401` (the function's own
+  auth check, not the router's 404). Functions container at deploy time:
+  `functions-i64jlyerora7ao9vkw5sweh3-043251777594` (re-resolve live via
+  `docker ps --format '{{.Names}}' | grep -iE '^functions-'` — this name
+  changes on recreate, same as the `db-` container).
 - **Permanently excluded** (not deployable under any batch — no reliable
-  local source match): `feature-flags` (no local source exists in the
-  repo), `migrate-flypal-directives` (superseded locally by
+  local source match): `migrate-flypal-directives` (superseded locally by
   `migrate-flypal-directives-v2`/`-v3`), and
   `flypal_configured_directives_id_match_with_code_form` (lowercase `code` —
   a legacy duplicate deployment; the correctly-cased

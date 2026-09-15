@@ -1,5 +1,15 @@
 -- supabase/migrations/20260915120000_seed_app_feature_flags.sql
 --
+-- APPLIED to the self-hosted production instance 2026-09-15 via
+-- `ssh hostinger-vps "docker exec -i <db-container> psql -U supabase_admin
+-- -d postgres -v ON_ERROR_STOP=1 -1" < this-file.sql` (see
+-- docs/superpowers/plans/2026-09-15-feature-flags-read-path-fix.md and
+-- supabase_self_host_cutover_complete memory for the container-resolution
+-- pattern). Pre-deploy inventory check confirmed clean (no existing rows
+-- for any of the 10 keys, no shadowing overrides) before applying.
+-- Post-apply smoke test (supabase/tests/feature_flags_seed.sql) passed
+-- all 4 assertions. Do not re-apply.
+--
 -- Fixes the feature-flags read path (docs/investigation/
 -- FEATURE_FLAGS_READ_PATH_BROKEN.md, docs/superpowers/specs/
 -- 2026-09-15-feature-flags-read-path-fix-design.md). Three things:

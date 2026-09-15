@@ -1,8 +1,13 @@
-# Feature Flags Read Path Is Broken (Tracked, Not Fixed)
+# Feature Flags Read Path Is Broken (Tracked, Fixed and Deployed)
 
-**Status:** Fixed on branch `feat/feature-flags-read-path-fix` — see
-`docs/superpowers/plans/2026-09-15-feature-flags-read-path-fix.md` and
-`docs/superpowers/specs/2026-09-15-feature-flags-read-path-fix-design.md`.
+**Status:** Fixed and deployed live 2026-09-15 — merged to `main`
+(`docs/superpowers/plans/2026-09-15-feature-flags-read-path-fix.md`,
+`docs/superpowers/specs/2026-09-15-feature-flags-read-path-fix-design.md`),
+the seed migration applied to the self-hosted instance, and the
+`feature-flags` edge function deployed (see
+`deploy/selfhosted-supabase/README.md`'s Phase 4 section for the
+deployment record). Confirmed live: `GET .../functions/v1/feature-flags`
+resolves real seeded values.
 The rest of this document is kept as the original investigation record.
 
 ## Executive Summary

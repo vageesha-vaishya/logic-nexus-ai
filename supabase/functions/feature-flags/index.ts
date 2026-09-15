@@ -1,5 +1,10 @@
 // supabase/functions/feature-flags/index.ts
 //
+// DEPLOYED to the self-hosted instance 2026-09-15 via the bind-mount
+// reseed procedure (deploy/selfhosted-supabase/README.md, "Phase 4: Edge
+// Functions") — confirmed live via the standard health checks plus a
+// direct GET/POST spot check against the real router.
+//
 // Public GET resolve (wraps platform.resolve_flags) + admin-gated POST
 // list/upsert against platform.feature_flags. See
 // docs/superpowers/specs/2026-09-15-feature-flags-read-path-fix-design.md.
