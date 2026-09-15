@@ -1,10 +1,26 @@
 # Restored "Email Client" Tab's SMTP/IMAP Save Path Is Broken
 
-**Status:** Open — found 2026-09-15 during the final whole-branch review
-of `feat/email-management-ui-bugs`, not fixed. This is a pre-existing bug
-in code that branch didn't touch — it just made the bug reachable for the
+**Status:** Open, confirmed live — found 2026-09-15 during the final
+whole-branch review of `feat/email-management-ui-bugs`, then reproduced
+against production the same day. Not fixed. This is a pre-existing bug in
+code that branch didn't touch — it just made the bug reachable for the
 first time by fixing an unrelated, confirmed UI bug (a duplicate tab that
 had made this whole panel unreachable).
+
+**Live confirmation (2026-09-15):** submitted the "SMTP/IMAP Email
+Client" form at `/dashboard/email-management` → Email Client with dummy
+test values (fake account, fake password — nothing real). Result exactly
+as predicted:
+- Browser console logged `API Error: 400 https://supabase.sosservices.online/rest/v1/email_accounts`
+  at the moment of submission.
+- No new row appeared under "Configured Accounts" — the insert did not
+  persist.
+- The form did not reset (the success path calls `setForm(emptyForm())`;
+  it stayed filled), confirming the save handler took its error branch.
+
+No row was written (a `400` on insert is rejected atomically by
+PostgREST — there is no partial-write cleanup needed). No real credentials
+were ever entered.
 
 ## Summary
 
@@ -38,14 +54,13 @@ session's work. Confirmed independently:
   `core.write_email_account_credential`" (added one migration earlier,
   `20260528250000_email_account_credential_rpcs.sql`).
 
-Submitting this form against the live database should fail with
-PostgREST's `PGRST204` ("Could not find the 'smtp_password' column of
-'email_accounts' in the schema cache") or an equivalent schema-mismatch
-error — the row (and its passwords) would never be written. This has not
-been confirmed by an actual live submission (see "What's not done" below)
-— the evidence above is strong (type generation + migration header both
-independently confirm the columns are gone) but static, not a live
-reproduction.
+Submitting this form against the live database fails — confirmed live,
+see above (`400` on `POST .../rest/v1/email_accounts`, most likely
+PostgREST's `PGRST204` "Could not find the 'smtp_password' column of
+'email_accounts' in the schema cache" or an equivalent schema-mismatch
+error, though the exact response body wasn't captured — the console only
+surfaced the status code and endpoint). The row (and its passwords) is
+never written.
 
 ## Why this matters now, specifically
 
@@ -80,31 +95,28 @@ should pin down before writing a fix, not guess at here.
 
 ## What's not done
 
-- **No live submission was attempted.** The evidence above (generated
-  types + migration header) is strong but static. Confirming this
-  requires either: (a) actually submitting the form against the live
-  self-hosted instance and observing the real error (a write attempt
-  against production, expected to fail harmlessly since the insert should
-  be rejected before any row is written — but not risk-free if this
-  analysis turns out to be wrong somehow), or (b) reading `GRANT EXECUTE`
-  privileges and RLS policy definitions closely enough to be fully certain
-  without touching production at all.
+- **The exact PostgREST error body wasn't captured.** The live
+  confirmation above got the HTTP status (400) and endpoint from the
+  browser console, but not the response body's error message/code — the
+  console only logged an unexpanded `Object` reference. This doesn't
+  change the conclusion (a 400 on this exact insert can only be the
+  schema mismatch already identified via static analysis), but whoever
+  picks this up may want the precise `PGRST` code for the fix's own
+  error-handling logic.
 - **No fix was written.** This needs its own scoped plan (brainstorm →
   spec → plan), given it touches the credential-vault RPC surface on
   shared, production-adjacent infrastructure — not a same-branch drive-by
   fix, matching how `docs/investigation/FEATURE_FLAGS_READ_PATH_BROKEN.md`
   was handled earlier in this project.
 
-## Recommended path forward (not started)
+## Recommended path forward (confirmed broken; fix not started)
 
-1. Confirm live behavior (with explicit human sign-off first, since it's
-   a write attempt against production, however low-risk) or confirm via
-   RLS/grants review alone if that's preferred.
-2. If confirmed broken: decide whether to (a) restructure the save flow
-   to use `core.write_email_account_credential` in two steps as described
-   above, or (b) temporarily hide/disable the SMTP/IMAP save form in
-   `EmailClientSettings.tsx` until (a) is done, so the newly-reachable tab
-   doesn't present users with a form that silently fails.
+1. ~~Confirm live behavior~~ — done, see "Live confirmation" above.
+2. Decide whether to (a) restructure the save flow to use
+   `core.write_email_account_credential` in two steps as described above,
+   or (b) temporarily hide/disable the SMTP/IMAP save form in
+   `EmailClientSettings.tsx` until (a) is done, so the tab doesn't present
+   users with a form that silently fails.
 3. Treat as its own scoped plan once a direction is chosen.
 
 ## Constraints for whoever picks this up
