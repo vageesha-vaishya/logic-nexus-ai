@@ -290,6 +290,9 @@ verify_jwt = false
 [functions.extract-invoice-items]
 verify_jwt = false
 
+[functions.feature-flags]
+verify_jwt = false
+
 [functions.fleet-utilization]
 verify_jwt = false
 
