@@ -25,6 +25,13 @@ export const FEATURE_FLAGS = {
    * docs/plans/2026-05-22-module-visibility-and-domain-login-design.md.
    */
   DOMAIN_GROUPED_NAV: 'domain_grouped_nav',
+  /**
+   * Plan 3 (usability feedback apparatus) — floating in-app widget that
+   * collects task-completion/ease/comment feedback for a usability-testing
+   * round. Default off; enabled per pilot tenant while a round is running.
+   * See docs/design-system/usability/PROTOCOL.md and src/config/uxRounds.ts.
+   */
+  UX_FEEDBACK_WIDGET: 'ux_feedback_widget',
 } as const;
 
 export type FeatureFlagKey = (typeof FEATURE_FLAGS)[keyof typeof FEATURE_FLAGS];
