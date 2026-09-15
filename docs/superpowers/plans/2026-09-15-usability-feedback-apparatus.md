@@ -163,43 +163,39 @@ DECLARE
   v_row_id uuid;
   v_count integer;
 BEGIN
-  -- Borrow three distinct EXISTING auth.users ids rather than inserting new
-  -- ones: auth.users is GoTrue-managed with ~30 required columns (see
-  -- supabase/migration-package/direct-migration/scripts/sync-auth.js for the
-  -- full INSERT), so fabricating rows there directly is fragile across
-  -- GoTrue versions and is not what this test is for. Tenants and
-  -- user_roles ARE created fresh and are fully self-contained/cleaned up
-  -- below -- only the auth.users identities themselves are borrowed, never
-  -- modified or deleted. public.user_roles' uniqueness is per
-  -- (user_id, role, tenant_id, franchise_id), so granting a borrowed user a
-  -- role in a brand-new synthetic tenant cannot collide with whatever real
-  -- roles that user already has elsewhere.
-  -- Precondition: the target database has at least 3 distinct auth.users
-  -- rows (true for any real dev/self-hosted instance that has real users;
-  -- this is the same "borrow real seed data" convention already used by
-  -- supabase/tests/markets_multibroker_rls.sql for the same reason).
-  SELECT id INTO v_user_a FROM auth.users ORDER BY id LIMIT 1;
-  SELECT id INTO v_user_b FROM auth.users WHERE id <> v_user_a ORDER BY id LIMIT 1;
-  SELECT id INTO v_admin_a FROM auth.users WHERE id NOT IN (v_user_a, v_user_b) ORDER BY id LIMIT 1;
+  -- Borrow real (user, tenant, role) triples wholesale rather than creating
+  -- any tenants/user_roles rows: public.user_roles carries BOTH
+  -- UNIQUE(user_id, role, tenant_id, franchise_id) (20251001011353_...sql)
+  -- AND, on top of it, UNIQUE(user_id, role) (added later in
+  -- 20251002144430_d298e016-c646-43c9-8cfa-c6d4ad605698.sql) -- so a real
+  -- user can hold a given role ('user', 'tenant_admin', ...) in only ONE
+  -- tenant, period. A borrowed user very likely already holds 'user'
+  -- somewhere, so granting them a second 'user' row in a fresh synthetic
+  -- tenant (an earlier draft of this test tried exactly that) would
+  -- violate the constraint. Also: auth.users is GoTrue-managed with ~30
+  -- required columns (see supabase/migration-package/direct-migration/
+  -- scripts/sync-auth.js), too fragile to fabricate directly. Borrowing
+  -- everything read-only sidesteps both problems -- same convention
+  -- supabase/tests/markets_multibroker_rls.sql already uses for this exact
+  -- reason. This test creates and cleans up nothing except the one
+  -- ux_feedback row from A1.
+  -- Precondition: the target database has at least 2 distinct tenants each
+  -- with a 'user'-role member, and tenant A also has a 'tenant_admin'
+  -- (true for any real multi-tenant dev/self-hosted instance with seed
+  -- data -- not true for a bare, freshly-migrated empty database).
+  SELECT user_id, tenant_id INTO v_user_a, v_tenant_a
+    FROM public.user_roles WHERE role = 'user'::public.app_role AND tenant_id IS NOT NULL LIMIT 1;
+  SELECT user_id, tenant_id INTO v_user_b, v_tenant_b
+    FROM public.user_roles
+    WHERE role = 'user'::public.app_role AND tenant_id IS NOT NULL AND tenant_id <> v_tenant_a
+    LIMIT 1;
+  SELECT user_id INTO v_admin_a
+    FROM public.user_roles WHERE role = 'tenant_admin'::public.app_role AND tenant_id = v_tenant_a LIMIT 1;
 
-  IF v_user_a IS NULL OR v_user_b IS NULL OR v_admin_a IS NULL THEN
-    RAISE NOTICE 'ux_feedback_rls.sql: skipped -- needs at least 3 distinct auth.users rows in this database.';
+  IF v_tenant_a IS NULL OR v_tenant_b IS NULL OR v_admin_a IS NULL THEN
+    RAISE NOTICE 'ux_feedback_rls.sql: skipped -- needs at least 2 distinct tenants each with a ''user''-role member, and tenant A needs a ''tenant_admin''. Run against a database with real multi-tenant seed data.';
     RETURN;
   END IF;
-
-  -- Fixture: two fresh tenants, borrowed user_a/user_b as a plain 'user' in
-  -- each, borrowed admin_a as tenant_admin in tenant A. slug must be
-  -- NOT NULL UNIQUE (public.tenants) -- suffix with a fresh uuid so reruns
-  -- never collide.
-  INSERT INTO public.tenants (id, name, slug)
-    VALUES (gen_random_uuid(), '[smoke_test] UX FB Tenant A', '_smoke_test_ux_fb_tenant_a_' || gen_random_uuid())
-    RETURNING id INTO v_tenant_a;
-  INSERT INTO public.tenants (id, name, slug)
-    VALUES (gen_random_uuid(), '[smoke_test] UX FB Tenant B', '_smoke_test_ux_fb_tenant_b_' || gen_random_uuid())
-    RETURNING id INTO v_tenant_b;
-  INSERT INTO public.user_roles (user_id, role, tenant_id) VALUES (v_user_a, 'user', v_tenant_a);
-  INSERT INTO public.user_roles (user_id, role, tenant_id) VALUES (v_user_b, 'user', v_tenant_b);
-  INSERT INTO public.user_roles (user_id, role, tenant_id) VALUES (v_admin_a, 'tenant_admin', v_tenant_a);
 
   -- A1: user_a inserts their own row for their own tenant.
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_user_a)::text, true);
@@ -248,13 +244,11 @@ BEGIN
   END;
   RESET ROLE;
 
-  -- Cleanup (service-role context restored by RESET ROLE above). Only the
-  -- synthetic tenants/roles/feedback row this test created are removed;
-  -- the borrowed auth.users rows (v_user_a/v_user_b/v_admin_a) are never
-  -- touched -- they are real accounts this test does not own.
-  DELETE FROM public.ux_feedback WHERE tenant_id IN (v_tenant_a, v_tenant_b);
-  DELETE FROM public.user_roles WHERE tenant_id IN (v_tenant_a, v_tenant_b);
-  DELETE FROM public.tenants WHERE id IN (v_tenant_a, v_tenant_b);
+  -- Cleanup (service-role context restored by RESET ROLE above). Every
+  -- tenant/user/role reference this test used is real, pre-existing data
+  -- it borrowed and must not touch -- the only row this test owns is the
+  -- one ux_feedback insert from A1.
+  DELETE FROM public.ux_feedback WHERE id = v_row_id;
 
   RAISE NOTICE 'ux_feedback_rls.sql: all assertions passed (A1-A5)';
 END $$;
@@ -266,8 +260,8 @@ There is no local Postgres/Docker in this environment and this plan must not tou
 - Confirm every column in the `INSERT`/`UPDATE` statements in the smoke test matches the migration's column list exactly (name and order-independent, since inserts use named columns).
 - Confirm `public.get_user_tenant_id`, `public.is_platform_admin`, `public.has_role`, and `public.user_roles`/`public.tenants` referenced here match the signatures found in `supabase/migrations/20251001011353_c6e4a402-3e6e-47c7-b19a-69d07c258f65.sql` and `20260128100001_fix_profiles_rls.sql` (re-read both files and diff the names/argument types against what you wrote).
 - Confirm `platform.feature_flags` columns (`key, name, description, enabled, tags`) match `supabase/migrations/20260516080945_platform_feature_flags.sql`'s `CREATE TABLE` exactly.
-- Confirm `public.tenants`' NOT NULL columns (`name`, `slug` — both `UNIQUE`) are both supplied in every `INSERT INTO public.tenants` in the smoke test.
-- Confirm the smoke test never inserts into `auth.users` or `public.profiles` directly (both are FK-heavy, GoTrue/profile-managed tables outside this task's scope) — it only ever `SELECT`s existing `auth.users.id` values and references them.
+- Confirm the smoke test contains no `INSERT`/`UPDATE`/`DELETE` against `auth.users`, `public.profiles`, `public.tenants`, or `public.user_roles` at all — it only ever `SELECT`s existing rows from `public.user_roles` (joined implicitly via `tenant_id`/`user_id`) and only ever writes to `public.ux_feedback`, cleaning up exactly the one row it inserted in A1.
+- Confirm `public.user_roles`' two stacked uniqueness constraints — `UNIQUE(user_id, role, tenant_id, franchise_id)` in `20251001011353_c6e4a402-3e6e-47c7-b19a-69d07c258f65.sql` and `UNIQUE(user_id, role)` in `20251002144430_d298e016-c646-43c9-8cfa-c6d4ad605698.sql` — are why this test borrows existing `(user_id, tenant_id, role)` triples instead of creating new `user_roles` rows for borrowed users; re-read both files to confirm the constraint really does mean "one role per user, globally" before trusting this design.
 Record in your report which files you cross-checked and that the names matched.
 
 - [ ] **Step 4: Commit**
