@@ -1,7 +1,9 @@
 # Feature Flags Read Path Is Broken (Tracked, Not Fixed)
 
-**Status:** Open — investigated 2026-09-15, no code changed. This is a
-tracked-issue write-up, not a fix.
+**Status:** Fixed on branch `feat/feature-flags-read-path-fix` — see
+`docs/superpowers/plans/2026-09-15-feature-flags-read-path-fix.md` and
+`docs/superpowers/specs/2026-09-15-feature-flags-read-path-fix-design.md`.
+The rest of this document is kept as the original investigation record.
 
 ## Executive Summary
 
@@ -135,7 +137,7 @@ catch block puts every requested key in the result, set to `false`. So:
 If defect 2 is ever fixed alone (edge function deployed) without also
 fixing defect 1, nothing changes — the query still never fires.
 
-## 5. Recommended path forward (not started)
+## 5. Path forward (now implemented — see the plan above)
 
 1. Design and implement the `feature-flags` edge function: read from
    `platform.feature_flags` (+ whatever per-tenant/user override table the

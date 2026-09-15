@@ -1,3 +1,4 @@
+// supabase/functions/feature-flags/index.ts
 //
 // Public GET resolve (wraps platform.resolve_flags) + admin-gated POST
 // list/upsert against platform.feature_flags. See
@@ -75,7 +76,8 @@ serveWithLogger(async (req, logger, supabase) => {
       const action = body?.action;
 
       if (action === "list") {
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
+          .schema("platform")
           .from("feature_flags")
           .select("id, key, name, description, enabled, rollout_pct, tags, updated_at")
           .order("key");
@@ -93,7 +95,8 @@ serveWithLogger(async (req, logger, supabase) => {
         if (!key || typeof name !== "string" || typeof enabled !== "boolean") {
           return json({ ok: false, error: "Invalid payload" }, 400, corsHeaders);
         }
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
+          .schema("platform")
           .from("feature_flags")
           .update({ name, enabled })
           .eq("key", key)

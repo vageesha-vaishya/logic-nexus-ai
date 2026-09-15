@@ -286,6 +286,15 @@ away.
   nobody relies on the comment later. Not fixed in this spec since fixing
   it has zero observable effect today and isn't worth the migration churn
   on its own; revisit if/when franchise-scoped overrides are ever used.
+- **`platform.access_log` write amplification on deploy.** Each
+  `useAppFeatureFlag([key])` call now fires its own HTTP GET (see the
+  "Per-key request amplification" limitation above), and `serveWithLogger`
+  writes one `platform.access_log` row per non-OPTIONS request
+  unconditionally. A single dashboard page load will produce roughly 5-6
+  new access_log rows once this is deployed — check this against
+  `platform.access_log`'s retention/cleanup behavior (see
+  `supabase/functions/cleanup-logs`) before deploying, given this
+  instance's documented WAL-retention sensitivity.
 
 ## Global Constraints
 

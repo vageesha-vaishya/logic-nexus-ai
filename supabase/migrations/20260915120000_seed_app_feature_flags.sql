@@ -30,6 +30,21 @@
 -- migration's ON CONFLICT DO NOTHING is a silent no-op and the existing
 -- row wins.
 
+-- DEPLOY ORDER (load-bearing -- two of the three possible orderings cause
+-- real production regressions):
+--   1. Apply this migration first.
+--   2. Deploy the feature-flags edge function second.
+--   3. Ship the frontend fix (src/lib/feature-flags.ts, src/hooks/
+--      useFeatureFlags.ts, LeadDetail.tsx, LeadNew.tsx) last.
+-- Frontend-alone (steps 2-3 skipped): lead_three_section_layout flips OFF
+-- (its call-site default is false; only the bug being fixed currently
+-- makes it effectively true).
+-- Function-before-migration (step 1 skipped): every one of the 10 seeded
+-- keys resolves to false via resolve_flags' "not found" fallback, so all
+-- four true-behavior flags (amro_rbac_fix_enabled,
+-- hybrid_route_configuration_v1, quotation_import_export_v2,
+-- lead_three_section_layout) flip OFF simultaneously.
+
 -- ── 1. Grants ─────────────────────────────────────────────────────────────
 -- The GET (public resolve) path goes through resolve_flags, which is
 -- SECURITY DEFINER and runs as its owner -- it does not need these grants

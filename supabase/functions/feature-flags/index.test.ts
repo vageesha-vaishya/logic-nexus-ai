@@ -1,3 +1,4 @@
+// supabase/functions/feature-flags/index.test.ts
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 type EdgeHandler = (
@@ -73,7 +74,8 @@ function tableSupabaseMock(opts: {
       })),
     };
   });
-  return { from };
+  const schema = vi.fn(() => ({ from }));
+  return { from, schema };
 }
 
 describe("feature-flags edge function", () => {
@@ -195,6 +197,7 @@ describe("feature-flags edge function", () => {
     expect(res.status).toBe(200);
     expect(body.ok).toBe(true);
     expect(body.data.flags).toEqual([flagRow]);
+    expect(supabase.schema).toHaveBeenCalledWith("platform");
   });
 
   it("POST upsert against an unknown key returns 404", async () => {
@@ -217,6 +220,7 @@ describe("feature-flags edge function", () => {
     );
 
     expect(res.status).toBe(404);
+    expect(supabase.schema).toHaveBeenCalledWith("platform");
   });
 
   it("POST with an unrecognized action returns 400", async () => {
