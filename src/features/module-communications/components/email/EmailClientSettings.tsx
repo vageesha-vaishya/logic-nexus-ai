@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import type { Tables, TablesInsert } from "@/integrations/supabase/types";
+import { invokeFunction } from "@/lib/supabase-functions";
+import type { Tables } from "@/integrations/supabase/types";
 import { useCRM } from "@/hooks/useCRM";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -178,51 +179,31 @@ export const EmailClientSettings: React.FC = () => {
     e.preventDefault();
     setSaving(true);
 
-    const { data: authData, error: userError } = await scopedDb.client.auth.getUser();
-    if (userError || !authData?.user) {
-      setSaving(false);
-      toast({ title: "Not signed in", description: "Please sign in to save email settings.", variant: "destructive" });
-      return;
-    }
-    const userId = authData.user.id;
-
-    const payload: TablesInsert<"email_accounts"> = {
-      user_id: userId,
-      provider: "smtp_imap",
-      email_address: form.email_address,
-      display_name: form.display_name || null,
-      is_primary: form.is_primary,
-      smtp_host: form.smtp.host,
-      smtp_port: form.smtp.port,
-      smtp_username: form.smtp.username,
-      smtp_password: form.smtp.password,
-      smtp_use_tls: form.smtp.use_tls,
-      imap_host: form.imap.host,
-      imap_port: form.imap.port,
-      imap_username: form.imap.username,
-      imap_password: form.imap.password,
-      imap_use_ssl: form.imap.use_ssl,
-      tenant_id: context?.tenantId ?? null,
-      franchise_id: context?.franchiseId ?? null,
-      is_active: true,
-      settings: { preset: form.preset },
-    };
-
-    const { error } = await scopedDb.from("email_accounts").insert(payload);
+    const { data, error } = await invokeFunction("create-email-client-account", {
+      body: {
+        display_name: form.display_name || null,
+        email_address: form.email_address,
+        is_primary: form.is_primary,
+        smtp: form.smtp,
+        imap: form.imap,
+        settings: { preset: form.preset },
+      },
+    });
     setSaving(false);
-    if (error) {
-      toast({ title: "Failed to save account", description: error.message, variant: "destructive" });
+
+    if (error || !(data as any)?.success) {
+      toast({ title: "Failed to save account", description: error?.message ?? "Failed to save account", variant: "destructive" });
       return;
     }
     toast({ title: "Email account saved", description: "SMTP/IMAP settings stored successfully." });
     setForm(emptyForm());
     // refresh list
-    const { data } = await scopedDb
+    const { data: accountsData } = await scopedDb
       .from("email_accounts")
       .select("*")
       .eq("is_active", true)
       .order("created_at", { ascending: false });
-    setAccounts((data as EmailAccountRow[]) || []);
+    setAccounts((accountsData as EmailAccountRow[]) || []);
   };
 
   const sendTestEmail = async (account: EmailAccountRow) => {
