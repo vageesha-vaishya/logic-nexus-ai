@@ -51,6 +51,8 @@ function supabaseMock(opts: {
   userRolesRow?: { tenant_id: string | null; franchise_id: string | null } | null;
   insertedAccount?: Record<string, unknown> | null;
   insertError?: unknown;
+  deleteAccountError?: unknown;
+  deleteSecretError?: unknown;
 }) {
   const insertedAccount = opts.insertedAccount ?? { id: "new-account-id", ...VALID_BODY };
   const capturedInserts: unknown[] = [];
@@ -88,7 +90,7 @@ function supabaseMock(opts: {
         delete: vi.fn(() => ({
           eq: vi.fn((_col: string, id: string) => {
             deleteEmailAccountsCalls.push(id);
-            return Promise.resolve({ error: null });
+            return Promise.resolve({ error: opts.deleteAccountError ?? null });
           }),
         })),
       };
@@ -106,7 +108,7 @@ function supabaseMock(opts: {
             eq: vi.fn((col1: string, val1: string) => ({
               eq: vi.fn((col2: string, val2: string) => {
                 deleteSecretsCalls.push({ subject_kind: val1, subject_id: val2 });
-                return Promise.resolve({ error: null });
+                return Promise.resolve({ error: opts.deleteSecretError ?? null });
               }),
             })),
           })),
@@ -260,5 +262,57 @@ describe("create-email-client-account edge function", () => {
 
     expect(res.status).toBeLessThan(400);
     expect(requireAuthMock).not.toHaveBeenCalled();
+  });
+
+  it("logs error when account delete fails after smtp_password write fails", async () => {
+    const handler = capturedHandler as EdgeHandler;
+    requireAuthMock.mockResolvedValue({ user: { id: "user-1" }, error: null });
+    setEmailCredentialMock.mockResolvedValueOnce({ ok: false, error: "vault error" });
+    const logger = loggerMock();
+    const supabase = supabaseMock({ deleteAccountError: "permission denied" });
+
+    const res = await handler(
+      new Request("https://example.com/create-email-client-account", {
+        method: "POST",
+        body: JSON.stringify(VALID_BODY),
+      }),
+      logger,
+      supabase,
+    );
+
+    expect(res.status).toBe(500);
+    // Verify that logger.error was called for the delete failure
+    const errorCalls = (logger.error as any).mock.calls;
+    const deleteErrorLogged = errorCalls.some((call: any[]) =>
+      call[0]?.includes("account row delete failed after smtp_password write failed"),
+    );
+    expect(deleteErrorLogged).toBe(true);
+  });
+
+  it("logs error when secret delete fails after imap_password write fails", async () => {
+    const handler = capturedHandler as EdgeHandler;
+    requireAuthMock.mockResolvedValue({ user: { id: "user-1" }, error: null });
+    setEmailCredentialMock
+      .mockResolvedValueOnce({ ok: true }) // smtp_password succeeds
+      .mockResolvedValueOnce({ ok: false, error: "vault error" }); // imap_password fails
+    const logger = loggerMock();
+    const supabase = supabaseMock({ deleteSecretError: "permission denied" });
+
+    const res = await handler(
+      new Request("https://example.com/create-email-client-account", {
+        method: "POST",
+        body: JSON.stringify(VALID_BODY),
+      }),
+      logger,
+      supabase,
+    );
+
+    expect(res.status).toBe(500);
+    // Verify that logger.error was called for the secret delete failure
+    const errorCalls = (logger.error as any).mock.calls;
+    const deleteErrorLogged = errorCalls.some((call: any[]) =>
+      call[0]?.includes("secret delete failed after imap_password write failed"),
+    );
+    expect(deleteErrorLogged).toBe(true);
   });
 });

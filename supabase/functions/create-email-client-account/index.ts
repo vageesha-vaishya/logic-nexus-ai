@@ -92,7 +92,10 @@ serveWithLogger(async (req, logger, supabase) => {
       logger,
     );
     if (!smtpResult.ok) {
-      await supabase.from("email_accounts").delete().eq("id", account.id);
+      const { error: deleteError } = await supabase.from("email_accounts").delete().eq("id", account.id);
+      if (deleteError) {
+        logger.error("create-email-client-account: account row delete failed after smtp_password write failed", { error: deleteError });
+      }
       logger.error("create-email-client-account: smtp_password write failed, rolled back", { error: smtpResult.error });
       return json({ error: "Failed to store SMTP password" }, 500, corsHeaders);
     }
@@ -103,13 +106,19 @@ serveWithLogger(async (req, logger, supabase) => {
       logger,
     );
     if (!imapResult.ok) {
-      await supabase.from("email_accounts").delete().eq("id", account.id);
+      const { error: deleteAccountError } = await supabase.from("email_accounts").delete().eq("id", account.id);
+      if (deleteAccountError) {
+        logger.error("create-email-client-account: account row delete failed after imap_password write failed", { error: deleteAccountError });
+      }
       // smtp_password already landed in core.secrets before this failure
       // -- core.secrets.subject_id has no FK to email_accounts.id, so
       // deleting the account row above does not cascade-clean it.
-      await supabase.schema("core").from("secrets").delete()
+      const { error: deleteSecretError } = await supabase.schema("core").from("secrets").delete()
         .eq("subject_kind", "comms.email_account")
         .eq("subject_id", account.id);
+      if (deleteSecretError) {
+        logger.error("create-email-client-account: secret delete failed after imap_password write failed", { error: deleteSecretError });
+      }
       logger.error("create-email-client-account: imap_password write failed, rolled back", { error: imapResult.error });
       return json({ error: "Failed to store IMAP password" }, 500, corsHeaders);
     }
