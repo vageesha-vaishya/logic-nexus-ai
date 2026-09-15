@@ -232,17 +232,17 @@ BEGIN
   RESET ROLE;
   IF v_count != 1 THEN RAISE EXCEPTION 'A4 FAILED: tenant_admin should see the row, saw %', v_count; END IF;
 
-  -- A5: no UPDATE policy — the owning user's UPDATE is rejected.
+  -- A5: no UPDATE policy — the owning user's UPDATE affects zero rows.
+  -- (Postgres RLS: absent an UPDATE policy, the row is invisible to the
+  -- implicit USING clause, so the statement succeeds with 0 rows affected;
+  -- it does NOT raise insufficient_privilege the way a failed INSERT
+  -- WITH CHECK does. Assert on ROW_COUNT, not on an exception.)
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_user_a)::text, true);
   SET LOCAL ROLE authenticated;
-  BEGIN
-    UPDATE public.ux_feedback SET ease = 5 WHERE id = v_row_id;
-    RAISE EXCEPTION 'A5 FAILED: update should have been rejected (no UPDATE policy)';
-  EXCEPTION WHEN insufficient_privilege OR others THEN
-    IF SQLERRM = 'A5 FAILED: update should have been rejected (no UPDATE policy)' THEN RAISE; END IF;
-    NULL; -- expected
-  END;
+  UPDATE public.ux_feedback SET ease = 5 WHERE id = v_row_id;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
   RESET ROLE;
+  IF v_count != 0 THEN RAISE EXCEPTION 'A5 FAILED: update should have affected 0 rows (no UPDATE policy), affected %', v_count; END IF;
 
   -- Cleanup (service-role context restored by RESET ROLE above). Every
   -- tenant/user/role reference this test used is real, pre-existing data
