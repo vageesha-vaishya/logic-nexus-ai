@@ -26,7 +26,7 @@ DATABASE_URL="postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supab
 Harness exits 0 if every test passes, 1 if any fails. Pass it through CI
 to catch regressions on schema/trigger/RPC changes.
 
-## Suite manifest (27 tests)
+## Suite manifest (28 tests)
 
 | File | Slice | Verifies |
 |---|---|---|
@@ -57,6 +57,7 @@ to catch regressions on schema/trigger/RPC changes.
 | `gateway_prompt_experiments.sql` | LLM Gateway P3.3 | prompt_experiments table + variants_differ CHECK + traffic_split [0,1] CHECK + partial-unique-active index (only one active per prompt_key; paused/completed can coexist) |
 | `gateway_outcomes.sql` | LLM Gateway P3.4 | outcomes table + llm_invocations new experiment columns + kind/variant_label/source CHECKs + append-only trigger on outcomes |
 | `gateway_experiment_evaluation.sql` | LLM Gateway P3.5 | evaluate_experiment RPC zero-counts on fresh experiment + latest-per-invocation aggregation + promote_experiment_winner flips active_version, supersedes prior, completes experiment + rejects unknown winner |
+| `feature_flags_seed.sql` | Feature flags read path fix | resolve_flags matches call-site defaults; no override rows shadow the seed |
 
 ## Authoring conventions
 
