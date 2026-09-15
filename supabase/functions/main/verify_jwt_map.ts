@@ -24,6 +24,7 @@ export const VERIFY_JWT_MAP: Record<string, boolean> = {
   "escalate-message": false,
   "execute-sql-external": false,
   "export-data": false,
+  "feature-flags": false,
   "fleet-utilization": false,
   "get-account-label": false,
   "get-contact-label": false,

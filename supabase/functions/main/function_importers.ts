@@ -45,6 +45,7 @@ export const FUNCTION_IMPORTERS: Record<string, () => Promise<any>> = {
   "escalate-message": () => import("../escalate-message/index.ts"),
   "execute-sql-external": () => import("../execute-sql-external/index.ts"),
   "export-data": () => import("../export-data/index.ts"),
+  "feature-flags": () => import("../feature-flags/index.ts"),
   "fleet-utilization": () => import("../fleet-utilization/index.ts"),
   "flypal_configured_directives_create_tasks": () => import("../flypal_configured_directives_create_tasks/index.ts"),
   "flypal_configured_directives_id_match": () => import("../flypal_configured_directives_id_match/index.ts"),
