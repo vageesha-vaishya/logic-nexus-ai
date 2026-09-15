@@ -5,8 +5,9 @@ import { UxFeedbackWidget } from './UxFeedbackWidget';
 
 // jsdom doesn't implement PointerEvent capture methods that Radix Select
 // relies on for its pointer-driven open/close handling; this repo's other
-// Radix Select tests (e.g. CarrierSelect.test.tsx) stub the same three
-// methods for the same reason.
+// Radix Select tests (e.g. CarrierSelect.test.tsx) stub scrollIntoView plus
+// two of these three pointer-capture methods (hasPointerCapture,
+// releasePointerCapture — not setPointerCapture) for the same reason.
 window.HTMLElement.prototype.hasPointerCapture = vi.fn();
 window.HTMLElement.prototype.releasePointerCapture = vi.fn();
 window.HTMLElement.prototype.setPointerCapture = vi.fn();
@@ -18,9 +19,10 @@ vi.mock('@/lib/feature-flags', async () => {
 });
 
 const mockInsert = vi.fn().mockResolvedValue({ error: null });
+let capturedTable: string | undefined;
 vi.mock('@/hooks/useCRM', () => ({
   useCRM: () => ({
-    supabase: { from: () => ({ insert: mockInsert }) },
+    supabase: { from: (table: string) => { capturedTable = table; return { insert: mockInsert }; } },
     user: { id: 'user-1' },
     context: { tenantId: 'tenant-1' },
   }),
@@ -29,6 +31,7 @@ vi.mock('@/hooks/useCRM', () => ({
 beforeEach(() => {
   mockUseAppFeatureFlag.mockReset();
   mockInsert.mockClear();
+  capturedTable = undefined;
 });
 
 describe('UxFeedbackWidget', () => {
@@ -58,6 +61,7 @@ describe('UxFeedbackWidget', () => {
     await user.click(screen.getByRole('button', { name: /submit/i }));
 
     await waitFor(() => expect(mockInsert).toHaveBeenCalledTimes(1));
+    expect(capturedTable).toBe('ux_feedback');
     const row = mockInsert.mock.calls[0][0];
     expect(row).toMatchObject({
       tenant_id: 'tenant-1',

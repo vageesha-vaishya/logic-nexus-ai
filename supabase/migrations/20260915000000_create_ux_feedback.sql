@@ -33,8 +33,11 @@ ALTER TABLE public.ux_feedback ENABLE ROW LEVEL SECURITY;
 
 -- Any authenticated user may insert exactly one row for themself, scoped to
 -- their own tenant (public.get_user_tenant_id resolves the caller's tenant
--- from public.user_roles — see 20251001011353_..., role IN ('tenant_admin',
--- 'franchise_admin','user'), so this covers ordinary staff, not just admins).
+-- from public.user_roles — see the live definition in
+-- 20260128100001_fix_profiles_rls.sql: no role filter, just
+-- `SELECT tenant_id FROM public.user_roles WHERE user_id = ... LIMIT 1`
+-- with no ORDER BY, so it covers ordinary staff, not just admins, but is
+-- not well-defined if a user ever has more than one user_roles row).
 CREATE POLICY ux_feedback_insert_own ON public.ux_feedback
   FOR INSERT TO authenticated
   WITH CHECK (

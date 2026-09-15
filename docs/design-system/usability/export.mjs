@@ -51,7 +51,7 @@ export function buildRoundMarkdown(rows, round) {
   } else {
     for (const [route, comments] of byRoute) {
       lines.push(`**${route}**`);
-      for (const c of comments) lines.push(`- ${c}`);
+      for (const c of comments) lines.push(`- ${c.replace(/\n+/g, ' ')}`);
       lines.push('');
     }
   }

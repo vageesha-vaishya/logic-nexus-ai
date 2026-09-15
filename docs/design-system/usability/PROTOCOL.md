@@ -41,17 +41,41 @@ change one, change both.)
 4. Switch the interface to dark mode.
 5. Show only today's activities.
 
+## Prerequisites (one-time)
+
+- The `ux_feedback` table must be applied via
+  `supabase/migrations/20260915000000_create_ux_feedback.sql` before any
+  round can produce real data. Applying it is a deliberate,
+  explicitly-confirmed human action — never automatic, and this plan never
+  applies it itself. See the migration's own header comment and the Global
+  Constraints in the plan for why.
+- After applying it, optionally run `supabase/tests/ux_feedback_rls.sql`
+  as a smoke check that the RLS policies behave as expected.
+
 ## Iteration loop
 
-1. Bump `UX_ROUNDS.activeRound` in `src/config/uxRounds.ts`; enable the
-   `ux_feedback_widget` flag for the pilot tenant at
-   `/dashboard/settings/feature-flags`; run sessions using the moderator
-   script above, with participants submitting feedback through the widget
-   as they go (or immediately after each task).
+1. Bump `UX_ROUNDS.activeRound` in `src/config/uxRounds.ts`. Enable the
+   `ux_feedback_widget` flag today via the `VITE_FEATURE_FLAG_OVERRIDES`
+   env var (e.g.
+   `VITE_FEATURE_FLAG_OVERRIDES='{"ux_feedback_widget":true}'`) — the
+   `/dashboard/settings/feature-flags` admin UI is the intended long-term
+   mechanism but is currently non-functional for this flag (the DB-backed
+   query it relies on never fires; a known, pre-existing platform issue
+   affecting 12+ flags, tracked separately and out of scope here). Run
+   sessions using the moderator script above, with participants submitting
+   feedback through the widget as they go (or immediately after each
+   task). Participants should be ordinary single-tenant users, not
+   platform admins or tenant-scope-switched sessions — a submitted row's
+   `tenant_id` is read from the participant's own CRM context, and a
+   mismatch with what the RLS policy expects will silently fail the
+   insert (shown to the participant as a generic error toast).
 2. `node docs/design-system/usability/export.mjs --round N` → paste its
    output into a new `round-N.md` (copy `round-template.md` as the
    starting point); rank findings by severity × frequency; decide fix /
-   defer / won't-fix per finding.
+   defer / won't-fix per finding. Note: `export.mjs` authenticates with
+   the Supabase service-role key and returns rows across ALL tenants (it
+   bypasses RLS) — fine for a single-tenant pilot but worth knowing before
+   pointing it at a multi-tenant database.
 3. Implement fixes; `npm run audit:design-system` must stay green; commit
    referencing `round-N`.
 4. Repeat. **Minimum three rounds before any "validated" claim enters

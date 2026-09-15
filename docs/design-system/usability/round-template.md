@@ -16,7 +16,7 @@
 ## Decisions
 
 | Finding # | Decision | Reasoning | Commit |
-|---|---|---|---|---|
+|---|---|---|---|
 | 1 | Fix / Defer / Won't fix | | |
 
 ## Before/after evidence

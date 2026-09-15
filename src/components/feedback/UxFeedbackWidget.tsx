@@ -76,6 +76,8 @@ export function UxFeedbackWidget() {
     const { error } = await (supabase as any).from('ux_feedback').insert(row);
     setSubmitting(false);
     if (error) {
+      // eslint-disable-next-line no-console -- surface the actual insert failure for a moderator debugging mid-session
+      console.error('ux_feedback insert failed:', error);
       toast.error('Could not save your feedback — please try again.');
       return;
     }
@@ -135,7 +137,11 @@ export function UxFeedbackWidget() {
           <RadioGroup value={ease} onValueChange={setEase} className="flex justify-between">
             {(['1', '2', '3', '4', '5'] as const).map((n) => (
               <div key={n} className="flex flex-col items-center gap-1">
-                <RadioGroupItem value={n} id={`ux-feedback-ease-${n}`} aria-label={n} />
+                <RadioGroupItem
+                  value={n}
+                  id={`ux-feedback-ease-${n}`}
+                  aria-label={n === '1' ? '1 — Very hard' : n === '5' ? '5 — Very easy' : n}
+                />
                 <Label htmlFor={`ux-feedback-ease-${n}`} className="text-xs font-normal">
                   {n === '1' ? 'Very hard' : n === '5' ? 'Very easy' : n}
                 </Label>

@@ -357,8 +357,12 @@ comment feedback into `public.ux_feedback`. Full protocol, the round-1 task
 list, and the iteration loop: [`usability/PROTOCOL.md`](usability/PROTOCOL.md).
 
 **Status: no rounds have run.** No `round-N.md` files exist yet — none will
-be fabricated. The apparatus (widget, table, export script) is built and
-tested; real sessions are the next step, on the team's schedule.
+be fabricated. The widget and export script are built and tested; the
+`ux_feedback` table's migration is written and reviewed but **not yet
+applied** to any database — see
+[`usability/PROTOCOL.md`](usability/PROTOCOL.md#prerequisites-one-time) for
+what applying it requires. Real sessions are the next step, on the team's
+schedule.
 
 To run a round: [`usability/PROTOCOL.md`](usability/PROTOCOL.md#iteration-loop).
 Per-round write-ups, once they exist, will be listed here.
