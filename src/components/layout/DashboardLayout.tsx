@@ -17,6 +17,7 @@ import { FeatureErrorBoundary } from '@/components/FeatureErrorBoundary';
 import { OnboardingTour } from '@/components/system/OnboardingTour';
 import { ConsentBanner } from '@/components/system/ConsentBanner';
 import { HelpDialog } from '@/components/system/HelpDialog';
+import { UxFeedbackWidget } from '@/components/feedback/UxFeedbackWidget';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useAuth } from '@/hooks/useAuth';
 import { useCRM } from '@/hooks/useCRM';
@@ -890,6 +891,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             </div>
           </DialogContent>
         </Dialog>
+        <UxFeedbackWidget />
       </div>
     </TooltipProvider>
   );
