@@ -73,9 +73,16 @@ this spec's frontend edits:
 - Calls `supabase.schema('platform').rpc('resolve_flags', { p_keys, p_tenant_id, p_user_id, p_franchise_id: null })`
   — the explicit `.schema('platform')` matters: a bare `.rpc()` targets
   `public` and 404s.
-- Does **not** call `logAccess`/write to `platform.access_log` for this
-  path — an unauthenticated, publicly-callable endpoint should not be a
-  write amplifier on infrastructure that already runs tight on WAL budget.
+- `serveWithLogger`'s wrapper unconditionally writes one `platform.access_log`
+  row per non-OPTIONS request, regardless of what the handler does — this
+  is baked into the shared wrapper every edge function in this repo uses,
+  not something a single function can opt out of without abandoning the
+  wrapper (and its centralized error handling/correlation IDs) entirely.
+  This function follows the same convention as all ~85 existing functions
+  rather than deviating; `platform.access_log` retention is an
+  already-existing, platform-wide operational concern (see
+  `supabase/functions/cleanup-logs`), not something this one function
+  needs to solve.
 - Returns `{ data: { flags: Record<string, boolean> } }` — exactly what
   `fetchFlagsFromEdge` already parses (`body?.data?.flags`).
 
