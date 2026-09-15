@@ -75,26 +75,57 @@ the badge — so a real, active, non-deleted account whose OAuth token has
 expired shows the same green "Active" badge as one that's fully working,
 which is misleading.
 
-Fix: when `is_active === true` AND the account needs re-authorization
-(the same condition already gating the warning message), the badge shows
-"Needs Re-auth" in the existing warning/amber badge style (matching this
-component's own established color convention for non-success states, not
-a new one). When `is_active === false`, the badge still shows "Inactive"
-regardless of OAuth state (deleted/disabled accounts don't need a
-re-auth prompt). When `is_active === true` and OAuth is fine, "Active" as
-today. No new data is fetched — this only changes which of the two
-already-fetched signals drives the badge's text/color.
+Fix: when `is_active === true` AND the account needs re-authorization —
+the exact compound condition already gating the warning message at line
+338, `!connectedAccountIds.has(account.id) && (account.provider ===
+'gmail' || account.provider === 'office365')` — the badge shows "Needs
+Re-auth" instead of "Active." (Note the provider check: SMTP/IMAP/POP3
+accounts never show the re-auth warning at all, so they're unaffected by
+this fix — only `gmail`/`office365` accounts can be in this state.) When
+`is_active === false`, the badge still shows "Inactive" regardless of
+OAuth state (deleted/disabled accounts don't need a re-auth prompt). When
+`is_active === true` and OAuth is fine, "Active" as today. No new data is
+fetched — this only changes which of the two already-fetched signals
+drives the badge's text/color.
+
+Use the project's semantic status tokens for the new state — `bg-status-warning
+text-status-warning-foreground border-status-warning-border` (`tailwind.config.ts:47`,
+`src/index.css:186-188`/`384-386` for light/dark) — matching this same
+component's own convention for the "Active" state (`bg-status-success
+text-status-success-foreground border-status-success-border`, line
+323-326). These tokens exist precisely because an earlier initiative in
+this project (the design-system status-tone work) built them for exactly
+this purpose; use them rather than inventing a new color.
+
+**Same-file opportunistic fix, directly adjacent to what's being touched:**
+the existing "⚠️ Authorization Required" warning box (lines 339-343) uses
+raw Tailwind colors (`bg-yellow-500/10 border-yellow-500/30` on the
+wrapping `<div>`, `text-yellow-600 dark:text-yellow-500` on the child
+`<p>`) instead of the semantic `status-warning` tokens above. This evades
+the project's own `no-restricted-syntax` "raw palette badge pair" lint
+rule (`eslint.config.*`'s `STATUS_PALETTE_BANS`) because that rule's regex
+requires `bg-X-N` and `text-X-N` in the *same* class string — here they're
+split across parent and child elements, so the rule never sees the pair.
+Since this fix is adding a `status-warning`-toned badge one line away in
+the same render path, convert this box to the same tokens in the same
+change — trivial, zero behavioral difference, and removes a real,
+lint-invisible inconsistency right next to the new code.
 
 ## Testing
 
-Each fix is small and isolated to one file:
-- Fix 1: a test confirming the "Email Client" tab is clickable and renders
-  `EmailClientSettings`, and that there is exactly one tab labeled
-  "Templates" (regression guard against the duplicate recurring).
-- Fix 2: a test (or a simple string assertion if no test file exists yet
-  for this exact label) confirming the tab reads "Queue Rules," not
+Neither `EmailManagement.tsx` nor `EmailAccounts.tsx` has an existing test
+file (confirmed — `find src -iname "EmailAccounts.test.*" -o -iname
+"EmailManagement.test.*"` returns nothing), so this plan creates both,
+new:
+
+- `src/pages/dashboard/EmailManagement.test.tsx` (Fixes 1-2): a test
+  confirming the "Email Client" tab is clickable and renders
+  `EmailClientSettings`; a test confirming there is exactly one tab
+  labeled "Templates" (regression guard against the duplicate
+  recurring); a test confirming the routing tab reads "Queue Rules," not
   "Routing Rules."
-- Fix 3: a test with an account where `is_active=true` and the OAuth
+- `src/features/module-communications/components/email/EmailAccounts.test.tsx`
+  (Fix 3): a test with an account where `is_active=true` and the OAuth
   RPC-derived needs-reauth flag is true, asserting the badge renders
   "Needs Re-auth" (not "Active"); a sibling case with `is_active=false`
   asserting "Inactive" regardless of OAuth state; a sibling case with
@@ -106,6 +137,13 @@ Each fix is small and isolated to one file:
 - No backend, database, or edge-function change of any kind — this is a
   pure frontend fix across two files.
 - No behavior change to anything on the page beyond the three fixes named
-  above — in particular, no other `TabsTrigger`/`TabsContent` pairing in
-  `EmailManagement.tsx` is touched, and no other status-badge logic in
-  `EmailAccounts.tsx` is touched.
+  above and the one directly-adjacent token-consistency fix (the
+  "Authorization Required" box's colors) called out under Fix 3 — in
+  particular, no other `TabsTrigger`/`TabsContent` pairing in
+  `EmailManagement.tsx` is touched, and no other status-badge or warning
+  logic in `EmailAccounts.tsx` is touched.
+- Semantic status tokens only for any new or touched color —
+  `bg-status-warning`/`text-status-warning-foreground`/`border-status-warning-border`
+  for the new badge state and the adjacent box fix — never a raw Tailwind
+  palette color (matches this project's established design-system
+  convention).
