@@ -49,6 +49,7 @@ const VALID_BODY = {
 
 function supabaseMock(opts: {
   userRolesRow?: { tenant_id: string | null; franchise_id: string | null } | null;
+  userRoleError?: unknown;
   insertedAccount?: Record<string, unknown> | null;
   insertError?: unknown;
   deleteAccountError?: unknown;
@@ -57,18 +58,20 @@ function supabaseMock(opts: {
   const insertedAccount = opts.insertedAccount ?? { id: "new-account-id", ...VALID_BODY };
   const capturedInserts: unknown[] = [];
   const deleteEmailAccountsCalls: string[] = [];
-  const deleteSecretsCalls: Array<{ subject_kind: string; subject_id: string }> = [];
+  const updateSecretsCalls: Array<{ subject_kind: string; subject_id: string; is_active: boolean }> = [];
 
   const from = vi.fn((table: string) => {
     if (table === "user_roles") {
       return {
         select: vi.fn(() => ({
           eq: vi.fn(() => ({
-            limit: vi.fn(() => ({
-              maybeSingle: vi.fn().mockResolvedValue({
-                data: opts.userRolesRow ?? { tenant_id: "tenant-1", franchise_id: null },
-                error: null,
-              }),
+            order: vi.fn(() => ({
+              limit: vi.fn(() => ({
+                maybeSingle: vi.fn().mockResolvedValue({
+                  data: opts.userRoleError ? null : (opts.userRolesRow ?? { tenant_id: "tenant-1", franchise_id: null }),
+                  error: opts.userRoleError ?? null,
+                }),
+              })),
             })),
           })),
         })),
@@ -104,10 +107,10 @@ function supabaseMock(opts: {
       from: vi.fn((table: string) => {
         if (table !== "secrets") throw new Error(`Unexpected core table: ${table}`);
         return {
-          delete: vi.fn(() => ({
+          update: vi.fn((patch: { is_active: boolean }) => ({
             eq: vi.fn((col1: string, val1: string) => ({
               eq: vi.fn((col2: string, val2: string) => {
-                deleteSecretsCalls.push({ subject_kind: val1, subject_id: val2 });
+                updateSecretsCalls.push({ subject_kind: val1, subject_id: val2, is_active: patch.is_active });
                 return Promise.resolve({ error: opts.deleteSecretError ?? null });
               }),
             })),
@@ -117,7 +120,7 @@ function supabaseMock(opts: {
     };
   });
 
-  return { from, schema, capturedInserts, deleteEmailAccountsCalls, deleteSecretsCalls };
+  return { from, schema, capturedInserts, deleteEmailAccountsCalls, updateSecretsCalls };
 }
 
 describe("create-email-client-account edge function", () => {
@@ -174,6 +177,10 @@ describe("create-email-client-account edge function", () => {
     expect(insertPayload.user_id).toBe("user-1");
     expect(insertPayload).not.toHaveProperty("smtp_password");
     expect(insertPayload).not.toHaveProperty("imap_password");
+    // The insert payload's tenant_id/franchise_id must match the caller's
+    // own user_roles row, not be left unset.
+    expect(insertPayload.tenant_id).toBe("tenant-1");
+    expect(insertPayload.franchise_id).toBe(null);
 
     expect(setEmailCredentialMock).toHaveBeenCalledWith(
       supabase,
@@ -206,10 +213,10 @@ describe("create-email-client-account edge function", () => {
     expect(setEmailCredentialMock).toHaveBeenCalledTimes(1);
     expect(supabase.deleteEmailAccountsCalls).toEqual(["new-account-id"]);
     // Nothing was written to core.secrets yet -- no cleanup call needed.
-    expect(supabase.deleteSecretsCalls).toHaveLength(0);
+    expect(supabase.updateSecretsCalls).toHaveLength(0);
   });
 
-  it("rolls back the account row AND cleans up the already-written smtp_password secret when imap_password fails", async () => {
+  it("rolls back the account row AND deactivates (not deletes) the already-written smtp_password secret when imap_password fails", async () => {
     const handler = capturedHandler as EdgeHandler;
     requireAuthMock.mockResolvedValue({ user: { id: "user-1" }, error: null });
     setEmailCredentialMock
@@ -228,9 +235,55 @@ describe("create-email-client-account edge function", () => {
 
     expect(res.status).toBe(500);
     expect(supabase.deleteEmailAccountsCalls).toEqual(["new-account-id"]);
-    expect(supabase.deleteSecretsCalls).toEqual([
-      { subject_kind: "comms.email_account", subject_id: "new-account-id" },
+    // The core.secrets row is deactivated, not hard-deleted, so its
+    // now-orphaned vault.secrets value stays purgeable by a future cleanup
+    // job -- a hard delete would make it permanently unreachable garbage.
+    expect(supabase.updateSecretsCalls).toEqual([
+      { subject_kind: "comms.email_account", subject_id: "new-account-id", is_active: false },
     ]);
+  });
+
+  it("returns 409 with a clear message on a duplicate email_address, and attempts no credential write or rollback", async () => {
+    const handler = capturedHandler as EdgeHandler;
+    requireAuthMock.mockResolvedValue({ user: { id: "user-1" }, error: null });
+    const supabase = supabaseMock({
+      insertError: { code: "23505", message: "duplicate key value violates unique constraint \"email_accounts_user_id_email_address_key\"" },
+    });
+
+    const res = await handler(
+      new Request("https://example.com/create-email-client-account", {
+        method: "POST",
+        body: JSON.stringify(VALID_BODY),
+      }),
+      loggerMock(),
+      supabase,
+    );
+
+    const body = await res.json();
+    expect(res.status).toBe(409);
+    expect(body.error).toBe("An account with this email address already exists.");
+    expect(setEmailCredentialMock).not.toHaveBeenCalled();
+    expect(supabase.deleteEmailAccountsCalls).toHaveLength(0);
+    expect(supabase.updateSecretsCalls).toHaveLength(0);
+  });
+
+  it("returns 500 and never attempts an insert when the user_roles lookup errors", async () => {
+    const handler = capturedHandler as EdgeHandler;
+    requireAuthMock.mockResolvedValue({ user: { id: "user-1" }, error: null });
+    const supabase = supabaseMock({ userRoleError: { message: "connection failed" } });
+
+    const res = await handler(
+      new Request("https://example.com/create-email-client-account", {
+        method: "POST",
+        body: JSON.stringify(VALID_BODY),
+      }),
+      loggerMock(),
+      supabase,
+    );
+
+    expect(res.status).toBe(500);
+    expect(supabase.capturedInserts).toHaveLength(0);
+    expect(setEmailCredentialMock).not.toHaveBeenCalled();
   });
 
   it("returns 400 when required fields are missing", async () => {

@@ -47,13 +47,23 @@ serveWithLogger(async (req, logger, supabase) => {
     // service-role and bypasses RLS. .limit(1).maybeSingle(), not bare
     // .single(): user_roles allows multiple rows per user (one per
     // distinct role), so .single() would throw for a user holding two
-    // roles.
-    const { data: userRole } = await supabase
+    // roles. order("assigned_at", { ascending: false }) makes which row
+    // wins deterministic (the most-recently-assigned one) instead of an
+    // arbitrary Postgres row order. The query's own error is checked too --
+    // a real lookup failure must surface, not silently fall through to
+    // tenant_id: null.
+    const { data: userRole, error: userRoleError } = await supabase
       .from("user_roles")
       .select("tenant_id, franchise_id")
       .eq("user_id", user.id)
+      .order("assigned_at", { ascending: false })
       .limit(1)
       .maybeSingle();
+
+    if (userRoleError) {
+      logger.error("create-email-client-account: user_roles lookup failed", { error: userRoleError });
+      return json({ error: "Failed to resolve account scope" }, 500, corsHeaders);
+    }
 
     const accountPayload = {
       user_id: user.id,
@@ -81,6 +91,10 @@ serveWithLogger(async (req, logger, supabase) => {
       .select()
       .single();
 
+    if (insertError?.code === "23505") {
+      logger.error("create-email-client-account: duplicate email_address", { error: insertError });
+      return json({ error: "An account with this email address already exists." }, 409, corsHeaders);
+    }
     if (insertError || !account) {
       logger.error("create-email-client-account: insert failed", { error: insertError });
       return json({ error: insertError?.message ?? "Failed to create account" }, 500, corsHeaders);
@@ -112,8 +126,14 @@ serveWithLogger(async (req, logger, supabase) => {
       }
       // smtp_password already landed in core.secrets before this failure
       // -- core.secrets.subject_id has no FK to email_accounts.id, so
-      // deleting the account row above does not cascade-clean it.
-      const { error: deleteSecretError } = await supabase.schema("core").from("secrets").delete()
+      // deleting the account row above does not cascade-clean it. Deactivate
+      // (not delete) the core.secrets row: the underlying vault.secrets value
+      // it points to is not cleaned up by a metadata delete, so hard-deleting
+      // this row would make that vault secret permanently unreachable garbage.
+      // Deactivating keeps a pointer a future purge job can still find, and
+      // secrets_unique_active_per_purpose is scoped WHERE is_active = true,
+      // so this doesn't block a future retry for the same account+purpose.
+      const { error: deleteSecretError } = await supabase.schema("core").from("secrets").update({ is_active: false })
         .eq("subject_kind", "comms.email_account")
         .eq("subject_id", account.id);
       if (deleteSecretError) {
