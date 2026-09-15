@@ -59,6 +59,8 @@ describe('EmailAccounts status badge', () => {
     const cardEl = card.closest('.border-2') as HTMLElement;
     expect(await within(cardEl).findByText('Needs Re-auth')).toBeInTheDocument();
     expect(within(cardEl).queryByText('Active')).not.toBeInTheDocument();
+    const badge = await within(cardEl).findByText('Needs Re-auth');
+    expect(badge.className).toContain('bg-status-warning');
   });
 
   it('shows "Inactive" for an is_active=false account regardless of OAuth state', async () => {

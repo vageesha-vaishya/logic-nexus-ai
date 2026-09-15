@@ -343,7 +343,7 @@ export function EmailAccounts() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {!connectedAccountIds.has(account.id) && (account.provider === 'gmail' || account.provider === 'office365') && (
-                  <div className="bg-status-warning/10 border border-status-warning-border/30 rounded-md p-3 mb-2">
+                  <div className="bg-status-warning border border-status-warning-border rounded-md p-3 mb-2">
                     <p className="text-xs text-status-warning-foreground font-medium">
                       ⚠️ Authorization Required: Click 'Re-authorize' to complete OAuth setup
                     </p>

@@ -39,9 +39,13 @@ vi.mock('@/features/module-communications/components/email/DomainHealth', () => 
 }));
 
 describe('EmailManagement tabs', () => {
-  it('renders exactly one tab labeled "Templates"', () => {
+  it('renders exactly one tab labeled "Templates"', async () => {
     render(<EmailManagement />);
     expect(screen.getAllByRole('tab', { name: 'Templates' })).toHaveLength(1);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('tab', { name: 'Templates' }));
+    expect(screen.getByTestId('email-templates')).toBeInTheDocument();
   });
 
   it('renders an "Email Client" tab that opens EmailClientSettings', async () => {
