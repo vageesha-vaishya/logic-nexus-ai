@@ -1,7 +1,11 @@
-#!/usr/bin/env node
 // Rewrites hardcoded Tailwind palette badge pairs (bg-X-N text-X-M) to semantic status tones.
 // Pure `rewriteClassString` + a CLI. Only exact same-hue pairs are rewritten; everything else is
 // reported for manual review so meaning ("selected" vs "info") is judged by a human.
+// No shebang: this is always invoked as `node codemod-status-tones.mjs`, never executed
+// directly — and a shebang here breaks Vite's SSR module transform, which hoists rewritten
+// import statements above the original source, so a `#!` line that isn't literally the file's
+// first character becomes invalid JS syntax. `codemod-status-tones.test.mjs` imports this
+// module at test time, so vitest has to load it through that same transform.
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';

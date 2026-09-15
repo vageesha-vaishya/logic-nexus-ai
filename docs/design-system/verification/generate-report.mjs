@@ -1,6 +1,13 @@
-#!/usr/bin/env node
 // Turns the harness's cell JSON (test-results/design-system/data/*.json) into
 // docs/design-system/verification/REPORT.md. Pure `buildReport` + thin CLI.
+// No shebang: this is always invoked as `node generate-report.mjs`, never
+// executed directly — and a shebang here breaks Vite's SSR module transform,
+// which hoists rewritten import statements above the original source, so a
+// `#!` line that isn't literally the file's first character becomes invalid
+// JS syntax. `tests/design-system/pages.unit.test.ts` and this file's own
+// `report.unit.test.mjs` both import this module at test time (see the
+// PAGE_KEYS cross-check), and vitest has to load it through that same
+// transform, so the shebang is a real, deterministic failure there.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
