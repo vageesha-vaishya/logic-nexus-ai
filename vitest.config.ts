@@ -3,7 +3,21 @@ import { defineConfig, configDefaults } from 'vitest/config';
 import path from 'path';
 
 export default defineConfig({
-  plugins: [],
+  plugins: [
+    {
+      name: 'npm-specifier-resolver',
+      resolveId(id) {
+        // Resolve the AWS SES SDK import used in edge function tests.
+        // Any test that imports npm:@aws-sdk/client-ses must supply its own
+        // matching vi.mock('npm:@aws-sdk/client-ses', ...) or it will fail
+        // with a less obvious "external module resolution" error instead of
+        // Vite's initial "cannot resolve import" message.
+        if (id === 'npm:@aws-sdk/client-ses') {
+          return { id: `__npm_mock__@aws-sdk/client-ses`, external: true };
+        }
+      },
+    },
+  ],
   test: {
     environment: 'jsdom',
     globals: true,

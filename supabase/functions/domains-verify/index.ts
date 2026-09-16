@@ -307,7 +307,7 @@ serveWithLogger(async (req, logger, _adminSupabase) => {
             // Standard DKIM CNAME: {token}._domainkey.{domain}
             const recordName = `${token}._domainkey.${domainName}`;
             const cnameRecords = await Deno.resolveDns(recordName, "CNAME");
-            
+
             if (cnameRecords && cnameRecords.length > 0) {
                 dkimVerifiedCount++;
             }
@@ -326,7 +326,13 @@ serveWithLogger(async (req, logger, _adminSupabase) => {
       }
     }
 
-    updates.status = (updates.spf_verified && updates.dkim_verified) ? 'active' : 'pending_verification';
+    // DMARC is a policy layer on top of SPF/DKIM, not required by most
+    // providers to call a domain "authenticated" -- it stays visible as
+    // its own separate check in the UI, but doesn't gate this flag.
+    // Boolean(...) turns a never-set dkim_verified (DKIM tokens were
+    // never available and identity provisioning also failed) into
+    // `false` rather than `undefined`.
+    updates.is_verified = Boolean(updates.spf_verified) && Boolean(updates.dkim_verified);
 
     // 7. Update Database
     const { error: updateError } = await supabaseClient
