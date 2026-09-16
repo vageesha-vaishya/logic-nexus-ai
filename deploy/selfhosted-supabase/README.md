@@ -1293,6 +1293,27 @@ own `{"error":"Function '<name>' not found or failed to load"}` 404 body).
   explicit human sign-off in this project's operating model — see this
   batch's task-2-report.md for the exact commands attempted and where they
   were blocked.
+- **Deployed — Batch 3** (2026-09-16): 1 function, `create-email-client-account`
+  (see `scripts/phase4-batch3-functions.txt`), added to fix the SMTP/IMAP
+  email-client save path — no secrets needed, no `verify_jwt_map.ts` entry
+  needed (it has no `config.toml` `verify_jwt = false` entry, so it
+  correctly defaults to `true`; confirmed Kong's `cors` plugin on the
+  `functions-v1` route answers CORS preflight OPTIONS directly — status 200
+  with `Access-Control-Allow-*` headers straight from Kong — before the
+  request ever reaches this router, so the default `verify_jwt = true` does
+  not block a browser's preflight). Live container at time of deploy:
+  `functions-i64jlyerora7ao9vkw5sweh3-043251777594` (re-resolve before any
+  future batch — this name changes on container recreate). Reseeded with
+  all 110 already-deployed functions plus this one (111 total function
+  dirs + `main`/`_shared`/`_types`/`deno.json`/`import_map.json`/`types.d.ts`
+  = 117 top-level items, confirmed via directory listing before and after
+  the swap). Post-restart verification: all 4 standard health checks
+  passed; the new function returned `{"error":"Missing Authorization
+  header"}` (401) rather than the router's own 404 "not found or failed to
+  load" body, confirming it loaded and dispatched; its OPTIONS preflight
+  returned 200 from Kong directly; two pre-existing functions
+  (`feature-flags`, `discover-email-settings`) spot-checked as still
+  working after the shared container restart.
 - **Pending — later batches:** every function needing a third-party secret
   not yet provisioned on the self-hosted VPS (email/SMS/payment provider
   keys, etc.), to be grouped and deployed once each secret is available.
