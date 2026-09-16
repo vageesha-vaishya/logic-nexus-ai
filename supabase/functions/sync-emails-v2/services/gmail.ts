@@ -162,54 +162,45 @@ export class GmailService {
 
   private async processMessageList(messages: any[], folder: string, direction: "inbound" | "outbound"): Promise<number> {
     if (!messages || messages.length === 0) return 0;
-    
+
     this.logger?.info(`Processing ${messages.length} messages for ${folder}`);
-    
+
     let savedCount = 0;
     let skippedCount = 0;
 
     for (const msgStub of messages) {
         try {
-            // Check if exists first to save API calls
-            const { data: existing } = await this.supabase
-                .from("emails")
-                .select("id")
-                .eq("message_id", msgStub.id)
-                .eq("account_id", this.account.id)
-                .single();
-                
-            if (existing) {
-                skippedCount++;
-                continue;
-            }
-
             const resp = await fetch(
                 `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msgStub.id}?format=raw`,
                 { headers: { Authorization: `Bearer ${this.currentAccessToken}` } }
             );
-            
+
             if (!resp.ok) continue;
-            
+
             const msgData = await resp.json();
-            await this.saveGmailMessage(msgData, folder, direction);
-            savedCount++;
+            const saved = await this.saveGmailMessage(msgData, folder, direction);
+            if (saved) {
+                savedCount++;
+            } else {
+                skippedCount++;
+            }
         } catch (e) {
             this.logger?.error(`Error processing Gmail message ${msgStub.id}:`, { error: e });
         }
     }
-    
+
     if (skippedCount > 0) {
         this.logger?.info(`Skipped ${skippedCount} existing messages for ${folder}`);
     }
-    
+
     return savedCount;
   }
 
-  private async saveGmailMessage(msgData: any, folder: string, direction: "inbound" | "outbound") {
+  private async saveGmailMessage(msgData: any, folder: string, direction: "inbound" | "outbound"): Promise<boolean> {
      const bytes = decodeGmailRawMessage(msgData.raw);
 
      const parsedEmail: ParsedEmail = await parseEmail(bytes);
-     
+
      // Override messageId if needed (Gmail provides a stable ID)
      if (!parsedEmail.messageId || parsedEmail.messageId.trim() === "") {
         parsedEmail.messageId = msgData.id;
@@ -219,7 +210,7 @@ export class GmailService {
      if (!parsedEmail.snippet && msgData.snippet) {
         parsedEmail.snippet = msgData.snippet;
      }
-     
-     await saveEmailToDb(this.supabase, this.account, parsedEmail, folder, direction, this.logger);
+
+     return await saveEmailToDb(this.supabase, this.account, parsedEmail, folder, direction, this.logger);
   }
 }
