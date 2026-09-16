@@ -1353,6 +1353,45 @@ own `{"error":"Function '<name>' not found or failed to load"}` 404 body).
   failed to load" body, confirming it loaded and dispatched; `feature-flags`
   and `domains-verify` spot-checked as still working after the shared
   container restart.
+- **Code-only reseed — `sync-emails-v2`** (2026-09-16, second reseed): not
+  a new-function batch — this function was already registered and
+  deployed. Reseeded to ship three more fixes to `services/gmail.ts`,
+  landed after the previous `sync-emails-v2` reseed above: (1) the
+  character-encoding-corruption fix's `imap.ts`/`parser.ts` changes (not
+  in `gmail.ts` itself, but part of the same merged-to-main state); (2) a
+  fix for `gmail.ts` decoding the Gmail API's raw message into a plain
+  `Uint8Array` instead of a real `Buffer`, which caused the real
+  `mailparser` library to throw on every single Gmail message — Gmail
+  sync had never successfully saved an email in production before this
+  (see `docs/superpowers/specs/2026-09-16-gmail-sync-uint8array-fix-design.md`);
+  (3) a fix removing `processMessageList`'s dead pre-fetch existence
+  check (compared the Gmail-native message id against a column that
+  actually stores the RFC822 `Message-ID` header, so it never matched)
+  and making `savedCount`/`skippedCount` reflect `saveEmailToDb`'s real
+  return value instead of incrementing unconditionally (see
+  `docs/superpowers/specs/2026-09-16-gmail-sync-fastpath-savedcount-fix-design.md`).
+  Pre-deploy check confirmed all 3 Gmail accounts had zero existing rows
+  in `public.emails`, so the fast-path fix's theoretical legacy-v1
+  duplicate-row risk (flagged by that fix's final review) was nil for
+  this deploy. No router-file changes needed, only function code. Live
+  container at time of deploy: `functions-i64jlyerora7ao9vkw5sweh3-043251777594`
+  (unchanged since Batch 4 and the first `sync-emails-v2` reseed).
+  Reseeded with all 113 already-deployed functions (confirmed via a live
+  directory listing taken before the wipe, matching this note's account
+  of "113" from the prior reseed) plus the 6 shared top-level items = 119,
+  confirmed via directory listing before and after the swap, and by
+  grepping the staged file for `decodeGmailRawMessage` and confirming the
+  deleted existence-check text (`Check if exists first`) was absent
+  before restarting. Post-restart verification: all 4 standard health
+  checks passed; `sync-emails-v2` returned its own real auth error (401
+  `{"error":"Unauthorized"}`, via `https://supabase.sosservices.online/functions/v1/sync-emails-v2`
+  — note this is the correct external host for the function router, not
+  `api.sosservices.online`, which routes to an unrelated custom backend
+  service and returns its own `{"error":"Route not found",...}` 404 for
+  any path it doesn't recognize) rather than the router's "not found or
+  failed to load" body, confirming it loaded and dispatched; `feature-flags`
+  and `domains-verify` spot-checked as still working after the shared
+  container restart.
 - **Pending — later batches:** every function needing a third-party secret
   not yet provisioned on the self-hosted VPS (email/SMS/payment provider
   keys, etc.), to be grouped and deployed once each secret is available.
