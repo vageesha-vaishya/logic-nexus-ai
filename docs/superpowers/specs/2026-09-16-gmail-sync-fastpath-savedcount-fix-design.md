@@ -64,9 +64,20 @@ if (!parsedEmail.messageId || parsedEmail.messageId.trim() === "") {
 }
 ```
 
-So for virtually every real Gmail message, the outer check's
-`.eq("message_id", msgStub.id)` compares against a value that was never
-stored under that key. It can never find a match. Two consequences:
+So for virtually every real Gmail message *saved by this v2 sync path*,
+the outer check's `.eq("message_id", msgStub.id)` compares against a
+value that was never stored under that key, and can never find a match.
+(**Correction, added after the final whole-branch review:** this is true
+only for rows this v2 code path itself wrote. Production Gmail rows
+predating this fix were written by the still-registered legacy
+`sync-emails` v1 function, which stores the Gmail-native id in
+`message_id` — so the outer check does match *those* rows. Deleting the
+check therefore also removes the thing keeping v1-era rows from being
+re-inserted as duplicates by v2's dedup, which keys on the RFC822 header
+value instead. See the implementation plan's note on the pre-deploy
+verification query. The fix below — delete the check — still stands; a
+check that only works by silently depending on a different function's
+legacy data convention is not something to keep.) Two consequences:
 
 1. **`skippedCount` stays 0 forever**, and every sync re-fetches the full
    raw message from the Gmail API for every message, including ones

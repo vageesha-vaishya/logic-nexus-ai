@@ -13,6 +13,35 @@
 - No schema changes, no new migration, no data backfill.
 - No change to `imap.ts`, `parser.ts`, `pop3.ts`, `db.ts`, or any file besides `gmail.ts` and its new test file.
 - `saveEmailToDb`'s own signature, return value, and dedup logic (`db.ts`) do not change — this fix only stops discarding a return value that already existed.
+
+## Post-review note: pre-deploy verification query
+
+The final whole-branch review found that the deleted existence check
+matched more than "nothing" — it also happened to match rows written by
+the still-registered legacy `sync-emails` v1 function, which stores the
+Gmail-native id in `message_id` (unlike v2, which stores the RFC822
+`Message-ID` header there). Since every Gmail row currently in production
+predates this v2 sync ever succeeding (see the Uint8Array fix's
+background), every existing Gmail row was written by v1 and carries a
+native-id `message_id`. Removing the check means v2's dedup — keyed on
+`(account_id, message_id)` — will not recognize those rows, and could
+insert a duplicate for each one still within the 20-most-recent-per-label
+sync window (bounded: ≤40/account, ≤120 across the 3 live Gmail accounts,
+first sync only).
+
+Before deploying this fix, run this read-only query against production:
+
+```sql
+SELECT count(*) FROM public.emails e
+JOIN public.email_accounts a ON a.id = e.account_id
+WHERE a.provider = 'gmail' AND e.message_id IS DISTINCT FROM e.internet_message_id;
+```
+
+A count of `0` means the risk is nil. A count `> 0` means that many
+duplicate rows should be expected on the first post-deploy sync per
+account (capped by the 40-message window), identifiable afterward as rows
+sharing `(account_id, internet_message_id)`, needing a one-time manual
+cleanup.
 - Full spec: `docs/superpowers/specs/2026-09-16-gmail-sync-fastpath-savedcount-fix-design.md`.
 
 ---
