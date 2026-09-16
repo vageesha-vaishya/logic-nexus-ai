@@ -28,9 +28,11 @@ its owner.
 
 - `core.email_accounts_secret_parity()` is redeployed and can be re-run at
   any time to check for this class of problem going forward.
-- A new trigger on `core.secrets` now rejects any future attempt to
-  activate a credential row with no matching vault secret — this class
-  of silent orphan can no longer happen undetected.
+- Two new triggers now guard this class of orphan symmetrically: one on
+  `core.secrets` rejects activating a credential row with no matching
+  vault secret; a second on `vault.secrets` rejects deleting a secret
+  that a credential row still references as active. Together, neither
+  direction of this bug can recur silently.
 - The 12 known-orphaned rows are deactivated (not deleted), so
   `core.email_accounts_secret_parity()` returns zero rows as of this
   report.
