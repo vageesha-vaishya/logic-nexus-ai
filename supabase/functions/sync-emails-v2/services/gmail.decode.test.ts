@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseEmail } from "../utils/parser.ts";
+import { decodeGmailRawMessage } from "./gmail.ts";
 
 /**
  * Builds a minimal, real RFC822 message as raw bytes: an ISO-8859-1-charset
@@ -40,21 +41,11 @@ function toGmailBase64Url(message: Buffer): string {
   return message.toString("base64").replace(/\+/g, "-").replace(/\//g, "_");
 }
 
-/**
- * The exact decode this task's fix performs in gmail.ts's
- * saveGmailMessage: reverse the base64url substitution, then decode
- * directly to a Buffer.
- */
-function decodeGmailBase64Url(rawBase64Url: string): Buffer {
-  const rawBase64 = rawBase64Url.replace(/-/g, "+").replace(/_/g, "/");
-  return Buffer.from(rawBase64, "base64");
-}
-
 describe("Gmail message decode pipeline", () => {
   it("decodes an ISO-8859-1 message end-to-end (base64url -> Buffer -> parseEmail) correctly", async () => {
     const original = buildIso88591Message();
     const gmailRaw = toGmailBase64Url(original);
-    const bytes = decodeGmailBase64Url(gmailRaw);
+    const bytes = decodeGmailRawMessage(gmailRaw);
     const result = await parseEmail(bytes);
     expect(result.bodyText).toBe("café");
   });
@@ -62,7 +53,7 @@ describe("Gmail message decode pipeline", () => {
   it("decodes a plain ASCII message identically through the same pipeline", async () => {
     const original = buildAsciiMessage();
     const gmailRaw = toGmailBase64Url(original);
-    const bytes = decodeGmailBase64Url(gmailRaw);
+    const bytes = decodeGmailRawMessage(gmailRaw);
     const result = await parseEmail(bytes);
     expect(result.bodyText).toBe("hello world");
   });
@@ -70,7 +61,7 @@ describe("Gmail message decode pipeline", () => {
   it("produces a byte-for-byte identical Buffer to the original message, independent of mailparser", () => {
     const original = buildIso88591Message();
     const gmailRaw = toGmailBase64Url(original);
-    const bytes = decodeGmailBase64Url(gmailRaw);
+    const bytes = decodeGmailRawMessage(gmailRaw);
     expect(bytes.equals(original)).toBe(true);
   });
 });

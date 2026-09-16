@@ -8,6 +8,11 @@ import {
 } from "../../_shared/email-credentials.ts";
 import { Buffer } from "node:buffer";
 
+export function decodeGmailRawMessage(rawBase64Url: string): Buffer {
+  const rawBase64 = rawBase64Url.replace(/-/g, '+').replace(/_/g, '/');
+  return Buffer.from(rawBase64, "base64");
+}
+
 export class GmailService {
   private account: EmailAccount;
   private supabase: SupabaseClient;
@@ -201,9 +206,7 @@ export class GmailService {
   }
 
   private async saveGmailMessage(msgData: any, folder: string, direction: "inbound" | "outbound") {
-     // msgData.raw is base64url encoded
-     const rawBase64 = msgData.raw.replace(/-/g, '+').replace(/_/g, '/');
-     const bytes = Buffer.from(rawBase64, "base64");
+     const bytes = decodeGmailRawMessage(msgData.raw);
 
      const parsedEmail: ParsedEmail = await parseEmail(bytes);
      
