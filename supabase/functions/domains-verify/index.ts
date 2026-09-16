@@ -344,11 +344,11 @@ serveWithLogger(async (req, logger, _adminSupabase) => {
       throw updateError;
     }
 
-    return new Response(JSON.stringify({ 
-        success: true, 
+    return new Response(JSON.stringify({
+        success: true,
         domain: domainName,
-        verification: verificationResults,
-        updates 
+        results: verificationResults,
+        updates
     }), {
       headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
     });

@@ -13,7 +13,7 @@ export default defineConfig({
         // with a less obvious "external module resolution" error instead of
         // Vite's initial "cannot resolve import" message.
         if (id === 'npm:@aws-sdk/client-ses') {
-          return { id: `__npm_mock__@aws-sdk/client-ses`, external: true };
+          return { id: '__npm_mock__@aws-sdk/client-ses', external: true };
         }
       },
     },

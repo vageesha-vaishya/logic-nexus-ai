@@ -235,5 +235,12 @@ describe("domains-verify edge function", () => {
     expect(payload.dmarc_verified).toBe(true);
     expect(payload.dkim_verified).toBe(true);
     expect(payload.is_verified).toBe(true);
+
+    // Response body must use the `results` key (not `verification`) so
+    // consumers like DomainManagement.tsx and TenantForm.tsx can read
+    // data.results.{spf,dmarc,dkim} instead of getting `undefined`.
+    const body = await res.json();
+    expect(body.results).toEqual({ spf: true, dmarc: true, dkim: true });
+    expect(body).not.toHaveProperty("verification");
   });
 });
