@@ -177,12 +177,15 @@ export async function saveEmailToDb(
     logger?.warn("Auto-link lead failed:", { error: e });
   }
 
-  const { error } = await supabase.from("emails").insert(payload);
-  
+  const { data: inserted, error } = await supabase
+    .from("emails")
+    .upsert(payload, { onConflict: "account_id,message_id", ignoreDuplicates: true })
+    .select("id");
+
   if (error) {
     logger?.error(`DB Insert Error for ${email.messageId}:`, { error });
     throw error;
   }
-  
-  return true;
+
+  return Boolean(inserted && inserted.length > 0);
 }
