@@ -15,6 +15,15 @@ reproduced 3 separate times against live production (once via the
 Accounts tab's "Re-authorize" button, twice via this dialog's own
 "Connect with Microsoft Office 365" button).
 
+**Correction, added after the final whole-branch review:** the
+Accounts tab's "Re-authorize" button (`EmailAccounts.tsx`'s
+`handleReauthorize`) already correctly `await`s and already surfaces a
+toast on error — it was not silent. Its reproduction demonstrated the
+same *underlying* unconfigured-Office-365 error (via a visible toast),
+not the *silent-failure symptom* that only this dialog's `handleConnect`
+exhibits. The silence itself was observed specifically via this
+dialog's own "Connect with Microsoft Office 365" button, twice.
+
 ### Root cause
 
 `src/features/module-communications/components/email/EmailAccountDialog.tsx`'s
@@ -87,9 +96,20 @@ This is exactly why testing the same account through *that* dialog (the
 error message, while `EmailAccountDialog.tsx`'s manual-configure flow
 showed nothing at all for the identical underlying failure.
 
-Confirmed via repo-wide grep: `initiateGoogleOAuth`/`initiateMicrosoftOAuth`
-have exactly these 2 call sites in the entire repository. No other file
-needs to change.
+**Correction, added after the final whole-branch review:** a repo-wide
+grep for the static `import { initiateGoogleOAuth, initiateMicrosoftOAuth
+} from ...` form finds exactly these 2 call sites — but there is a
+**third**: `src/features/module-communications/components/email/EmailAccounts.tsx`'s
+own `handleReauthorize` (the Accounts tab's "Re-authorize" button) calls
+both functions via a dynamic `await import('@/lib/oauth')`, which that
+grep pattern misses. Read directly and confirmed already correct: both
+calls are properly `await`ed inside a `try` whose `catch` toasts
+`error.message` — this is in fact the third real-world OAuth entry
+point in the app, and it already behaves the way this fix is making
+`EmailAccountDialog.tsx` behave. So "no other file needs to change" is
+still the right conclusion, but it holds because that third call site
+already got this right independently, not because only 2 call sites
+exist.
 
 ## Goal
 
