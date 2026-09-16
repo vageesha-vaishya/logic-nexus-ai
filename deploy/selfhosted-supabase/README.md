@@ -1333,6 +1333,26 @@ own `{"error":"Function '<name>' not found or failed to load"}` 404 body).
   confirming both loaded and dispatched; `feature-flags` and
   `create-email-client-account` spot-checked as still working after the
   shared container restart.
+- **Code-only reseed — `sync-emails-v2`** (2026-09-16): not a new-function
+  batch — this function was already registered (`main/function_importers.ts:113`,
+  `main/verify_jwt_map.ts:62`) and deployed since Batch 1. Reseeded to
+  ship a bugfix (`saveEmailToDb`'s check-then-insert race replaced with
+  an atomic `upsert(..., { onConflict: "account_id,message_id",
+  ignoreDuplicates: true })`, closing a real duplicate-email-ingestion
+  race — see `docs/superpowers/specs/2026-09-16-duplicate-email-ingestion-fix-design.md`).
+  No router-file changes needed, only the function's own code. Live
+  container at time of deploy: `functions-i64jlyerora7ao9vkw5sweh3-043251777594`
+  (unchanged since Batch 4). Reseeded with all 113 already-deployed
+  functions, `sync-emails-v2`'s directory now carrying the fixed
+  `utils/db.ts` (113 function dirs + 6 shared top-level items = 119,
+  confirmed via directory listing before and after the swap, and by
+  grepping the staged/live file for `ignoreDuplicates` before restarting).
+  Post-restart verification: all 4 standard health checks passed;
+  `sync-emails-v2` returned its own real auth error (401
+  `{"error":"Unauthorized"}`) rather than the router's 404 "not found or
+  failed to load" body, confirming it loaded and dispatched; `feature-flags`
+  and `domains-verify` spot-checked as still working after the shared
+  container restart.
 - **Pending — later batches:** every function needing a third-party secret
   not yet provisioned on the self-hosted VPS (email/SMS/payment provider
   keys, etc.), to be grouped and deployed once each secret is available.
