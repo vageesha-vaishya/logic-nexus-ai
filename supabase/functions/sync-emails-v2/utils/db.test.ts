@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { saveEmailToDb } from "./db.ts";
+import { saveEmailToDb, uploadAttachments } from "./db.ts";
 import type { EmailAccount } from "./db.ts";
 import type { ParsedEmail } from "./parser.ts";
 
@@ -146,5 +146,52 @@ describe("saveEmailToDb", () => {
       saveEmailToDb(supabase, defaultAccount(), defaultEmail(), "inbox", "inbound", logger),
     ).rejects.toEqual({ message: "connection reset" });
     expect(logger.error).toHaveBeenCalled();
+  });
+});
+
+describe("uploadAttachments", () => {
+  it("sanitizes the RFC822 Message-ID before using it as a storage path prefix", async () => {
+    const uploadedPaths: string[] = [];
+    const supabase = {
+      storage: {
+        from: vi.fn(() => ({
+          upload: vi.fn((path: string) => {
+            uploadedPaths.push(path);
+            return Promise.resolve({ error: null });
+          }),
+        })),
+      },
+    } as any;
+
+    const attachments = [
+      { filename: "image001.png", content: new Uint8Array(), mimeType: "image/png", size: 0, contentId: undefined },
+    ] as any;
+
+    const result = await uploadAttachments(supabase, attachments, "<abc123@mail.gmail.com>");
+
+    expect(uploadedPaths).toEqual(["_abc123_mail.gmail.com_/image001.png"]);
+    expect(result[0].path).toBe("_abc123_mail.gmail.com_/image001.png");
+  });
+
+  it("still sanitizes the filename portion the same as before (regression guard)", async () => {
+    const uploadedPaths: string[] = [];
+    const supabase = {
+      storage: {
+        from: vi.fn(() => ({
+          upload: vi.fn((path: string) => {
+            uploadedPaths.push(path);
+            return Promise.resolve({ error: null });
+          }),
+        })),
+      },
+    } as any;
+
+    const attachments = [
+      { filename: "my file (1)!.pdf", content: new Uint8Array(), mimeType: "application/pdf", size: 0, contentId: undefined },
+    ] as any;
+
+    await uploadAttachments(supabase, attachments, "plain-message-id");
+
+    expect(uploadedPaths).toEqual(["plain-message-id/my_file__1__.pdf"]);
   });
 });

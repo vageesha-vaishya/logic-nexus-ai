@@ -49,11 +49,19 @@ export async function uploadAttachments(
 ): Promise<any[]> {
   const uploaded = [];
   
+  // Sanitize once per call, outside the loop -- messageId is the same
+  // RFC822 Message-ID (e.g. "<abc@mail.gmail.com>") for every attachment
+  // on this message, and Supabase Storage object keys reject its "<",
+  // ">", "@" characters (confirmed live: InvalidKey errors during
+  // Gmail sync). Only the filename was ever sanitized before; the
+  // messageId prefix was used raw.
+  const safeMessageId = messageId.replace(/[^a-zA-Z0-9.-]/g, '_');
+
   for (const att of attachments) {
     try {
       // Sanitize filename
       const safeFilename = att.filename.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const path = `${messageId}/${safeFilename}`;
+      const path = `${safeMessageId}/${safeFilename}`;
       
       const { error } = await supabase.storage
         .from('email-attachments')
