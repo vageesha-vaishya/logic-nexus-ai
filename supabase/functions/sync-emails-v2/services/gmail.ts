@@ -6,6 +6,7 @@ import {
   getEmailCredential,
   setEmailCredential,
 } from "../../_shared/email-credentials.ts";
+import { Buffer } from "node:buffer";
 
 export class GmailService {
   private account: EmailAccount;
@@ -202,11 +203,7 @@ export class GmailService {
   private async saveGmailMessage(msgData: any, folder: string, direction: "inbound" | "outbound") {
      // msgData.raw is base64url encoded
      const rawBase64 = msgData.raw.replace(/-/g, '+').replace(/_/g, '/');
-     const binaryString = atob(rawBase64);
-     const bytes = new Uint8Array(binaryString.length);
-     for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-     }
+     const bytes = Buffer.from(rawBase64, "base64");
 
      const parsedEmail: ParsedEmail = await parseEmail(bytes);
      
