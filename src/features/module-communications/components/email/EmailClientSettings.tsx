@@ -12,7 +12,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/components/ui/use-toast";
-import { DomainManagement } from "./DomainManagement";
 import { EmailAccountDialog } from "./EmailAccountDialog";
 
 type ProviderPreset = "gmail" | "office365" | "yahoo" | "zoho" | "custom";
@@ -233,18 +232,6 @@ export const EmailClientSettings: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {canEdit && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Domain Management</CardTitle>
-            <CardDescription>Manage verified domains for sending emails via high-deliverability infrastructure.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <DomainManagement />
-          </CardContent>
-        </Card>
-      )}
-
       <Card>
         <CardHeader>
           <CardTitle>SMTP/IMAP Email Client</CardTitle>

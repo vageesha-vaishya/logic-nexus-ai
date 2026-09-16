@@ -2,9 +2,6 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-vi.mock('./DomainManagement', () => ({
-  DomainManagement: () => <div data-testid="domain-management" />,
-}));
 vi.mock('./EmailAccountDialog', () => ({
   EmailAccountDialog: () => null,
 }));
@@ -115,5 +112,10 @@ describe('EmailClientSettings save form', () => {
       ),
     );
     expect((screen.getByLabelText('Email address') as HTMLInputElement).value).toBe('test@example.com');
+  });
+
+  it('does not render a duplicate Domain Management card (Domains tab owns this feature)', () => {
+    render(<EmailClientSettings />);
+    expect(screen.queryByText('Domain Management')).toBeNull();
   });
 });
