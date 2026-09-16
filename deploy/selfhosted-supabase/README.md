@@ -1723,3 +1723,26 @@ above.
   dispatched; `domains-verify` and `sync-emails-v2` spot-checked as
   still working (both `401 Unauthorized`, their own real error) after
   the shared container restart.
+- **Code-only reseed — `sync-emails-v2` (2026-09-16, third reseed):**
+  ships the attachment-storage-path sanitization fix
+  (`supabase/functions/sync-emails-v2/utils/db.ts`'s `uploadAttachments`
+  now sanitizes the RFC822 Message-ID prefix the same way it already
+  sanitized the filename — discovered live during the first-ever
+  successful Gmail sync today, which surfaced 3 `InvalidKey` attachment
+  upload failures). No router-file changes needed (already registered).
+  Live container unchanged:
+  `functions-i64jlyerora7ao9vkw5sweh3-043251777594`. Reseeded with all
+  114 already-deployed functions (120 with shared items, confirmed via
+  directory listing before and after, and by grepping the staged file
+  for `safeMessageId` before restarting). Post-restart verification: all
+  4 standard health checks passed; `sync-emails-v2` returned its own
+  real auth error (401), confirming it loaded; a real sync for
+  `bahuguna.vimal@gmail.com` immediately after saved 15 more emails (25
+  -> 40 total) with zero new attachment-upload failures in the logs.
+  This deploy also carries the earlier same-day fixes to this file
+  family (Uint8Array/Buffer decode, dead fast-path/syncedCount) that
+  were reseeded separately before this one — this is the first time all
+  of today's sync-emails-v2 fixes have been live together and verified
+  against a real, successful Gmail sync end-to-end (25 -> 40 real
+  emails saved for `bahuguna.vimal@gmail.com`, the first successful
+  Gmail sync in this account's history).
