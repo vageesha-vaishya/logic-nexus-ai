@@ -32,12 +32,25 @@ delete. No way to view DNS for an already-verified domain.
 (`TabsContent value="domains"`). Reads/writes the *same*
 `public.tenant_domains` table and calls the *same* `domains-register`/
 `domains-verify` edge functions, but through a dedicated service layer
-(`src/services/email/DomainVerificationService.ts`). Has everything
+(`src/services/email/DomainVerificationService.ts`). Has most of what
 `DomainManagement.tsx` has, plus: a delete button, a "DNS" button showing
 full SPF+DKIM+DMARC instructions for *any* domain (not just unverified
 ones), explicit tenant-scoping (`tenantId` derived from `useAuth()` and
 passed into `addDomain` rather than relying purely on RLS), and a
 permanent "DNS Configuration Guide" help card.
+
+**Correction, added after the final whole-branch review:** this is not
+a strict superset. Two capabilities the removed card had are genuinely
+missing from `DomainHealth.tsx`: (1) its "Verify DNS" button disables
+once `is_verified = true` (`disabled={verifying === domain.id ||
+domain.is_verified}`), so an already-verified domain can never be
+re-checked — a real gap now that `domains-verify` can flip a domain back
+to unverified on a later run (recoverable only via delete + re-add, not
+a re-verify); (2) it has no copy-to-clipboard affordance for DKIM CNAME
+records, unlike the removed card's per-token `Copy` button. Both are
+pre-existing properties of `DomainHealth.tsx` itself, not something this
+plan introduces or is in scope to fix (this plan's Global Constraints
+explicitly forbid touching that file) — tracked as a follow-up.
 
 `DomainManagement.tsx` has exactly one consumer — `EmailClientSettings.tsx`
 — confirmed by repo-wide grep. `DomainHealth.tsx` is objectively the more
