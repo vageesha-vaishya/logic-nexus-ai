@@ -177,6 +177,9 @@ export async function saveEmailToDb(
     logger?.warn("Auto-link lead failed:", { error: e });
   }
 
+  // .select("id") triggers Prefer: return=representation, subject to the emails table's
+  // RLS SELECT policy. A tightened SELECT policy would silently break this function's
+  // return value (syncedCount would report 0 with no error).
   const { data: inserted, error } = await supabase
     .from("emails")
     .upsert(payload, { onConflict: "account_id,message_id", ignoreDuplicates: true })
