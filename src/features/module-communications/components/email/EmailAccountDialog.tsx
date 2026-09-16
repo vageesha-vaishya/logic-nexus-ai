@@ -105,9 +105,9 @@ export function EmailAccountDialog({ open, onOpenChange, account, onSuccess }: E
       sessionStorage.setItem("oauth_hint_is_primary", String(is_primary));
 
       if (provider === "gmail") {
-        initiateGoogleOAuth(context.userId || (supabase.auth.getUser() as any)?.id);
+        await initiateGoogleOAuth(context.userId || (supabase.auth.getUser() as any)?.id);
       } else if (provider === "office365") {
-        initiateMicrosoftOAuth(context.userId || (supabase.auth.getUser() as any)?.id);
+        await initiateMicrosoftOAuth(context.userId || (supabase.auth.getUser() as any)?.id);
       } else {
         // Manual/Other
         setMode('manual');
