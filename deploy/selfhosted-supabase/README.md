@@ -1679,3 +1679,23 @@ above.
   leads count is 2 (its real data), zero rows remain matching any of the
   three test patterns. No emails, quotes, or other real records were
   touched.
+- **Data fix — stale OAuth redirect_uri (2026-09-16):** no code/migration
+  change. Discovered live while testing Gmail OAuth re-authorization for
+  `bahuguna.vimal@gmail.com` after the orphaned-credentials remediation
+  above: Google's own consent screen showed
+  `redirect_uri=http://localhost:8081/oauth/callback`, which cannot work
+  in production (nothing listens on localhost there). Root cause:
+  `initiateGoogleOAuth` (`src/lib/oauth.ts`) uses the `redirect_uri`
+  stored per-user in `public.oauth_configurations` when a row exists,
+  falling back to `window.location.origin` only when `client_id` is
+  missing — so a stale stored value is used verbatim even in production.
+  All 3 active `provider='gmail'` rows had stale values: one
+  `http://localhost:8081/oauth/callback`, two
+  `http://localhost:3000/auth/callback` (wrong host *and* wrong path —
+  `/auth/callback` is a different route, `AuthOAuthCallback`, for
+  platform-login SSO, not email-account linking — confirmed via
+  `src/App.tsx`'s route table). Fixed by updating all 3 rows (pinned by
+  id, not a sweep) to `https://app.sosservices.online/oauth/callback`,
+  the correct production route. Not yet checked: whether
+  `provider='office365'` rows in the same table have the same staleness
+  — flagged for whoever next attempts an Office365 re-authorization.
