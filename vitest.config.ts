@@ -15,6 +15,13 @@ export default defineConfig({
         if (id === 'npm:@aws-sdk/client-ses') {
           return { id: '__npm_mock__@aws-sdk/client-ses', external: true };
         }
+        // Resolve npm:mailparser to the REAL mailparser package (installed
+        // as a devDependency specifically for this) instead of a mock --
+        // the fix this test verifies depends on mailparser's actual
+        // charset-decoding behavior, not an assumption about it.
+        if (id === 'npm:mailparser') {
+          return this.resolve('mailparser', undefined, { skipSelf: true });
+        }
       },
     },
   ],

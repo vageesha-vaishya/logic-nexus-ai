@@ -281,6 +281,7 @@
     "jsdom": "^27.4.0",
     "lint-staged": "^17.0.5",
     "lovable-tagger": "^1.1.10",
+    "mailparser": "^3.9.28",
     "node-mocks-http": "^1.17.2",
     "pdf-lib": "^1.17.1",
     "postcss": "^8.5.6",

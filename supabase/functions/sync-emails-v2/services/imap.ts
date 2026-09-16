@@ -90,8 +90,7 @@ export class ImapService {
           for await (const message of messageStream) {
             debugInfo.messagesFound++;
             try {
-              const rawSource = message.source.toString();
-              const parsedEmail = await parseEmail(rawSource);
+              const parsedEmail = await parseEmail(message.source);
               
               const saved = await saveEmailToDb(
                 this.supabase, 
