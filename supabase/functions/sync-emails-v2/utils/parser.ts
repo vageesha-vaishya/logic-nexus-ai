@@ -29,7 +29,7 @@ export interface ParsedEmail {
   hasInlineImages?: boolean;
 }
 
-export async function parseEmail(source: Buffer | Uint8Array | string): Promise<ParsedEmail> {
+export async function parseEmail(source: Buffer | string): Promise<ParsedEmail> {
   const parsed = await simpleParser(source);
   
   const attachments: ParsedAttachment[] = (parsed.attachments || []).map((att: Attachment) => ({
