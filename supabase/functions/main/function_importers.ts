@@ -46,6 +46,7 @@ export const FUNCTION_IMPORTERS: Record<string, () => Promise<any>> = {
   "email-stats": () => import("../email-stats/index.ts"),
   "emit-event": () => import("../emit-event/index.ts"),
   "escalate-message": () => import("../escalate-message/index.ts"),
+  "exchange-oauth-token": () => import("../exchange-oauth-token/index.ts"),
   "execute-sql-external": () => import("../execute-sql-external/index.ts"),
   "export-data": () => import("../export-data/index.ts"),
   "feature-flags": () => import("../feature-flags/index.ts"),
