@@ -1314,6 +1314,25 @@ own `{"error":"Function '<name>' not found or failed to load"}` 404 body).
   returned 200 from Kong directly; two pre-existing functions
   (`feature-flags`, `discover-email-settings`) spot-checked as still
   working after the shared container restart.
+- **Deployed — Batch 4** (2026-09-16): 2 functions, `domains-register` and
+  `domains-verify` (see `scripts/phase4-batch4-functions.txt`), added to
+  fix the domain-verification-never-persists bug. No secrets needed
+  (`domains-verify`'s `getEmailProvider()` falls back to a mock provider
+  when `EMAIL_PROVIDER_TYPE` is unset); no `verify_jwt_map.ts` change
+  needed — both already had `false` entries there from when that map was
+  pre-populated for all 132 functions ahead of their actual deployment.
+  Live container at time of deploy: `functions-i64jlyerora7ao9vkw5sweh3-043251777594`
+  (unchanged since Batch 3 — re-resolve before any future batch regardless).
+  Reseeded with all 111 already-deployed functions plus these two (113
+  total function dirs + the 6 shared top-level items = 119, confirmed via
+  directory listing before and after the swap). Post-restart verification:
+  all 4 standard health checks passed; both new functions returned their
+  own real auth errors (`domains-verify` → 401 `{"error":"Unauthorized"}`;
+  `domains-register` → 400 `{"error":"Unauthorized: Invalid token"}`)
+  rather than the router's 404 "not found or failed to load" body,
+  confirming both loaded and dispatched; `feature-flags` and
+  `create-email-client-account` spot-checked as still working after the
+  shared container restart.
 - **Pending — later batches:** every function needing a third-party secret
   not yet provisioned on the self-hosted VPS (email/SMS/payment provider
   keys, etc.), to be grouped and deployed once each secret is available.
