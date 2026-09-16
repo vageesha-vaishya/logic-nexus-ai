@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, XCircle, RefreshCw, Plus, Trash2, Globe, AlertTriangle } from "lucide-react";
+import { CheckCircle2, XCircle, RefreshCw, Plus, Trash2, Globe, AlertTriangle, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
 
@@ -129,6 +129,15 @@ export function DomainHealth() {
     }
   };
 
+  const handleCopy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Copied to clipboard.");
+    } catch {
+      toast.error("Could not copy to clipboard.");
+    }
+  };
+
   const StatusIcon = ({ verified }: { verified: boolean }) => {
     return verified ? (
       <CheckCircle2 className="w-5 h-5 text-green-500" />
@@ -197,9 +206,29 @@ export function DomainHealth() {
                     <div className="border rounded-md divide-y">
                       {dnsDialogData.dkim.map((record, i) => (
                         <div key={i} className="p-3 grid grid-cols-12 gap-4 text-sm">
-                          <div className="col-span-5 font-mono break-all text-xs bg-muted p-2 rounded">{record.name}</div>
+                          <div className="col-span-5 flex items-center gap-1">
+                            <span className="font-mono break-all text-xs bg-muted p-2 rounded flex-1">{record.name}</span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label="Copy DKIM record name"
+                              onClick={() => handleCopy(record.name)}
+                            >
+                              <Copy className="w-3 h-3" />
+                            </Button>
+                          </div>
                           <div className="col-span-1 flex items-center justify-center text-muted-foreground">CNAME</div>
-                          <div className="col-span-6 font-mono break-all text-xs bg-muted p-2 rounded">{record.value}</div>
+                          <div className="col-span-6 flex items-center gap-1">
+                            <span className="font-mono break-all text-xs bg-muted p-2 rounded flex-1">{record.value}</span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label="Copy DKIM record value"
+                              onClick={() => handleCopy(record.value)}
+                            >
+                              <Copy className="w-3 h-3" />
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -207,15 +236,31 @@ export function DomainHealth() {
 
                   <div className="space-y-2">
                     <h3 className="font-semibold text-sm">SPF (TXT Record)</h3>
-                    <div className="p-3 border rounded-md bg-muted font-mono text-xs break-all">
-                      {dnsDialogData.spf}
+                    <div className="p-3 border rounded-md bg-muted font-mono text-xs break-all flex items-center gap-2">
+                      <span className="flex-1">{dnsDialogData.spf}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Copy SPF record"
+                        onClick={() => handleCopy(dnsDialogData.spf)}
+                      >
+                        <Copy className="w-3 h-3" />
+                      </Button>
                     </div>
                   </div>
 
                   <div className="space-y-2">
                     <h3 className="font-semibold text-sm">DMARC (TXT Record)</h3>
-                    <div className="p-3 border rounded-md bg-muted font-mono text-xs break-all">
-                      {dnsDialogData.dmarc}
+                    <div className="p-3 border rounded-md bg-muted font-mono text-xs break-all flex items-center gap-2">
+                      <span className="flex-1">{dnsDialogData.dmarc}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Copy DMARC record"
+                        onClick={() => handleCopy(dnsDialogData.dmarc)}
+                      >
+                        <Copy className="w-3 h-3" />
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -289,11 +334,11 @@ export function DomainHealth() {
                         >
                           DNS
                         </Button>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="sm"
                           onClick={() => handleVerify(domain)}
-                          disabled={verifying === domain.id || domain.is_verified}
+                          disabled={verifying === domain.id}
                         >
                           {verifying === domain.id ? (
                             <RefreshCw className="w-4 h-4 animate-spin" />
