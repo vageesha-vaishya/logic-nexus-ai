@@ -35,6 +35,7 @@ export const FUNCTION_IMPORTERS: Record<string, () => Promise<any>> = {
   "check-expiring-documents": () => import("../check-expiring-documents/index.ts"),
   "cleanup-logs": () => import("../cleanup-logs/index.ts"),
   "clone-user-from-example": () => import("../clone-user-from-example/index.ts"),
+  "create-email-client-account": () => import("../create-email-client-account/index.ts"),
   "create-franchise": () => import("../create-franchise/index.ts"),
   "create-user": () => import("../create-user/index.ts"),
   "delete-user": () => import("../delete-user/index.ts"),
