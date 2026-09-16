@@ -1699,3 +1699,27 @@ above.
   the correct production route. Not yet checked: whether
   `provider='office365'` rows in the same table have the same staleness
   — flagged for whoever next attempts an Office365 re-authorization.
+- **Router registration fix — `exchange-oauth-token` (2026-09-16):**
+  discovered live while testing Gmail OAuth re-authorization in
+  production: the Google OAuth callback flow failed with `Connection
+  Failed: Function 'exchange-oauth-token' not found`. Root cause: this
+  function already had entries in `supabase/config.toml` and
+  `main/verify_jwt_map.ts` (`verify_jwt = false` in both) but was never
+  added to `main/function_importers.ts`, and its directory had never
+  been copied into the live bind-mount at all — a genuinely
+  never-deployed function, not a code bug in the OAuth flow itself.
+  Fixed the router entry (commit `e83ca154`), then reseeded. Live
+  container at time of deploy:
+  `functions-i64jlyerora7ao9vkw5sweh3-043251777594` (unchanged since
+  today's earlier batches). Reseeded with all 113 already-deployed
+  functions plus this one (114 function dirs + 6 shared top-level items
+  = 120, confirmed via directory listing before and after the swap, and
+  by confirming `exchange-oauth-token/index.ts` and its
+  `function_importers.ts` entry were both present in the staged
+  directory before restarting). Post-restart verification: all 4
+  standard health checks passed; `exchange-oauth-token` returned its own
+  real auth error (401 `{"error":"Unauthorized"}`) rather than the
+  router's "not found or failed to load" body, confirming it loaded and
+  dispatched; `domains-verify` and `sync-emails-v2` spot-checked as
+  still working (both `401 Unauthorized`, their own real error) after
+  the shared container restart.
