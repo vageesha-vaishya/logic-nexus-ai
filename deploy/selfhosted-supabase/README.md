@@ -1657,3 +1657,25 @@ invalidate every currently-issued production access/refresh token and both
 production API keys. Treat a post-Phase-5 rollback as its own decision
 requiring the plan owner's sign-off, not a mechanical repeat of the steps
 above.
+- **Data cleanup — Group C "test data visible in the UI" (2026-09-16):**
+  no code/migration change. Per the original audit
+  (`docs/superpowers/specs/2026-09-15-email-management-ui-bugs-design.md`),
+  this Group C item was explicitly deferred as "not a confirmed bug, needs
+  a human decision." Investigated directly against production: tenant
+  `bb451198-2877-4345-a578-d404c5720f1a` (the real tenant
+  `vimal.bahuguna@miapps.co`'s SMTP/IMAP account belongs to) had only 33
+  leads total, 31 of which matched the pattern `lead<timestamp>@test.com`
+  with no name — clearly automated test-seed data from a tight Feb 7-10,
+  2026 burst window, unrelated to any real usage. Traced every FK
+  referencing `public.leads` (9 tables); found 27 dependent
+  `public.opportunities` rows (named `"Lead<timestamp> TestUser
+  Opportunity"`, `lead_id` FK is `ON DELETE SET NULL` not cascade) and 29
+  dependent `public.activities` rows (generic "Follow up on inquiry"
+  tasks, `lead_id` FK is `ON DELETE CASCADE`) — confirmed zero real
+  `emails`/`quotes` linked to any of the 27 test opportunities. Deleted
+  the 27 test opportunities first (explicit, to avoid leaving them
+  dangling with a nulled `lead_id`), then the 31 test leads (cascaded the
+  29 test activities automatically). Post-delete: tenant `bb451198`'s
+  leads count is 2 (its real data), zero rows remain matching any of the
+  three test patterns. No emails, quotes, or other real records were
+  touched.
