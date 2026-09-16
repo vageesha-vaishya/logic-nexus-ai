@@ -40,6 +40,8 @@ export const FUNCTION_IMPORTERS: Record<string, () => Promise<any>> = {
   "create-user": () => import("../create-user/index.ts"),
   "delete-user": () => import("../delete-user/index.ts"),
   "discover-email-settings": () => import("../discover-email-settings/index.ts"),
+  "domains-register": () => import("../domains-register/index.ts"),
+  "domains-verify": () => import("../domains-verify/index.ts"),
   "email-scan": () => import("../email-scan/index.ts"),
   "email-stats": () => import("../email-stats/index.ts"),
   "emit-event": () => import("../emit-event/index.ts"),

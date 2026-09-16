@@ -1,0 +1,2 @@
+domains-register
+domains-verify
