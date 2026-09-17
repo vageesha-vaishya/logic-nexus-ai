@@ -138,27 +138,13 @@ export function EmailAccountDialog({ open, onOpenChange, account, onSuccess }: E
 
     setSaving(true);
     try {
-      const accountData = {
-        user_id: context.userId,
-        tenant_id: context.tenantId,
-        franchise_id: context.franchiseId,
-        provider: providerId,
-        ...formConfig
-      };
-
-      let error;
-      if (account) {
-        const { error: updateError } = await supabase
-          .from("email_accounts")
-          .update(accountData)
-          .eq("id", account.id);
-        error = updateError;
-      } else {
-        const { error: insertError } = await supabase
-          .from("email_accounts")
-          .insert(accountData);
-        error = insertError;
-      }
+      const { error } = await invokeFunction("save-smtp-imap-account", {
+        body: {
+          accountId: account?.id,
+          provider: providerId,
+          ...formConfig,
+        },
+      });
 
       if (error) throw error;
 
