@@ -407,6 +407,9 @@ verify_jwt = false
 [functions.save-quotation-version]
 verify_jwt = false
 
+[functions.save-smtp-imap-account]
+verify_jwt = false
+
 [functions.search-emails]
 verify_jwt = false
 

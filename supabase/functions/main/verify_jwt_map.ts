@@ -52,6 +52,7 @@ export const VERIFY_JWT_MAP: Record<string, boolean> = {
   "revenue-forecasting": false,
   "route-email": false,
   "save-quotation-version": false,
+  "save-smtp-imap-account": false,
   "search-emails": false,
   "send-web": false,
   "send-whatsapp": false,
