@@ -1746,3 +1746,33 @@ above.
   against a real, successful Gmail sync end-to-end (25 -> 40 real
   emails saved for `bahuguna.vimal@gmail.com`, the first successful
   Gmail sync in this account's history).
+- **New functions — `save-smtp-imap-account` and `test-email-account-credentials`
+  (2026-09-17):** ship the fix for a second, previously-undiscovered
+  production bug found while helping a real account owner fall back to
+  SMTP/IMAP for two Office 365 accounts with no OAuth configured:
+  `EmailAccountDialog.tsx`'s "Save Account" button, and `EmailAccounts.tsx`'s
+  "Test IMAP Connection" button, had both been silently broken since the
+  2026-05-29 migration that dropped `smtp_password`/`imap_password` from
+  `public.email_accounts` — the browser was still writing/reading those
+  columns directly instead of going through vault. `EmailAutoSetup.tsx` (the
+  default "Add Email Account" auto-detect flow) had the identical bug,
+  caught by the final whole-branch review and fixed in the same branch.
+  Both new functions derive the caller's tenant/ownership from the verified
+  JWT (`user_roles` + `email_accounts.user_id`) rather than trusting any
+  client-supplied field — the final review caught and fixed a real
+  cross-user credential-exfiltration path in an earlier draft (tenant-only
+  authorization where the table's RLS is owner-scoped) before this ever
+  reached production. Full design/plan/SDD history:
+  `docs/superpowers/specs/2026-09-17-smtp-imap-credential-save-fix-design.md`,
+  `docs/superpowers/plans/2026-09-17-smtp-imap-credential-save-fix.md`.
+  Live container: `functions-i64jlyerora7ao9vkw5sweh3-043251777594`.
+  Reseeded with all 114 already-deployed functions plus these 2 (116
+  function dirs + 6 shared top-level items = 122, confirmed via directory
+  listing before and after the swap). Post-restart verification: all 4
+  standard health checks passed; both new functions returned their own real
+  auth error (`{"error":"Unauthorized"}`) rather than the router's "not
+  found or failed to load" body; `exchange-oauth-token` and `sync-emails-v2`
+  spot-checked as still working (same real 401) after the shared container
+  restart. Live smoke test (actually saving real credentials end-to-end)
+  not yet run as of this entry — pending the account owner re-entering a
+  password through the now-fixed dialog.
