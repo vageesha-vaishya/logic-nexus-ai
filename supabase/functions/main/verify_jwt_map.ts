@@ -62,6 +62,7 @@ export const VERIFY_JWT_MAP: Record<string, boolean> = {
   "sync-emails": false,
   "sync-emails-v2": false,
   "sync-hts-data": false,
+  "test-email-account-credentials": false,
   "win-probability": false,
   // Remaining functions with verify_jwt=false in config.toml, not in this
   // batch (needs-secrets or excluded) but included so this map stays

@@ -114,6 +114,7 @@ export const FUNCTION_IMPORTERS: Record<string, () => Promise<any>> = {
   "sync-emails": () => import("../sync-emails/index.ts"),
   "sync-emails-v2": () => import("../sync-emails-v2/index.ts"),
   "sync-hts-data": () => import("../sync-hts-data/index.ts"),
+  "test-email-account-credentials": () => import("../test-email-account-credentials/index.ts"),
   "track-email": () => import("../track-email/index.ts"),
   "update-aircraft-template-model-json": () => import("../update-aircraft-template-model-json/index.ts"),
   "verify-email-credentials": () => import("../verify-email-credentials/index.ts"),

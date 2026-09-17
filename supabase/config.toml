@@ -449,6 +449,9 @@ verify_jwt = false
 [functions.sync-hts-data]
 verify_jwt = false
 
+[functions.test-email-account-credentials]
+verify_jwt = false
+
 [functions.win-probability]
 verify_jwt = false
 
