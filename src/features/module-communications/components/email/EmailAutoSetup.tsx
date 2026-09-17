@@ -7,7 +7,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Mail, CheckCircle2, AlertCircle, ArrowRight } from "lucide-react";
 import { initiateGoogleOAuth, initiateMicrosoftOAuth } from "@/lib/oauth";
 import { useCRM } from "@/hooks/useCRM";
-import { supabase } from "@/integrations/supabase/client";
 import { logger } from "@/lib/logger";
 
 interface EmailAutoSetupProps {
@@ -117,33 +116,27 @@ export function EmailAutoSetup({ onSuccess, onManual, onClose }: EmailAutoSetupP
         throw new Error(verifyData?.error || "Authentication failed. Please check your password.");
       }
 
-      // 2. Save Account
-      const payload = {
-        user_id: context.userId,
-        tenant_id: context.tenantId,
-        franchise_id: context.franchiseId,
-        provider: 'smtp_imap', // Store as generic IMAP/SMTP
-        email_address: email,
-        display_name: email.split('@')[0],
-        is_primary: false,
-        is_active: true,
-        // IMAP
-        imap_host: imapConfig.host,
-        imap_port: imapConfig.port,
-        imap_username: imapConfig.username,
-        imap_password: password,
-        imap_use_ssl: imapConfig.secure,
-        // SMTP (Best guess or from discovery)
-        smtp_host: settings.smtp?.host,
-        smtp_port: settings.smtp?.port,
-        smtp_username: settings.smtp?.username?.replace('%EMAIL%', email) || imapConfig.username,
-        smtp_password: password,
-        smtp_use_tls: settings.smtp?.socketType !== 'PLAIN'
-      };
-
-      const { error: saveError } = await supabase
-        .from("email_accounts")
-        .insert(payload as any);
+      // 2. Save Account via the edge function, which writes the credentials to
+      // Vault. user_id / tenant_id / franchise_id are derived server-side from
+      // the authenticated caller, so they are deliberately not sent from here.
+      const { error: saveError } = await invokeFunction("save-smtp-imap-account", {
+        body: {
+          provider: "smtp_imap",
+          display_name: email.split('@')[0],
+          email_address: email,
+          is_primary: false,
+          imap_host: imapConfig.host,
+          imap_port: imapConfig.port,
+          imap_username: imapConfig.username,
+          imap_password: password,
+          imap_use_ssl: imapConfig.secure,
+          smtp_host: settings.smtp?.host,
+          smtp_port: settings.smtp?.port,
+          smtp_username: settings.smtp?.username?.replace('%EMAIL%', email) || imapConfig.username,
+          smtp_password: password,
+          smtp_use_tls: settings.smtp?.socketType !== 'PLAIN',
+        },
+      });
 
       if (saveError) throw saveError;
 

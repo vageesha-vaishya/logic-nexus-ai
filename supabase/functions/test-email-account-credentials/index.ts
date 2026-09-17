@@ -38,26 +38,24 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       );
     }
 
-    const { data: userRole } = await supabaseAdmin
-      .from("user_roles")
-      .select("tenant_id")
-      .eq("user_id", user.id)
-      .single();
-
-    if (!userRole?.tenant_id) {
-      return new Response(
-        JSON.stringify({ error: "Unable to resolve your tenant. Contact your administrator." }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
+    // Authorization is ownership-based, matching the RLS policy on
+    // email_accounts: USING (user_id = auth.uid() OR is_platform_admin(...)).
+    // A tenant-membership check would let any colleague read this account's
+    // IMAP password in plaintext.
     const { data: account, error: accountError } = await supabaseAdmin
       .from("email_accounts")
-      .select("tenant_id, imap_host, imap_port, imap_username, imap_use_ssl, email_address")
+      .select("user_id, imap_host, imap_port, imap_username, imap_use_ssl, email_address")
       .eq("id", accountId)
       .maybeSingle();
 
-    if (accountError || !account || account.tenant_id !== userRole.tenant_id) {
+    if (accountError) {
+      return new Response(JSON.stringify({ error: "Failed to look up account. Please try again." }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!account || account.user_id !== user.id) {
       return new Response(JSON.stringify({ error: "Account not found" }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

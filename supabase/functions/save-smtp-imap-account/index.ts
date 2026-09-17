@@ -5,10 +5,13 @@ import { setEmailCredential } from "../_shared/email-credentials.ts";
 
 declare const Deno: any;
 
+// Passwords are intentionally absent here: they are required only when
+// creating a new account. On update, an omitted password means "keep the
+// currently stored credential" rather than "clear it".
 const REQUIRED_FIELDS = [
   "display_name", "email_address",
-  "smtp_host", "smtp_port", "smtp_username", "smtp_password",
-  "imap_host", "imap_port", "imap_username", "imap_password",
+  "smtp_host", "smtp_port", "smtp_username",
+  "imap_host", "imap_port", "imap_username",
 ] as const;
 
 serveWithLogger(async (req, logger, supabaseAdmin) => {
@@ -51,11 +54,30 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       imap_host, imap_port, imap_username, imap_password, imap_use_ssl,
     } = payload;
 
-    const { data: userRole } = await supabaseAdmin
+    if (!accountId && (!smtp_password || !imap_password)) {
+      return new Response(
+        JSON.stringify({ error: "smtp_password and imap_password are required when creating a new account" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // user_roles is UNIQUE(user_id, role, tenant_id, franchise_id): a user may
+    // legitimately hold several rows. .single() would error for them, so take
+    // the first-assigned role deterministically instead.
+    const { data: userRole, error: roleError } = await supabaseAdmin
       .from("user_roles")
       .select("tenant_id, franchise_id")
       .eq("user_id", user.id)
-      .single();
+      .order("assigned_at")
+      .limit(1)
+      .maybeSingle();
+
+    if (roleError) {
+      return new Response(
+        JSON.stringify({ error: "Failed to resolve your role. Please try again." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     if (!userRole?.tenant_id) {
       return new Response(
@@ -83,13 +105,22 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
     let savedAccountId: string;
 
     if (accountId) {
+      // Ownership check, matching the RLS policy on email_accounts:
+      // USING (user_id = auth.uid() OR is_platform_admin(auth.uid())).
       const { data: existing, error: existingError } = await supabaseAdmin
         .from("email_accounts")
-        .select("id, tenant_id")
+        .select("id, user_id")
         .eq("id", accountId)
         .maybeSingle();
 
-      if (existingError || !existing || existing.tenant_id !== userRole.tenant_id) {
+      if (existingError) {
+        return new Response(JSON.stringify({ error: "Failed to look up account. Please try again." }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (!existing || existing.user_id !== user.id) {
         return new Response(JSON.stringify({ error: "Account not found" }), {
           status: 404,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -120,18 +151,35 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       savedAccountId = inserted.id;
     }
 
-    const smtpResult = await setEmailCredential(
-      supabaseAdmin,
-      { account_id: savedAccountId, purpose: "smtp_password", value: smtp_password, tenant_id: userRole.tenant_id },
-      logger,
-    );
-    const imapResult = await setEmailCredential(
-      supabaseAdmin,
-      { account_id: savedAccountId, purpose: "imap_password", value: imap_password, tenant_id: userRole.tenant_id },
-      logger,
-    );
+    // Only rotate a credential the caller actually supplied a new value for.
+    const credentialWrites: Promise<{ ok: boolean; error?: unknown }>[] = [];
+    if (smtp_password) {
+      credentialWrites.push(
+        setEmailCredential(
+          supabaseAdmin,
+          { account_id: savedAccountId, purpose: "smtp_password", value: smtp_password, tenant_id: userRole.tenant_id },
+          logger,
+        ),
+      );
+    }
+    if (imap_password) {
+      credentialWrites.push(
+        setEmailCredential(
+          supabaseAdmin,
+          { account_id: savedAccountId, purpose: "imap_password", value: imap_password, tenant_id: userRole.tenant_id },
+          logger,
+        ),
+      );
+    }
+    const credentialResults = await Promise.all(credentialWrites);
+    const credentialFailed = credentialResults.some((r) => !r.ok);
 
-    if (!smtpResult.ok || !imapResult.ok) {
+    if (credentialFailed) {
+      if (!accountId) {
+        // Creation path: delete the row this request just inserted rather
+        // than leave a credential-less orphan a retry would duplicate.
+        await supabaseAdmin.from("email_accounts").delete().eq("id", savedAccountId);
+      }
       return new Response(
         JSON.stringify({ error: "Account saved, but credential storage failed. Please try saving again." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
