@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Mail, Settings, RefreshCw, Trash2, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { invokeFunction, invokeAnonymous } from "@/lib/supabase-functions";
+import { invokeFunction } from "@/lib/supabase-functions";
 import { EmailAccountDialog } from "./EmailAccountDialog";
 import { EmailDelegationDialog } from "./EmailDelegationDialog";
 import { format } from "date-fns";
@@ -183,24 +183,17 @@ export function EmailAccounts() {
         toast({ title: "Error", description: "Account not found", variant: "destructive" });
         return;
       }
-      if (!acc.imap_host || !acc.imap_username || !acc.imap_password) {
-        toast({ title: "Missing IMAP settings", description: "Please configure IMAP host, username and password.", variant: "destructive" });
+      const { data, error } = await invokeFunction("test-email-account-credentials", {
+        body: { accountId },
+      });
+      if (error) {
+        toast({ title: "IMAP Test Failed", description: error.message || "Connection failed", variant: "destructive" });
         return;
       }
-      const result: any = await invokeAnonymous("verify-email-credentials", {
-        imap: {
-          host: acc.imap_host,
-          port: acc.imap_port || 993,
-          username: acc.imap_username || acc.email_address,
-          password: acc.imap_password,
-          secure: acc.imap_use_ssl ?? true
-        }
-      });
-      if (result?.success) {
-        toast({ title: "IMAP OK", description: result?.message || "Connection successful" });
+      if (data?.success) {
+        toast({ title: "IMAP OK", description: data?.message || "Connection successful" });
       } else {
-        const msg = result?.error || "Connection failed";
-        toast({ title: "IMAP Test Failed", description: msg, variant: "destructive" });
+        toast({ title: "IMAP Test Failed", description: data?.error || "Connection failed", variant: "destructive" });
       }
     } catch (e: any) {
       toast({ title: "IMAP Test Failed", description: e?.message || "Connection failed", variant: "destructive" });
