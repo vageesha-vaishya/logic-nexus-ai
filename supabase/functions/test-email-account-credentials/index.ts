@@ -55,11 +55,23 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       });
     }
 
-    if (!account || account.user_id !== user.id) {
+    if (!account) {
       return new Response(JSON.stringify({ error: "Account not found" }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    if (account.user_id !== user.id) {
+      const { data: isPlatformAdmin } = await supabaseAdmin.rpc("is_platform_admin", {
+        check_user_id: user.id,
+      });
+      if (!isPlatformAdmin) {
+        return new Response(JSON.stringify({ error: "Account not found" }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     if (!account.imap_host || !account.imap_username) {

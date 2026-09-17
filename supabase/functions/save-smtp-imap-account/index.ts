@@ -63,11 +63,18 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
 
     // user_roles is UNIQUE(user_id, role, tenant_id, franchise_id): a user may
     // legitimately hold several rows. .single() would error for them, so take
-    // the first-assigned role deterministically instead.
+    // the first-assigned role deterministically instead -- but a
+    // platform_admin's earliest-assigned row is often the global,
+    // tenant-less platform_admin role itself (tenant_id NULL), so exclude
+    // null-tenant rows first or every platform admin who also holds a
+    // tenant-scoped role gets a false "unable to resolve your tenant" 403
+    // (discovered live: bahuguna.vimal@gmail.com's earliest role is exactly
+    // this shape).
     const { data: userRole, error: roleError } = await supabaseAdmin
       .from("user_roles")
       .select("tenant_id, franchise_id")
       .eq("user_id", user.id)
+      .not("tenant_id", "is", null)
       .order("assigned_at")
       .limit(1)
       .maybeSingle();
@@ -120,11 +127,23 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
         });
       }
 
-      if (!existing || existing.user_id !== user.id) {
+      if (!existing) {
         return new Response(JSON.stringify({ error: "Account not found" }), {
           status: 404,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
+      }
+
+      if (existing.user_id !== user.id) {
+        const { data: isPlatformAdmin } = await supabaseAdmin.rpc("is_platform_admin", {
+          check_user_id: user.id,
+        });
+        if (!isPlatformAdmin) {
+          return new Response(JSON.stringify({ error: "Account not found" }), {
+            status: 404,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
       }
 
       const { error: updateError } = await supabaseAdmin
