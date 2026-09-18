@@ -287,11 +287,6 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, ini
   const onSubmit = async (values: EmailComposeValues) => {
     setSending(true);
     try {
-      const selected = accounts.find((a) => a.id === values.accountId);
-      if (selected?.provider === "gmail" && !selected?.access_token && !selected?.refresh_token) {
-        throw new Error("Selected Gmail account is not connected. Please connect it in Accounts.");
-      }
-
       // Call edge function to send email
       const { data, error } = await invokeFunction("send-email", {
         body: {
