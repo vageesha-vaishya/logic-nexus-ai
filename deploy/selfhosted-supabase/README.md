@@ -1816,3 +1816,44 @@ above.
   still needs to run the OAuth connect flow themselves to actually fix
   their `Bahuguna.vimal@outlook.com` account; this fix only stops a
   platform admin's attempt from silently forking a duplicate.
+- **New function — `send-email` (2026-09-18):** found live while trying to
+  send a plain internal Compose email — every send failed with `Error:
+  Function 'send-email' not found`. Root cause: `send-email` had a real,
+  complete local implementation the whole time (Resend/Gmail/Office
+  365/SMTP providers, template rendering, attachment handling, suppression
+  filtering) and was even already listed in `supabase/config.toml`
+  (`[functions.send-email]`, `verify_jwt = false`) and in
+  `main/verify_jwt_map.ts` — but had **no entry in
+  `main/function_importers.ts`**, so the router's dynamic-import map never
+  learned the function existed and 404'd every call before the function's
+  own code ever ran. This is a distinct, partial-registration variant of
+  the "new function" deploy gap this README has documented before (see
+  the Batch/`feature-flags` history above) — half the registration was
+  done, half wasn't, and nothing caught it because no automated check
+  diffs `function_importers.ts` against `config.toml`. Fixed by adding
+  `"send-email": () => import("../send-email/index.ts")` to
+  `main/function_importers.ts` (alphabetically before `send-web`).
+  **Caution for whoever touches this next:** `verify_jwt_map.ts` already
+  had a `"send-email": false` entry, just not alphabetically next to
+  `send-web`/`send-whatsapp` (it sits further up, near
+  `self-service-onboarding`) — a first attempt at this fix added a second,
+  duplicate `"send-email"` entry near `send-web` before this was noticed
+  and reverted; `verify_jwt_map.ts` in this codebase is evidently not kept
+  fully alphabetical, so grep for the key before assuming it's missing.
+  Confirmed both `nodemailer` (resolves via `import_map.json`'s
+  `"nodemailer": "npm:nodemailer@6.9.7"`) and this function's three
+  `_shared` dependencies (`comms-suppression.ts`,
+  `comms-unsubscribe-token.ts`, `email-credentials.ts`) were already
+  present on the live bind-mount before reseeding, so no other files
+  needed staging alongside it. Live container:
+  `functions-i64jlyerora7ao9vkw5sweh3-043251777594`. Reseeded with all 122
+  already-deployed items plus this 1 new function directory (123 items,
+  confirmed via directory listing before and after the swap). Restarted
+  only the `functions` container (plain `docker restart`; no `.env`
+  change, so `kong` and the other 5 containers were confirmed untouched
+  via `docker ps` timestamps). Post-restart verification: all 4 standard
+  health checks passed; `send-email` returned its own real auth error
+  (`401 {"error":"Unauthorized"}`) rather than the router's "not found or
+  failed to load" body, confirming it now loads and dispatches. Live
+  smoke test (actually sending a real email end-to-end through Compose)
+  pending as of this entry.

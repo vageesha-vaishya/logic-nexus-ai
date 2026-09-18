@@ -106,6 +106,7 @@ export const FUNCTION_IMPORTERS: Record<string, () => Promise<any>> = {
   "save-smtp-imap-account": () => import("../save-smtp-imap-account/index.ts"),
   "scheduled-reconcile": () => import("../scheduled-reconcile/index.ts"),
   "search-emails": () => import("../search-emails/index.ts"),
+  "send-email": () => import("../send-email/index.ts"),
   "send-web": () => import("../send-web/index.ts"),
   "send-whatsapp": () => import("../send-whatsapp/index.ts"),
   "subscription-plans": () => import("../subscription-plans/index.ts"),
