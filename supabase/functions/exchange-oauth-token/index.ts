@@ -165,19 +165,41 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
     let account;
     let accountError;
 
-    // Prefer updating the hinted account id (the one user clicked Re-authorize on)
+    // Prefer updating the hinted account id (the one user clicked Re-authorize on).
+    // Ownership check matches the RLS policy on email_accounts:
+    // USING (user_id = auth.uid() OR is_platform_admin(auth.uid())) -- without it,
+    // a platform admin re-authorizing another user's account would silently fall
+    // through to inserting a brand-new row owned by the admin instead of updating
+    // the real owner's account.
     let existingId: string | null = null;
     if (accountIdHint) {
       const { data: existingById } = await supabaseAdmin
         .from("email_accounts")
         .select("id, user_id, email_address")
         .eq("id", accountIdHint)
-        .eq("user_id", userId)
         .maybeSingle();
-      existingId = existingById?.id ?? null;
-      // If no email was provided by provider, reuse existing row email
-      if (existingById?.email_address && !(resolvedEmail || emailAddress)) {
-        resolvedEmail = existingById.email_address;
+
+      if (existingById) {
+        let authorized = existingById.user_id === userId;
+        if (!authorized) {
+          const { data: isPlatformAdmin } = await supabaseAdmin.rpc("is_platform_admin", {
+            check_user_id: userId,
+          });
+          authorized = Boolean(isPlatformAdmin);
+        }
+
+        if (!authorized) {
+          return new Response(JSON.stringify({ error: "Account not found" }), {
+            status: 404,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        existingId = existingById.id;
+        // If no email was provided by provider, reuse existing row email
+        if (existingById.email_address && !(resolvedEmail || emailAddress)) {
+          resolvedEmail = existingById.email_address;
+        }
       }
     }
 

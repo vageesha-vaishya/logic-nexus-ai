@@ -1776,3 +1776,43 @@ above.
   restart. Live smoke test (actually saving real credentials end-to-end)
   not yet run as of this entry — pending the account owner re-entering a
   password through the now-fixed dialog.
+- **Code-only reseed — `exchange-oauth-token` (2026-09-18):** not a new-function
+  batch — this function was already registered and deployed. Reseeded to fix
+  a cross-user ownership gap in its `accountIdHint` lookup, found live while
+  testing the new "Register an Azure AD app for Office 365 OAuth" work (see
+  the Azure app registration and Coolify env-var wiring for
+  `MICROSOFT_CLIENT_ID`/`MICROSOFT_CLIENT_SECRET`, done the same day): the
+  hint lookup filtered `.eq("id", accountIdHint).eq("user_id", userId)`, so
+  when a platform admin (`bahuguna.vimal@gmail.com`) ran "Connect with
+  Microsoft Office 365" on `Bahuguna.vimal@outlook.com` — a real account
+  owned by a different user (`admin-user-tenant001@gmail.com`) — the
+  ownership filter silently failed to match, and the function fell through
+  to inserting a brand-new `email_accounts` row owned by the admin instead
+  of updating the real owner's row. Live evidence: row
+  `53dbfa1e-40c3-4181-aed1-37656c313a1b` (provider `office365`, owned by the
+  admin) got created alongside the untouched original row
+  `bb193040-e8ef-408b-be7c-3968aa0723e8` (provider `smtp_imap`, owned by the
+  real user) — both for the same email address. Fixed by fetching the
+  hinted row by `id` alone, then authorizing via
+  `existingById.user_id === userId OR is_platform_admin(userId)`, matching
+  the RLS policy on `email_accounts` and the identical fix already applied
+  to `save-smtp-imap-account`/`test-email-account-credentials` on
+  2026-09-17. A caller who is neither the owner nor a platform admin now
+  gets a real `404 {"error":"Account not found"}` instead of the account
+  silently forking. Live container:
+  `functions-i64jlyerora7ao9vkw5sweh3-043251777594`. Code-only change (no
+  new function directory), so the bind-mount item count stayed at 122
+  before and after the reseed. Restarted only the `functions` container
+  (plain `docker restart`, not `docker compose up -d` — no `.env` change
+  this time, so `kong` was correctly left untouched: confirmed via
+  `docker ps` timestamps, `kong` still at its prior uptime while `functions`
+  showed a fresh restart). Post-restart verification: all 4 standard health
+  checks passed; `exchange-oauth-token` returned its own real auth error
+  (`401 {"error":"Unauthorized"}`) rather than the router's "not found or
+  failed to load" body, confirming the fixed code loaded and dispatched.
+  The orphaned test row (`53dbfa1e-...`) this bug produced was left in
+  place, not cleaned up as part of this fix — flagged here in case it
+  needs deleting later. The real owner (`admin-user-tenant001@gmail.com`)
+  still needs to run the OAuth connect flow themselves to actually fix
+  their `Bahuguna.vimal@outlook.com` account; this fix only stops a
+  platform admin's attempt from silently forking a duplicate.
