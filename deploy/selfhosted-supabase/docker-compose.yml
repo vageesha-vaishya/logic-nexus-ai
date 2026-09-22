@@ -264,6 +264,8 @@ services:
       - "127.0.0.1:3070:3000/tcp"
     depends_on:
       - meta
+    healthcheck:
+      disable: true
     environment:
       STUDIO_PG_META_URL: http://meta:8080
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -271,6 +273,7 @@ services:
       SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL:-http://127.0.0.1:8010}
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      AUTH_JWT_SECRET: ${JWT_SECRET}
       LOGFLARE_API_KEY: ""
       LOGFLARE_URL: ""
       NEXT_PUBLIC_ENABLE_LOGS: "false"
