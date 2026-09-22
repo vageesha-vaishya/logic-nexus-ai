@@ -252,7 +252,7 @@ services:
       PG_META_PORT: 8080
       PG_META_DB_URL: postgres://supabase_admin:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
 
-studio:
+  studio:
     container_name: logic-nexus-studio
     image: supabase/studio:2026.09.21-sha-512201d
     restart: unless-stopped
