@@ -354,7 +354,7 @@ services:
       PG_META_DB_PASSWORD: '${POSTGRES_PASSWORD}'
   studio:
     container_name: logic-nexus-studio
-    image: 'supabase/studio:20241202-602f31f'
+    image: 'supabase/studio:20240101-1574fa1'
     restart: unless-stopped
     networks:
       - coolify
