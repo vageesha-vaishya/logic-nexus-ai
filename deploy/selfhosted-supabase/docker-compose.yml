@@ -1,45 +1,6 @@
-# Self-hosted Supabase-equivalent lean stack — Phase 1
-#
-# See: docs/superpowers/specs/2026-08-22-supabase-selfhost-phase1-design.md
-# and: deploy/selfhosted-supabase/README.md
-#
-# Adapted from upstream supabase/supabase:docker/docker-compose.yml +
-# docker/docker-compose.kong.yml (fetched 2026-08-22). Deliberate differences
-# from upstream:
-#   - Postgres runs as a `db` service in THIS compose file (revised Task 2,
-#     2026-08-22), not a separate Coolify-native "Database" resource — that
-#     approach doesn't work because supabase/postgres's own entrypoint
-#     unconditionally requires bind-mounted init SQL under
-#     /docker-entrypoint-initdb.d/ (see volumes/db/), which a bare Coolify
-#     Database resource has no way to supply. Every other service's DB
-#     connection URL below points at the literal internal hostname `db:5432`.
-#   - `db`'s image tag is supabase/postgres:17.6.1.136 — the tag upstream's
-#     docker-compose.yml actually pins as of this fetch (2026-08-22), not the
-#     supabase/postgres:17.4.1.037 the plan assumed; both exist on Docker Hub,
-#     but 17.6.1.136 is what upstream currently ships and every other image
-#     tag in this file already matches this same upstream snapshot exactly.
-#   - Upstream's default gateway is Envoy (`api-gw` service), with Kong as an
-#     opt-in override (docker-compose.kong.yml) that replaces `api-gw` in
-#     place. This file skips Envoy entirely and defines `kong` directly,
-#     using the exact image/environment/volumes/entrypoint from that Kong
-#     override — see kong-entrypoint.sh for why the entrypoint is a mounted
-#     script rather than an inline command.
-#   - No Studio, postgres-meta, Analytics/Logflare, imgproxy, or MinIO/S3 —
-#     all explicitly out of scope for Phase 1 (see design spec §2, §4).
-#   - Storage uses the local-disk backend (STORAGE_BACKEND=file), not S3.
-#   - Every service has an explicit mem_limit, and a matching memswap_limit
-#     equal to its own mem_limit (fixed 2026-08-22 for the six non-`db`
-#     services — no extra swap headroom anywhere in this stack; see design
-#     spec §4 for the rationale — this is the safety mechanism protecting the
-#     other 24 apps on the shared VPS from this stack, not network isolation).
-#   - All services join the shared external `coolify` Docker network (see
-#     design spec §5) — Coolify-native Database resources (incl. the one
-#     Task 2 creates) and Coolify's Traefik routing both require it.
-
 name: logic-nexus-selfhosted-supabase
 
 services:
-
   kong:
     container_name: logic-nexus-kong
     image: kong/kong:3.9.3
@@ -54,13 +15,6 @@ services:
       timeout: 5s
       retries: 5
     ports:
-      # NOT needed for Coolify's Traefik — Traefik reaches this container over
-      # the shared `coolify` network by container name, not via a published
-      # host port (fixed 2026-08-22; the prior comment claiming otherwise was
-      # wrong and this port was reachable over plaintext HTTP from the public
-      # internet, undocumented). Bound to loopback only, kept solely for local
-      # debugging convenience (`ssh hostinger-vps` + `curl 127.0.0.1:8010`);
-      # safe to delete this whole `ports:` block if that convenience isn't needed.
       - "127.0.0.1:${KONG_HTTP_PORT:-8000}:8000/tcp"
     volumes:
       - ./kong.yml:/home/kong/temp.yml:ro
@@ -82,9 +36,6 @@ services:
       SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY:-}
       ANON_KEY_ASYMMETRIC: ${ANON_KEY_ASYMMETRIC:-}
       SERVICE_ROLE_KEY_ASYMMETRIC: ${SERVICE_ROLE_KEY_ASYMMETRIC:-}
-    # Custom entrypoint that substitutes $SUPABASE_ANON_KEY / $SUPABASE_SERVICE_KEY
-    # (and builds the $LUA_AUTH_EXPR / $LUA_RT_WS_EXPR expressions) into kong.yml
-    # before Kong starts. See kong-entrypoint.sh — copied verbatim from upstream.
     entrypoint: ["/bin/sh", "/home/kong/kong-entrypoint.sh"]
 
   auth:
@@ -112,27 +63,20 @@ services:
       GOTRUE_API_HOST: 0.0.0.0
       GOTRUE_API_PORT: 9999
       API_EXTERNAL_URL: ${API_EXTERNAL_URL}
-
       GOTRUE_DB_DRIVER: postgres
       GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-
       GOTRUE_SITE_URL: ${SITE_URL}
       GOTRUE_URI_ALLOW_LIST: ${ADDITIONAL_REDIRECT_URLS}
       GOTRUE_DISABLE_SIGNUP: ${DISABLE_SIGNUP}
-
       GOTRUE_JWT_ADMIN_ROLES: service_role
       GOTRUE_JWT_AUD: authenticated
       GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
       GOTRUE_JWT_EXP: ${JWT_EXPIRY}
-
-      # Legacy symmetric HS256 key
       GOTRUE_JWT_SECRET: ${JWT_SECRET}
       GOTRUE_JWT_ISSUER: ${API_EXTERNAL_URL}
-
       GOTRUE_EXTERNAL_EMAIL_ENABLED: ${ENABLE_EMAIL_SIGNUP}
       GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED: ${ENABLE_ANONYMOUS_USERS}
       GOTRUE_MAILER_AUTOCONFIRM: ${ENABLE_EMAIL_AUTOCONFIRM}
-
       GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_ADMIN_EMAIL}
       GOTRUE_SMTP_HOST: ${SMTP_HOST}
       GOTRUE_SMTP_PORT: ${SMTP_PORT}
@@ -143,7 +87,6 @@ services:
       GOTRUE_MAILER_URLPATHS_CONFIRMATION: ${MAILER_URLPATHS_CONFIRMATION}
       GOTRUE_MAILER_URLPATHS_RECOVERY: ${MAILER_URLPATHS_RECOVERY}
       GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: ${MAILER_URLPATHS_EMAIL_CHANGE}
-
       GOTRUE_EXTERNAL_PHONE_ENABLED: ${ENABLE_PHONE_SIGNUP}
       GOTRUE_SMS_AUTOCONFIRM: ${ENABLE_PHONE_AUTOCONFIRM}
 
@@ -156,7 +99,7 @@ services:
     mem_limit: 256m
     memswap_limit: 256m
     healthcheck:
-      test: [ "CMD", "postgrest", "--ready" ]
+      test: ["CMD", "postgrest", "--ready"]
       interval: 5s
       timeout: 5s
       retries: 3
@@ -166,20 +109,13 @@ services:
       PGRST_DB_MAX_ROWS: ${PGRST_DB_MAX_ROWS:-1000}
       PGRST_DB_EXTRA_SEARCH_PATH: ${PGRST_DB_EXTRA_SEARCH_PATH:-public}
       PGRST_DB_ANON_ROLE: anon
-
       PGRST_ADMIN_SERVER_PORT: 3001
       PGRST_ADMIN_SERVER_HOST: localhost
-
-      # PostgREST accepts a plain-text symmetric secret, a single JWK, or a JWKS.
       PGRST_JWT_SECRET: ${JWT_JWKS:-${JWT_SECRET}}
-
       PGRST_DB_USE_LEGACY_GUCS: "false"
       PGRST_APP_SETTINGS_JWT_SECRET: ${JWT_SECRET}
       PGRST_APP_SETTINGS_JWT_EXP: ${JWT_EXPIRY}
-    command:
-      [
-        "postgrest"
-      ]
+    command: ["postgrest"]
 
   storage:
     container_name: logic-nexus-storage
@@ -210,32 +146,21 @@ services:
       ANON_KEY: ${ANON_KEY}
       SERVICE_KEY: ${SERVICE_ROLE_KEY}
       POSTGREST_URL: http://rest:3000
-
-      # Legacy symmetric HS256 key
       AUTH_JWT_SECRET: ${JWT_SECRET}
-
       DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       STORAGE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL}
       REQUEST_ALLOW_X_FORWARDED_PATH: "true"
       FILE_SIZE_LIMIT: 52428800
-
-      # Local-disk backend (no MinIO/S3) — matches the spec's "skip MinIO" decision.
       STORAGE_BACKEND: file
       GLOBAL_S3_BUCKET: ${GLOBAL_S3_BUCKET}
       FILE_STORAGE_BACKEND_PATH: /var/lib/storage
       TENANT_ID: ${STORAGE_TENANT_ID}
       REGION: ${REGION}
-
-      # imgproxy is out of scope for Phase 1 (see design spec §2) — image
-      # transformation is disabled rather than pointing at a container that
-      # doesn't exist in this stack.
       ENABLE_IMAGE_TRANSFORMATION: "false"
     volumes:
       - storage-data:/var/lib/storage
 
   realtime:
-    # This container name looks inconsistent but is correct because realtime
-    # constructs its tenant id by parsing the subdomain (verbatim from upstream).
     container_name: realtime-dev.supabase-realtime
     image: supabase/realtime:v2.102.3
     restart: unless-stopped
@@ -262,10 +187,7 @@ services:
       DB_NAME: ${POSTGRES_DB}
       DB_AFTER_CONNECT_QUERY: 'SET search_path TO _realtime'
       DB_ENC_KEY: ${REALTIME_DB_ENC_KEY:-supabaserealtime}
-
-      # Legacy symmetric HS256 key
       API_JWT_SECRET: ${JWT_SECRET}
-
       SECRET_KEY_BASE: ${SECRET_KEY_BASE}
       METRICS_JWT_SECRET: ${JWT_SECRET}
       ERL_AFLAGS: -proto_dist inet_tcp
@@ -296,9 +218,7 @@ services:
       timeout: 5s
       retries: 3
     environment:
-      # Legacy symmetric HS256 key
       JWT_SECRET: ${JWT_SECRET}
-
       SUPABASE_URL: http://kong:8000
       SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL}
       SUPABASE_ANON_KEY: ${ANON_KEY}
@@ -306,10 +226,6 @@ services:
       SUPABASE_DB_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
-      # Self-hosted vLLM fallback (see _shared/llm-gateway.ts) — used when no
-      # tenant LLM config and no ANTHROPIC_API_KEY are set. GEMINI_API_KEY,
-      # ANTHROPIC_API_KEY, and the UPSTASH_REDIS_REST_* pair are deliberately
-      # NOT set here; see README's Phase 4 Batch 2 section for why.
       VLLM_BASE_URL: ${VLLM_BASE_URL:-}
       VLLM_API_KEY: ${VLLM_API_KEY:-}
       VLLM_MODEL_NAME: ${VLLM_MODEL_NAME:-}
@@ -320,12 +236,10 @@ services:
         "--main-service",
         "/home/deno/functions/main"
       ]
-    # Known Phase 1 limitation: no functions are deployed yet (deploy/selfhosted-supabase/
-    # volumes/functions/ is not part of this task) — this only proves the container starts
-    # and the healthcheck TCP port responds. Real function deployment is a later phase.
+
   meta:
     container_name: logic-nexus-meta
-    image: 'supabase/postgres-meta:v0.84.2'
+    image: supabase/postgres-meta:v0.84.2
     restart: unless-stopped
     networks:
       - coolify
@@ -334,79 +248,50 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:8080/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))\""]
-      timeout: 5s
-      interval: 5s
-      retries: 5
-      start_period: 10s
     environment:
       PG_META_PORT: 8080
-      PG_META_DB_URL: 'postgres://supabase_admin:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}'
+      PG_META_DB_URL: postgres://supabase_admin:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
 
   studio:
     container_name: logic-nexus-studio
-    image: 'supabase/studio:2026.09.21-sha-512201d'
+    image: supabase/studio:2026.09.21-sha-512201d
     restart: unless-stopped
     networks:
       - coolify
     mem_limit: 512m
     memswap_limit: 512m
     ports:
-      - '127.0.0.1:${STUDIO_PORT:-3000}:3000/tcp'
+      - "127.0.0.1:${STUDIO_PORT:-3000}:3000/tcp"
     depends_on:
-      meta:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3000/api/profile', (r) => process.exit(r.statusCode === 200 ? 0 : 1))\""]
-      timeout: 5s
-      interval: 5s
-      retries: 5
-      start_period: 15s
+      - meta
     environment:
-      STUDIO_PG_META_URL: 'http://meta:8080'
-      POSTGRES_PASSWORD: '${POSTGRES_PASSWORD}'
-      SUPABASE_URL: 'http://kong:8000'
-      SUPABASE_PUBLIC_URL: '${SUPABASE_PUBLIC_URL}'
-      SUPABASE_ANON_KEY: '${ANON_KEY}'
-      SUPABASE_SERVICE_KEY: '${SERVICE_ROLE_KEY}'
-      LOGFLARE_API_KEY: ''
-      LOGFLARE_URL: ''
-      NEXT_PUBLIC_ENABLE_LOGS: 'false'  db:
+      STUDIO_PG_META_URL: http://meta:8080
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL}
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      LOGFLARE_API_KEY: ""
+      LOGFLARE_URL: ""
+      NEXT_PUBLIC_ENABLE_LOGS: "false"
+
+  db:
     container_name: logic-nexus-db
-    # Image tag verified against upstream docker/docker-compose.yml on this
-    # fetch (2026-08-22) — see note at top of file re: 17.6.1.136 vs the
-    # 17.4.1.037 the plan assumed.
     image: supabase/postgres:17.6.1.136
     restart: unless-stopped
     networks:
       - coolify
     mem_limit: 3g
-    # Caps swap at zero extra headroom beyond mem_limit (memswap_limit is the
-    # combined memory+swap ceiling; setting it equal to mem_limit means no
-    # swap is available at all) — a clean OOM-kill beats swap-thrashing a
-    # database. The other six services now mirror this same pattern (fixed
-    # 2026-08-22 — they originally had no memswap_limit at all, which let
-    # each swap up to 2x its mem_limit).
     memswap_limit: 3g
     volumes:
       - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/migrations/99-realtime.sql:Z
-      # Must be superuser to create event trigger
       - ./volumes/db/webhooks.sql:/docker-entrypoint-initdb.d/init-scripts/98-webhooks.sql:Z
-      # Must be superuser to alter reserved role
       - ./volumes/db/roles.sql:/docker-entrypoint-initdb.d/init-scripts/99-roles.sql:Z
-      # Initialize the database settings with JWT_SECRET and JWT_EXP
       - ./volumes/db/jwt.sql:/docker-entrypoint-initdb.d/init-scripts/99-jwt.sql:Z
-      # PGDATA directory is persisted between restarts (host-created at
-      # runtime; gitignored, never committed — see .gitignore)
       - ./volumes/db/data:/var/lib/postgresql/data:Z
-      # Changes required for internal supabase data such as _analytics
       - ./volumes/db/_supabase.sql:/docker-entrypoint-initdb.d/migrations/97-_supabase.sql:Z
-      # Changes required for Analytics support
       - ./volumes/db/logs.sql:/docker-entrypoint-initdb.d/migrations/99-logs.sql:Z
-      # Changes required for Pooler support
       - ./volumes/db/pooler.sql:/docker-entrypoint-initdb.d/migrations/99-pooler.sql:Z
-      # Named volume persists the pgsodium decryption key between restarts
       - db-config:/etc/postgresql-custom
     healthcheck:
       test:
@@ -437,7 +322,7 @@ services:
         "-c",
         "config_file=/etc/postgresql/postgresql.conf",
         "-c",
-        "log_min_messages=fatal" # prevents Realtime polling queries from appearing in logs
+        "log_min_messages=fatal"
       ]
 
 networks:
