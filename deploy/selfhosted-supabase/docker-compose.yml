@@ -261,7 +261,7 @@ services:
     mem_limit: 512m
     memswap_limit: 512m
     ports:
-      - "127.0.0.1:${STUDIO_PORT:-3000}:3000/tcp"
+      - "127.0.0.1:3010:3000/tcp"
     depends_on:
       - meta
     environment:
