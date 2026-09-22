@@ -274,6 +274,7 @@ services:
       LOGFLARE_API_KEY: ""
       LOGFLARE_URL: ""
       NEXT_PUBLIC_ENABLE_LOGS: "false"
+      NEXT_PUBLIC_IS_PLATFORM: "false"
 
   db:
     container_name: logic-nexus-db
