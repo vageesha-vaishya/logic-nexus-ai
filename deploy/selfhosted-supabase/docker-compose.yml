@@ -323,6 +323,69 @@ services:
     # Known Phase 1 limitation: no functions are deployed yet (deploy/selfhosted-supabase/
     # volumes/functions/ is not part of this task) — this only proves the container starts
     # and the healthcheck TCP port responds. Real function deployment is a later phase.
+  meta:
+    container_name: logic-nexus-meta
+    image: 'supabase/postgres-meta:v0.84.2'
+    restart: unless-stopped
+    networks:
+      - coolify
+    mem_limit: 256m
+    memswap_limit: 256m
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - '--no-verbose'
+        - '--tries=1'
+        - '--spider'
+        - 'http://localhost:8080/health'
+      timeout: 5s
+      interval: 5s
+      retries: 3
+    environment:
+      PG_META_PORT: 8080
+      PG_META_DB_HOST: db
+      PG_META_DB_PORT: 5432
+      PG_META_DB_NAME: '${POSTGRES_DB}'
+      PG_META_DB_USER: supabase_admin
+      PG_META_DB_PASSWORD: '${POSTGRES_PASSWORD}'
+  studio:
+    container_name: logic-nexus-studio
+    image: 'supabase/studio:20241202-602f31f'
+    restart: unless-stopped
+    networks:
+      - coolify
+    mem_limit: 512m
+    memswap_limit: 512m
+    ports:
+      - '127.0.0.1:${STUDIO_PORT:-3000}:3000/tcp'
+    depends_on:
+      meta:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - '--no-verbose'
+        - '--tries=1'
+        - '--spider'
+        - 'http://localhost:3000/api/profile'
+      timeout: 5s
+      interval: 5s
+      retries: 3
+    environment:
+      STUDIO_PG_META_URL: 'http://meta:8080'
+      POSTGRES_PASSWORD: '${POSTGRES_PASSWORD}'
+      SUPABASE_URL: 'http://kong:8000'
+      SUPABASE_PUBLIC_URL: '${SUPABASE_PUBLIC_URL}'
+      SUPABASE_ANON_KEY: '${ANON_KEY}'
+      SUPABASE_SERVICE_KEY: '${SERVICE_ROLE_KEY}'
+      LOGFLARE_API_KEY: ''
+      LOGFLARE_URL: ''
+      NEXT_PUBLIC_ENABLE_LOGS: 'false'
 
   db:
     container_name: logic-nexus-db
